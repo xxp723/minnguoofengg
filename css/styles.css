@@ -59,7 +59,7 @@ body.hide-status-bar #top-status-bar {
    ========================= */
 .phone-frame {
   width: min(390px, 100vw);
-  height: min(844px, 100vh);
+  height: min(844px, 100dvh, 100vh);
   margin: 0 auto;
   background: #000;
   border-radius: 34px;
@@ -146,12 +146,17 @@ body.hide-status-bar #top-status-bar {
 
 .desktop-page {
   flex: 0 0 100%;
-  height: 100%;
+  min-height: 100%;
   scroll-snap-align: start;
   padding: 15px 20px;
   position: relative;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.desktop-page::-webkit-scrollbar {
+  display: none;
 }
 
 /* =========================
@@ -309,18 +314,18 @@ body.hide-status-bar #top-status-bar {
   height: auto;
   background: var(--c-white-rice);
   border: 2px solid var(--c-border);
-  border-radius: 12px;
+  border-radius: 0;
   padding: 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
   position: relative;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08), inset 0 0 0 1px var(--c-border);
   cursor: pointer;
   overflow: hidden;
 }
 .p1-news-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: bold;
   text-align: center;
   border-bottom: 2px solid var(--c-border);
@@ -328,17 +333,22 @@ body.hide-status-bar #top-status-bar {
   margin-bottom: 12px;
   z-index: 1;
   width: 100%;
+  max-width: 6em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .p1-news-content {
   flex: 1;
   writing-mode: vertical-rl;
   text-orientation: upright;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.8;
   letter-spacing: 2px;
   z-index: 1;
   overflow: hidden;
-  align-self: flex-end; /* 从右起 */
+  align-self: flex-end;
+  max-width: 100%;
 }
 
 /* 右侧：2:3 头像框组件 */
@@ -348,6 +358,7 @@ body.hide-status-bar #top-status-bar {
   height: auto;
   background: var(--c-white-rice);
   border: 2px solid var(--c-border);
+  border-radius: 8px;
   padding: 6px;
   position: relative;
   box-shadow: 2px 2px 0px rgba(0,0,0,0.1);
@@ -413,6 +424,7 @@ body.hide-status-bar #top-status-bar {
   padding: 8px;
   gap: 12px;
   position: relative;
+  overflow: hidden;
 }
 
 /* 左侧：剧院名 (竖排奶咖色背景) */
@@ -447,50 +459,53 @@ body.hide-status-bar #top-status-bar {
   display: block;
 }
 
-/* 右侧：文字区 (竖排，从右向左) */
+/* 右侧：文字区 (横向布局) */
 .p2-ticket-text-zone {
   flex: 1;
   display: flex;
-  flex-direction: row-reverse; /* 竖排从右向左的Flex排版 */
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   overflow: hidden;
+  padding: 4px;
 }
 
 /* 右侧标题 */
 .p2-ticket-title {
-  writing-mode: vertical-rl;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: bold;
-  border-left: 2px solid var(--c-border); /* 标题左侧竖线区分正文 */
-  padding-left: 8px;
+  border-bottom: 2px solid var(--c-border);
+  padding-bottom: 6px;
   cursor: text;
-  max-height: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
 }
 
-/* 右侧正文 (三行) */
+/* 右侧正文 */
 .p2-ticket-desc {
-  writing-mode: vertical-rl;
   font-size: 12px;
-  line-height: 1.8;
-  display: flex;
-  justify-content: flex-start;
-  gap: 6px;
+  line-height: 1.6;
   cursor: text;
-  max-height: 100%;
+  overflow: hidden;
+}
+.p2-ticket-desc span {
+  display: block;
 }
 
 /* 底部：奶咖色小印章 */
 .p2-ticket-stamp {
   position: absolute;
-  bottom: 8px;
-  right: 8px;
+  bottom: 3px;
+  right: 3px;
   background: var(--c-milktea);
   border: 1px solid var(--c-border);
-  padding: 2px 6px;
-  font-size: 10px;
+  padding: 1px 4px;
+  font-size: 9px;
   transform: rotate(-5deg);
   box-shadow: 1px 1px 0px rgba(0,0,0,0.2);
   cursor: text;
+  opacity: 0.85;
 }
 
 /* 底部应用区 1x3 (居中排布) */
@@ -508,12 +523,15 @@ body.hide-status-bar #top-status-bar {
    民国车票 (Page 1 extra)
    ========================= */
 .p1-ticket-widget {
-  width: 100%;
+  width: 92%;
+  height: auto;
   background: var(--c-white-rice);
   border: 3px solid var(--c-border);
   padding: 6px;
   box-shadow: 2px 2px 0 rgba(0,0,0,0.12);
   position: relative;
+  margin: 0 auto;
+  margin-bottom: 10px;
 }
 .p1-ticket-widget::before, .p1-ticket-widget::after {
   content: '';
@@ -531,6 +549,7 @@ body.hide-status-bar #top-status-bar {
   gap: 12px;
   align-items: center;
   position: relative;
+  overflow: hidden;
 }
 .p1-ticket-brand {
   writing-mode: vertical-rl;
@@ -541,6 +560,7 @@ body.hide-status-bar #top-status-bar {
   font-size: 16px;
   font-weight: bold;
   letter-spacing: 3px;
+  align-self: center;
 }
 .p1-ticket-body {
   flex: 1;

@@ -88,9 +88,6 @@
           <div class="p1-ticket-widget" id="p1-ticket-trigger" title="点击编辑">
             <div class="p1-ticket-brand" id="cfg-p1-ticket-brand">中华民国长江航运公司</div>
             <div class="p1-ticket-inner">
-              <div class="p1-ticket-img-box">
-                <img class="p1-ticket-img" id="widget-p1-ticket-img" style="display:none;" alt="图片" />
-              </div>
               <div class="p1-ticket-body">
                 <div class="p1-ticket-route">
                   <div class="p1-ticket-date" id="cfg-p1-ticket-date">民国十四年五月初七</div>
@@ -165,21 +162,18 @@
             <span class="app-icon-glyph">世</span>
             <img class="app-custom-img" data-dock-img="worldbook" src="" style="display:none;" alt="世情"/>
           </button>
-          <span class="app-icon-label">世情</span>
         </div>
         <div class="app-icon dock-icon" data-app-id="memory">
           <button class="app-icon-btn dock-btn" type="button" data-open-app="memory">
             <span class="app-icon-glyph">旧</span>
             <img class="app-custom-img" data-dock-img="memory" src="" style="display:none;" alt="旧事"/>
           </button>
-          <span class="app-icon-label">旧事</span>
         </div>
         <div class="app-icon dock-icon" data-app-id="settings">
           <button class="app-icon-btn dock-btn" type="button" data-open-app="settings">
             <span class="app-icon-glyph">设</span>
             <img class="app-custom-img" data-dock-img="settings" src="" style="display:none;" alt="设置"/>
           </button>
-          <span class="app-icon-label">设置</span>
         </div>
       </div>
 
@@ -217,14 +211,6 @@
               </div>
             </div>
             <div class="modal-section" data-modal-section="ticket1">
-              <div class="modal-field">
-                <label>车票图片</label>
-                <div class="modal-img-preview">
-                  <img id="modal-ticket1-preview" style="display:none;" alt="图片预览" />
-                  <div class="modal-img-placeholder" id="modal-ticket1-placeholder">尚未设置</div>
-                </div>
-                <button type="button" class="modal-btn" id="modal-ticket1-upload">上传/URL</button>
-              </div>
               <div class="modal-field">
                 <label>航运公司名称</label>
                 <input id="modal-ticket1-brand-input" type="text" />
@@ -457,7 +443,8 @@
         currentModalMode = mode;
         modal?.classList.remove('hidden');
         modal?.setAttribute('aria-hidden', 'false');
-        modalTitle.textContent = mode === 'avatar' ? '编辑头像' : '编辑报纸';
+        const titleMap = { avatar: '编辑头像', news: '编辑报纸', ticket1: '编辑船票', ticket2: '编辑戏票' };
+        modalTitle.textContent = titleMap[mode] || '编辑';
         showSection(mode);
 
         if (mode === 'avatar') {
@@ -487,15 +474,6 @@
           modalNewsTitleInput.value = title ? title.innerText : '';
             modalNewsContentInput.value = content ? content.innerHTML.replace(/<br\s*\/?>/g, '\n') : '';
         } else if (mode === 'ticket1') {
-          const img = $('widget-p1-ticket-img');
-          if (img && img.style.display !== 'none') {
-            modalTicket1Preview.src = img.src;
-            modalTicket1Preview.style.display = 'block';
-            modalTicket1Placeholder.style.display = 'none';
-          } else {
-            modalTicket1Preview.style.display = 'none';
-            modalTicket1Placeholder.style.display = 'block';
-          }
           modalTicket1Brand.value = $('cfg-p1-ticket-brand')?.innerText || '';
           modalTicket1Date.value = $('cfg-p1-ticket-date')?.innerText || '';
           modalTicket1From.value = $('cfg-p1-ticket-from')?.innerText || '';
@@ -570,7 +548,6 @@
 
       modalAvatarUpload?.addEventListener('click', () => handleUploadClick('avatar'));
       modalNewsUpload?.addEventListener('click', () => handleUploadClick('news'));
-      modalTicket1Upload?.addEventListener('click', () => handleUploadClick('ticket1'));
       modalTicket2Upload?.addEventListener('click', () => handleUploadClick('ticket2'));
       modalClose?.addEventListener('click', hideModal);
       modal?.querySelector('.widget-modal__mask')?.addEventListener('click', hideModal);
@@ -657,10 +634,6 @@
               modalNewsPreview.src = evt.target.result;
               modalNewsPreview.style.display = 'block';
               modalNewsPlaceholder.style.display = 'none';
-            } else if (currentUploadTarget === 'ticket1') {
-              modalTicket1Preview.src = evt.target.result;
-              modalTicket1Preview.style.display = 'block';
-              modalTicket1Placeholder.style.display = 'none';
             } else if (currentUploadTarget === 'ticket2') {
               modalTicket2Preview.src = evt.target.result;
               modalTicket2Preview.style.display = 'block';
