@@ -239,13 +239,16 @@ export class Desktop {
     const modalP1TicketToInput = document.getElementById('modal-p1-ticket-to-input');
     const modalP1TicketInfoInput = document.getElementById('modal-p1-ticket-info-input');
 
-    const modalP2TicketUpload = document.getElementById('modal-p2-ticket-upload');
-    const modalP2TicketPreview = document.getElementById('modal-p2-ticket-preview');
-    const modalP2TicketPlaceholder = document.getElementById('modal-p2-ticket-placeholder');
-    const modalP2TicketBrandInput = document.getElementById('modal-p2-ticket-brand-input');
-    const modalP2TicketTitleInput = document.getElementById('modal-p2-ticket-title-input');
-    const modalP2TicketDescInput = document.getElementById('modal-p2-ticket-desc-input');
-    const modalP2TicketStampInput = document.getElementById('modal-p2-ticket-stamp-input');
+    const modalP2TicketUpload = document.getElementById('modal-ticket2-upload');
+    const modalP2TicketPreview = document.getElementById('modal-ticket2-preview');
+    const modalP2TicketPlaceholder = document.getElementById('modal-ticket2-placeholder');
+    const modalP2TicketBrandInput = document.getElementById('modal-ticket2-brand-input');
+    const modalP2TicketTitleInput = document.getElementById('modal-ticket2-title-input');
+    const modalP2TicketDescInput = document.getElementById('modal-ticket2-desc-input');
+    const modalP2TicketStampInput = document.getElementById('modal-ticket2-stamp-input');
+
+    const modalAvatarDelete = document.getElementById('modal-avatar-delete');
+    const modalP2TicketDelete = document.getElementById('modal-ticket2-delete');
 
     const hideModal = () => {
       if (modal) {
@@ -381,6 +384,18 @@ export class Desktop {
     if (modalP1TicketUpload) modalP1TicketUpload.addEventListener('click', () => handleUploadClick('p1ticket'));
     if (modalP2TicketUpload) modalP2TicketUpload.addEventListener('click', () => handleUploadClick('ticket'));
 
+    // 删除按钮事件
+    if (modalAvatarDelete) modalAvatarDelete.addEventListener('click', () => {
+      this.removeImageFromTarget('avatar');
+      modalAvatarPreview.style.display = 'none';
+      modalAvatarPlaceholder.style.display = 'block';
+    });
+    if (modalP2TicketDelete) modalP2TicketDelete.addEventListener('click', () => {
+      this.removeImageFromTarget('ticket');
+      modalP2TicketPreview.style.display = 'none';
+      modalP2TicketPlaceholder.style.display = 'block';
+    });
+
     if (modalClose) modalClose.addEventListener('click', hideModal);
     modal?.querySelector('.widget-modal__mask')?.addEventListener('click', hideModal);
 
@@ -509,6 +524,20 @@ export class Desktop {
 
     // 从 localStorage 恢复自定义文本和图片
     this.restoreWidgetData();
+  }
+
+  removeImageFromTarget(targetStr) {
+    if (targetStr === 'avatar') {
+      const img = this.container.querySelector('#widget-avatar');
+      const hint = this.container.querySelector('#widget-avatar-hint');
+      if (img) { img.src = ''; img.style.display = 'none'; }
+      if (hint) hint.style.display = 'block';
+      localStorage.removeItem('miniphone_widget_avatar');
+    } else if (targetStr === 'ticket') {
+      const img = this.container.querySelector('#widget-ticket-img');
+      if (img) { img.src = ''; img.style.display = 'none'; }
+      localStorage.removeItem('miniphone_widget_ticket');
+    }
   }
 
   applyImageToTarget(targetStr, src) {
