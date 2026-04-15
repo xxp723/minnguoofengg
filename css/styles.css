@@ -92,7 +92,7 @@ body.hide-status-bar #top-status-bar {
   color: var(--c-text-main);
   position: absolute;
   top: 0; left: 0; right: 0;
-  z-index: 50;
+  z-index: 250;
   letter-spacing: 1px;
 }
 
@@ -744,7 +744,10 @@ body.hide-status-bar #top-status-bar {
 
 .app-window {
   position: absolute;
-  inset: 0;
+  top: var(--status-bar-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: var(--c-bg-wallpaper);
   color: var(--c-text-main);
   transform: translateY(100%);
@@ -990,75 +993,66 @@ body.hide-status-bar #top-status-bar {
 }
 
 /* =========================
-   设置应用卡片式布局
+   设置应用卡片式布局（仿iPhone扁平化）
    ========================= */
 .settings-home {
-  padding: 20px 16px;
-}
-
-.settings-home__title {
-  font-size: 24px;
-  font-weight: bold;
-  margin: 0 0 24px 0;
-  letter-spacing: 1px;
-  text-align: center;
+  padding: 16px 14px;
+  overflow-y: auto;
+  height: 100%;
 }
 
 .settings-cards-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 10px;
 }
 
 .settings-card {
-  background: var(--c-white-rice);
+  background: #fff;
   border: none;
-  border-radius: 20px;
-  padding: 24px 16px;
+  border-radius: 14px;
+  padding: 14px 12px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   cursor: pointer;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 
 .settings-card:active {
-  transform: scale(0.96);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  transform: scale(0.97);
+  box-shadow: 0 0.5px 2px rgba(0,0,0,0.08);
 }
 
 .settings-card__icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  background: var(--c-milktea);
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--c-white-rice);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
-  transition: transform 0.2s ease;
+  flex-shrink: 0;
+  transition: transform 0.18s ease;
+}
+
+.settings-card__icon svg {
+  width: 20px;
+  height: 20px;
 }
 
 .settings-card:active .settings-card__icon {
-  transform: scale(0.9);
+  transform: scale(0.92);
 }
 
 .settings-card__title {
-  font-size: 15px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
   margin: 0;
-}
-
-.settings-card__desc {
-  font-size: 12px;
-  color: #888;
-  text-align: center;
-  line-height: 1.4;
-  margin: 0;
+  color: var(--c-text-main);
 }
 
 /* 设置详情页 */
@@ -1066,6 +1060,8 @@ body.hide-status-bar #top-status-bar {
   display: none;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .settings-detail.is-active {
@@ -1109,64 +1105,13 @@ body.hide-status-bar #top-status-bar {
 .settings-detail__body {
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 16px;
+  padding-bottom: 40px;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 
 .settings-detail__body::-webkit-scrollbar {
   display: none;
-}
-
-/* 底部TAB栏 */
-.settings-tab-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 60px;
-  background: var(--c-white-rice);
-  border-top: 1px solid var(--c-gray-light);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 300;
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.settings-tab-bar.hidden {
-  transform: translateY(100%);
-}
-
-.settings-tab-bar__btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 24px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: transform 0.15s ease;
-}
-
-.settings-tab-bar__btn:active {
-  transform: scale(0.95);
-}
-
-.settings-tab-bar__icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
-  background: var(--c-milktea);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-}
-
-.settings-tab-bar__label {
-  font-size: 11px;
-  color: var(--c-text-main);
-  letter-spacing: 0.5px;
 }

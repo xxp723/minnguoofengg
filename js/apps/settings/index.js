@@ -1,13 +1,20 @@
 /**
  * 文件名: js/apps/settings/index.js
  * 用途: 设置应用（卡片式分类界面）
- *       - 首页：4个圆角卡片式分类选项
+ *       - 首页：4个圆角卡片式分类选项（仿iPhone扁平化）
  *       - 详情页：外观设置、API设置、数据设置、日志
- *       - 底部TAB栏：返回桌面功能
  * 位置: /js/apps/settings/index.js
  * 架构层: 应用层（由 AppManager 动态加载）
  */
 import { Logger } from '../../utils/Logger.js';
+
+// IconPark SVG 图标定义
+const ICONS = {
+  appearance: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><path d="M24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44Z" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round"/><path d="M24 4V24L39.5 37" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 4C24 4 36.2 8.4 39.5 37" fill="none" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14" cy="14" r="3" fill="#F97066"/><circle cx="10" cy="26" r="3" fill="#47B881"/><circle cx="16" cy="36" r="3" fill="#6C6EC7"/><circle cx="30" cy="16" r="3" fill="#FFCB47"/></svg>`,
+  api: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><path d="M40 12L24 4L8 12V36L24 44L40 36V12Z" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round"/><path d="M24 44V24" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 12L24 24" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12L24 24" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 4V14" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  data: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><path d="M42 6H6V20H42V6Z" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round"/><path d="M42 28H6V42H42V28Z" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="13" cy="13" r="2" fill="#333"/><circle cx="13" cy="35" r="2" fill="#333"/><path d="M21 13H35" stroke="#333" stroke-width="3" stroke-linecap="round"/><path d="M21 35H35" stroke="#333" stroke-width="3" stroke-linecap="round"/><path d="M24 20V28" stroke="#333" stroke-width="3" stroke-linecap="round"/></svg>`,
+  logs: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><rect x="8" y="4" width="32" height="40" rx="2" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round"/><path d="M16 16H32" stroke="#333" stroke-width="3" stroke-linecap="round"/><path d="M16 24H32" stroke="#333" stroke-width="3" stroke-linecap="round"/><path d="M16 32H24" stroke="#333" stroke-width="3" stroke-linecap="round"/></svg>`
+};
 
 export async function mount(container, context) {
   const { settings, eventBus } = context;
@@ -21,27 +28,22 @@ export async function mount(container, context) {
     <div class="settings-app-container" style="height: 100%; display: flex; flex-direction: column;">
       <!-- 首页 -->
       <div id="settings-home" class="settings-home">
-        <h2 class="settings-home__title">设置</h2>
         <div class="settings-cards-grid">
           <div class="settings-card" data-page="appearance">
-            <div class="settings-card__icon">🎨</div>
+            <div class="settings-card__icon">${ICONS.appearance}</div>
             <h3 class="settings-card__title">外观设置</h3>
-            <p class="settings-card__desc">壁纸、主题色、图标大小</p>
           </div>
           <div class="settings-card" data-page="api">
-            <div class="settings-card__icon">🔌</div>
+            <div class="settings-card__icon">${ICONS.api}</div>
             <h3 class="settings-card__title">API设置</h3>
-            <p class="settings-card__desc">生图与TTS接口配置</p>
           </div>
           <div class="settings-card" data-page="data">
-            <div class="settings-card__icon">💾</div>
+            <div class="settings-card__icon">${ICONS.data}</div>
             <h3 class="settings-card__title">数据设置</h3>
-            <p class="settings-card__desc">导入导出本地数据</p>
           </div>
           <div class="settings-card" data-page="logs">
-            <div class="settings-card__icon">📋</div>
+            <div class="settings-card__icon">${ICONS.logs}</div>
             <h3 class="settings-card__title">日志</h3>
-            <p class="settings-card__desc">查看系统运行日志</p>
           </div>
         </div>
       </div>
@@ -67,6 +69,14 @@ export async function mount(container, context) {
             <label style="display:flex;align-items:center;gap:10px;font-size:13px;">
               <span style="min-width:70px;">图标大小:</span>
               <input id="setting-icon-size" type="number" min="40" max="96" value="${current.appearance?.iconSize || 56}" style="flex:1;">
+            </label>
+          </section>
+          <section class="ui-card">
+            <h3>状态栏</h3>
+            <p class="ui-muted" style="margin-bottom: 10px;">控制顶部状态栏显示</p>
+            <label style="display:flex;align-items:center;gap:10px;font-size:13px;">
+              <input id="setting-status-bar" type="checkbox" ${localStorage.getItem('miniphone_status_bar_hidden') === '1' ? '' : 'checked'}>
+              <span>显示顶部状态栏</span>
             </label>
           </section>
           <button class="ui-button primary" id="save-appearance" style="width: 100%; margin-top: 10px;">保存外观设置</button>
@@ -139,14 +149,6 @@ export async function mount(container, context) {
           </section>
         </div>
       </div>
-
-      <!-- 底部TAB栏 -->
-      <div id="settings-tab-bar" class="settings-tab-bar">
-        <button class="settings-tab-bar__btn" id="back-to-desktop">
-          <div class="settings-tab-bar__icon">🏠</div>
-          <span class="settings-tab-bar__label">返回桌面</span>
-        </button>
-      </div>
     </div>
   `;
 
@@ -167,8 +169,6 @@ export async function mount(container, context) {
     });
 
     currentPage = page;
-
-    // TAB栏始终显示（仅在关闭设置应用时消失）
   };
 
   // 卡片点击事件
@@ -186,19 +186,20 @@ export async function mount(container, context) {
     });
   });
 
-  // 返回桌面按钮
-  container.querySelector('#back-to-desktop')?.addEventListener('click', () => {
-    // 触发关闭窗口事件
-    const closeBtn = container.closest('.app-window')?.querySelector('.app-window__close');
-    if (closeBtn) {
-      closeBtn.click();
-    }
-  });
-
   // 外观设置保存
   const onSaveAppearance = async () => {
     const themeColor = container.querySelector('#setting-theme-color')?.value || '#4f46e5';
     const iconSize = Number(container.querySelector('#setting-icon-size')?.value || 56);
+    const statusBarChecked = container.querySelector('#setting-status-bar')?.checked;
+
+    // 状态栏显示控制
+    if (statusBarChecked) {
+      localStorage.removeItem('miniphone_status_bar_hidden');
+      document.body.classList.remove('hide-status-bar');
+    } else {
+      localStorage.setItem('miniphone_status_bar_hidden', '1');
+      document.body.classList.add('hide-status-bar');
+    }
 
     await settings.update({
       appearance: {
