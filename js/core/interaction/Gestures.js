@@ -74,7 +74,21 @@ export class Gestures {
 
   onScroll() {
     const width = this.desktopContainer.clientWidth || 1;
-    const pageIndex = Math.round(this.desktopContainer.scrollLeft / width);
+    const scrollLeft = this.desktopContainer.scrollLeft;
+    const pageIndex = Math.round(scrollLeft / width);
+
+    // Apply snap directly to prevent scrolling past limits
+    if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
+    
+    this.scrollTimeout = setTimeout(() => {
+      const targetScrollLeft = pageIndex * width;
+      if (Math.abs(scrollLeft - targetScrollLeft) > 1) {
+        this.desktopContainer.scrollTo({
+          left: targetScrollLeft,
+          behavior: 'smooth'
+        });
+      }
+    }, 150);
 
     if (pageIndex !== this.lastPageIndex) {
       this.lastPageIndex = pageIndex;

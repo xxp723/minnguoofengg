@@ -67,10 +67,14 @@ export async function mount(container, context) {
         `
       )}
       ${createSection(
-        '错误日志',
-        '查看 Logger 记录的最近错误日志。',
+        '日志',
+        '查看系统运行时的所有日志内容，包含错误日志专栏。',
         `
-          <div id="error-log-list" class="ui-muted">暂无错误日志</div>
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <button class="ui-button" id="view-all-logs">查看全部日志</button>
+            <button class="ui-button" id="view-error-logs" style="background:var(--c-milktea);">查看错误日志</button>
+          </div>
+          <div id="log-viewer-area" style="max-height:300px;overflow-y:auto;background:var(--c-white-rice);border:1px solid var(--c-border);padding:8px;font-size:12px;display:none;"></div>
         `
       )}
     </div>
@@ -129,19 +133,44 @@ export async function mount(container, context) {
     Logger.info('导入成功，请返回桌面查看最新状态');
   };
 
-  const renderLogs = () => {
-    const logEl = container.querySelector('#error-log-list');
+  const renderLogs = (type) => {
+    const logEl = container.querySelector('#log-viewer-area');
     if (!logEl) return;
-    const logs = Logger.getErrorLogs();
-    if (!logs.length) {
-      logEl.innerHTML = '暂无错误日志';
+    
+    logEl.style.display = 'block';
+    
+    const logs = localStorage.getItem('miniphone_sys_logs') || '[]';
+    let parsedLogs = [];
+    try {
+      parsedLogs = JSON.parse(logs);
+    } catch(e) {}
+    
+    let filteredLogs = parsedLogs;
+    if (type === 'error') {
+      filteredLogs = parsedLogs.filter(l => l.level === 'error');
+    }
+    
+    if (!filteredLogs.length) {
+      logEl.innerHTML = '暂无相关日志';
       return;
     }
-    logEl.innerHTML = logs
-      .slice(0, 20)
-      .map((item) => `<div style="margin-bottom:6px;">• ${new Date(item.timestamp).toLocaleString()} - ${item.message}</div>`)
+    
+    logEl.innerHTML = filteredLogs
+      .reverse() // 最新在前
+      .slice(0, 100)
+      .map((item) => {
+        const color = item.level === 'error' ? 'red' : (item.level === 'warn' ? 'orange' : 'inherit');
+        return `<div style="margin-bottom:6px;color:${color};border-bottom:1px dashed #ccc;padding-bottom:4px;">
+          [${item.level.toUpperCase()}] ${new Date(item.timestamp).toLocaleString()} <br>
+          ${item.message}
+          ${item.details ? `<pre style="margin:2px 0 0;white-space:pre-wrap;font-size:10px;background:#eee;padding:2px;">${JSON.stringify(item.details)}</pre>` : ''}
+        </div>`;
+      })
       .join('');
   };
+
+  container.querySelector('#view-all-logs')?.addEventListener('click', () => renderLogs('all'));
+  container.querySelector('#view-error-logs')?.addEventListener('click', () => renderLogs('error'));
 
   container.querySelector('#save-appearance')?.addEventListener('click', onSaveAppearance);
   container.querySelector('#save-api')?.addEventListener('click', onSaveApi);

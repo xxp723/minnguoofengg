@@ -45,9 +45,6 @@
 
             <!-- 报纸组件：点击弹窗编辑 -->
             <div class="p1-news-widget" id="news-trigger" title="点击编辑报纸">
-              <div class="p1-news-image" id="widget-news-img-wrap">
-                <img class="p1-news-img" id="widget-news-img" style="display:none;" alt="报纸图片" />
-              </div>
               <div class="p1-news-title" id="cfg-news-title">民国日报</div>
               <div class="p1-news-content" id="cfg-news-content">
                 旧时光里的人事风烟，<br>皆可在此书写。<br>从右到左的竖排，<br>记录你的报纸头条。
@@ -88,9 +85,12 @@
           </div>
 
           <!-- 民国车票组件 -->
-          <div class="p1-ticket-widget" id="p1-ticket">
+          <div class="p1-ticket-widget" id="p1-ticket-trigger" title="点击编辑">
+            <div class="p1-ticket-brand" id="cfg-p1-ticket-brand">中华民国长江航运公司</div>
             <div class="p1-ticket-inner">
-              <div class="p1-ticket-brand" id="cfg-p1-ticket-brand">中华民国长江航运公司</div>
+              <div class="p1-ticket-img-box">
+                <img class="p1-ticket-img" id="widget-p1-ticket-img" style="display:none;" alt="图片" />
+              </div>
               <div class="p1-ticket-body">
                 <div class="p1-ticket-route">
                   <div class="p1-ticket-date" id="cfg-p1-ticket-date">民国十四年五月初七</div>
@@ -106,29 +106,29 @@
                   <span id="cfg-p1-ticket-no">票号：M1925-001</span>
                 </div>
               </div>
-              <div class="p1-ticket-stamp">民国快线</div>
+              <div class="p1-ticket-stamp" id="cfg-p1-ticket-stamp">民国快线</div>
             </div>
           </div>
         </section>
 
         <!-- 第二页 -->
         <section class="desktop-page page-2" data-page-id="page-2">
-          <div class="p2-ticket-widget">
+          <div class="p2-ticket-widget" id="p2-ticket-trigger" title="点击编辑">
             <div class="p2-ticket-inner">
-              <div class="p2-ticket-brand" contenteditable="true" id="cfg-ticket-brand" spellcheck="false">浮生剧院</div>
-              <div class="p2-ticket-img-box" id="ticket-img-trigger" title="点击上传戏票图（本地或URL）">
+              <div class="p2-ticket-brand" id="cfg-ticket-brand">浮生剧院</div>
+              <div class="p2-ticket-img-box">
                 <img class="p2-ticket-img" id="widget-ticket-img" style="display:none;" alt="戏票图" />
               </div>
               <div class="p2-ticket-text-zone">
-                <div class="p2-ticket-title" contenteditable="true" id="cfg-ticket-title" spellcheck="false">旧戏新梦</div>
-                <div class="p2-ticket-desc" contenteditable="true" id="cfg-ticket-desc" spellcheck="false">
+                <div class="p2-ticket-title" id="cfg-ticket-title">旧戏新梦</div>
+                <div class="p2-ticket-desc" id="cfg-ticket-desc">
                   <span>首映：辛已年五月廿十</span>
                   <span>地点：渝州县横河街</span>
                   <span>剧目：经年旧事，浮生若梦</span>
                 </div>
               </div>
             </div>
-            <div class="p2-ticket-stamp" contenteditable="true" id="cfg-ticket-stamp" spellcheck="false">No.001925 凭券入场</div>
+            <div class="p2-ticket-stamp" id="cfg-ticket-stamp">No.001925 凭券入场</div>
           </div>
 
           <!-- 三个应用：戏笔、梦笺、游戏 -->
@@ -208,20 +208,76 @@
             </div>
             <div class="modal-section" data-modal-section="news">
               <div class="modal-field">
-                <label>报纸图片</label>
-                <div class="modal-img-preview">
-                  <img id="modal-news-preview" style="display:none;" alt="报纸预览" />
-                  <div class="modal-img-placeholder" id="modal-news-placeholder">尚未设置</div>
-                </div>
-                <button type="button" class="modal-btn" id="modal-news-upload">上传/URL</button>
-              </div>
-              <div class="modal-field">
                 <label>标题</label>
                 <input id="modal-news-title-input" type="text" placeholder="报纸标题" />
               </div>
               <div class="modal-field">
                 <label>正文</label>
                 <textarea id="modal-news-content-input" rows="4" placeholder="报纸正文，支持换行"></textarea>
+              </div>
+            </div>
+            <div class="modal-section" data-modal-section="ticket1">
+              <div class="modal-field">
+                <label>车票图片</label>
+                <div class="modal-img-preview">
+                  <img id="modal-ticket1-preview" style="display:none;" alt="图片预览" />
+                  <div class="modal-img-placeholder" id="modal-ticket1-placeholder">尚未设置</div>
+                </div>
+                <button type="button" class="modal-btn" id="modal-ticket1-upload">上传/URL</button>
+              </div>
+              <div class="modal-field">
+                <label>航运公司名称</label>
+                <input id="modal-ticket1-brand-input" type="text" />
+              </div>
+              <div class="modal-field">
+                <label>日期</label>
+                <input id="modal-ticket1-date-input" type="text" />
+              </div>
+              <div class="modal-field" style="display:flex;gap:10px;flex-direction:row;">
+                <div style="flex:1;"><label>起点</label><input id="modal-ticket1-from-input" type="text" /></div>
+                <div style="flex:1;"><label>终点</label><input id="modal-ticket1-to-input" type="text" /></div>
+              </div>
+              <div class="modal-field">
+                <label>乘客</label>
+                <input id="modal-ticket1-name-input" type="text" />
+              </div>
+              <div class="modal-field">
+                <label>开航</label>
+                <input id="modal-ticket1-time-input" type="text" />
+              </div>
+              <div class="modal-field">
+                <label>票号</label>
+                <input id="modal-ticket1-no-input" type="text" />
+              </div>
+              <div class="modal-field">
+                <label>印章内容</label>
+                <input id="modal-ticket1-stamp-input" type="text" />
+              </div>
+            </div>
+            <div class="modal-section" data-modal-section="ticket2">
+              <div class="modal-field">
+                <label>戏票图片</label>
+                <div class="modal-img-preview">
+                  <img id="modal-ticket2-preview" style="display:none;" alt="图片预览" />
+                  <div class="modal-img-placeholder" id="modal-ticket2-placeholder">尚未设置</div>
+                </div>
+                <button type="button" class="modal-btn" id="modal-ticket2-upload">上传/URL</button>
+              </div>
+              <div class="modal-field">
+                <label>剧院名称</label>
+                <input id="modal-ticket2-brand-input" type="text" />
+              </div>
+              <div class="modal-field">
+                <label>戏票标题</label>
+                <input id="modal-ticket2-title-input" type="text" />
+              </div>
+              <div class="modal-field">
+                <label>戏票内容</label>
+                <textarea id="modal-ticket2-desc-input" rows="3"></textarea>
+              </div>
+              <div class="modal-field">
+                <label>印章内容</label>
+                <input id="modal-ticket2-stamp-input" type="text" />
               </div>
             </div>
           </div>
@@ -364,10 +420,28 @@
       const modalAvatarPlaceholder = $('modal-avatar-placeholder');
       const modalAvatarDescInput = $('modal-avatar-desc-input');
       const modalNewsUpload = $('modal-news-upload');
-      const modalNewsPreview = $('modal-news-preview');
-      const modalNewsPlaceholder = $('modal-news-placeholder');
       const modalNewsTitleInput = $('modal-news-title-input');
       const modalNewsContentInput = $('modal-news-content-input');
+
+      const modalTicket1Upload = $('modal-ticket1-upload');
+      const modalTicket1Preview = $('modal-ticket1-preview');
+      const modalTicket1Placeholder = $('modal-ticket1-placeholder');
+      const modalTicket1Brand = $('modal-ticket1-brand-input');
+      const modalTicket1Date = $('modal-ticket1-date-input');
+      const modalTicket1From = $('modal-ticket1-from-input');
+      const modalTicket1To = $('modal-ticket1-to-input');
+      const modalTicket1Name = $('modal-ticket1-name-input');
+      const modalTicket1Time = $('modal-ticket1-time-input');
+      const modalTicket1No = $('modal-ticket1-no-input');
+      const modalTicket1Stamp = $('modal-ticket1-stamp-input');
+
+      const modalTicket2Upload = $('modal-ticket2-upload');
+      const modalTicket2Preview = $('modal-ticket2-preview');
+      const modalTicket2Placeholder = $('modal-ticket2-placeholder');
+      const modalTicket2Brand = $('modal-ticket2-brand-input');
+      const modalTicket2Title = $('modal-ticket2-title-input');
+      const modalTicket2Desc = $('modal-ticket2-desc-input');
+      const modalTicket2Stamp = $('modal-ticket2-stamp-input');
 
       const fileInput = $('sys-file-upload');
       let currentUploadTarget = null;
@@ -411,7 +485,52 @@
           const title = $('cfg-news-title');
           const content = $('cfg-news-content');
           modalNewsTitleInput.value = title ? title.innerText : '';
-          modalNewsContentInput.value = content ? content.innerHTML.replace(/<br\s*\/?>/g, '\n') : '';
+            modalNewsContentInput.value = content ? content.innerHTML.replace(/<br\s*\/?>/g, '\n') : '';
+        } else if (mode === 'ticket1') {
+          const img = $('widget-p1-ticket-img');
+          if (img && img.style.display !== 'none') {
+            modalTicket1Preview.src = img.src;
+            modalTicket1Preview.style.display = 'block';
+            modalTicket1Placeholder.style.display = 'none';
+          } else {
+            modalTicket1Preview.style.display = 'none';
+            modalTicket1Placeholder.style.display = 'block';
+          }
+          modalTicket1Brand.value = $('cfg-p1-ticket-brand')?.innerText || '';
+          modalTicket1Date.value = $('cfg-p1-ticket-date')?.innerText || '';
+          modalTicket1From.value = $('cfg-p1-ticket-from')?.innerText || '';
+          modalTicket1To.value = $('cfg-p1-ticket-to')?.innerText || '';
+          
+          const tName = $('cfg-p1-ticket-name')?.innerText || '';
+          const tTime = $('cfg-p1-ticket-time')?.innerText || '';
+          const tNo = $('cfg-p1-ticket-no')?.innerText || '';
+          
+          modalTicket1Name.value = tName;
+          modalTicket1Time.value = tTime;
+          modalTicket1No.value = tNo;
+          
+          modalTicket1Stamp.value = $('cfg-p1-ticket-stamp')?.innerText || '';
+        } else if (mode === 'ticket2') {
+          const img = $('widget-ticket-img');
+          if (img && img.style.display !== 'none') {
+            modalTicket2Preview.src = img.src;
+            modalTicket2Preview.style.display = 'block';
+            modalTicket2Placeholder.style.display = 'none';
+          } else {
+            modalTicket2Preview.style.display = 'none';
+            modalTicket2Placeholder.style.display = 'block';
+          }
+          modalTicket2Brand.value = $('cfg-ticket-brand')?.innerText || '';
+          modalTicket2Title.value = $('cfg-ticket-title')?.innerText || '';
+          
+          const descSpans = document.querySelectorAll('#cfg-ticket-desc span');
+          let descText = '';
+          descSpans.forEach(span => {
+            descText += span.innerText + '\n';
+          });
+          modalTicket2Desc.value = descText.trim();
+          
+          modalTicket2Stamp.value = $('cfg-ticket-stamp')?.innerText || '';
         }
       };
 
@@ -446,10 +565,13 @@
 
       $('avatar-trigger')?.addEventListener('click', () => openModal('avatar'));
       $('news-trigger')?.addEventListener('click', () => openModal('news'));
-      $('ticket-img-trigger')?.addEventListener('click', () => handleUploadClick('ticket'));
+      $('p1-ticket-trigger')?.addEventListener('click', () => openModal('ticket1'));
+      $('p2-ticket-trigger')?.addEventListener('click', () => openModal('ticket2'));
 
       modalAvatarUpload?.addEventListener('click', () => handleUploadClick('avatar'));
       modalNewsUpload?.addEventListener('click', () => handleUploadClick('news'));
+      modalTicket1Upload?.addEventListener('click', () => handleUploadClick('ticket1'));
+      modalTicket2Upload?.addEventListener('click', () => handleUploadClick('ticket2'));
       modalClose?.addEventListener('click', hideModal);
       modal?.querySelector('.widget-modal__mask')?.addEventListener('click', hideModal);
 
@@ -476,6 +598,45 @@
               contentEl.innerHTML = html;
               localStorage.setItem('miniphone_widget_cfg-news-content', contentEl.innerHTML);
             }
+          } else if (currentModalMode === 'ticket1') {
+            const saveText = (id, val) => {
+              const el = $(id);
+              if (el) {
+                el.innerText = val;
+                localStorage.setItem('miniphone_widget_' + id, el.innerHTML);
+              }
+            };
+            saveText('cfg-p1-ticket-brand', modalTicket1Brand.value || '');
+            saveText('cfg-p1-ticket-date', modalTicket1Date.value || '');
+            saveText('cfg-p1-ticket-from', modalTicket1From.value || '');
+            saveText('cfg-p1-ticket-to', modalTicket1To.value || '');
+            saveText('cfg-p1-ticket-name', modalTicket1Name.value || '');
+            saveText('cfg-p1-ticket-time', modalTicket1Time.value || '');
+            saveText('cfg-p1-ticket-no', modalTicket1No.value || '');
+            saveText('cfg-p1-ticket-stamp', modalTicket1Stamp.value || '');
+          } else if (currentModalMode === 'ticket2') {
+            const saveText = (id, val) => {
+              const el = $(id);
+              if (el) {
+                el.innerText = val;
+                localStorage.setItem('miniphone_widget_' + id, el.innerHTML);
+              }
+            };
+            saveText('cfg-ticket-brand', modalTicket2Brand.value || '');
+            saveText('cfg-ticket-title', modalTicket2Title.value || '');
+            saveText('cfg-ticket-stamp', modalTicket2Stamp.value || '');
+            
+            const descEl = $('cfg-ticket-desc');
+            if (descEl) {
+              const lines = (modalTicket2Desc.value || '').split('\n').filter(l => l.trim() !== '');
+              descEl.innerHTML = '';
+              lines.forEach(line => {
+                const span = document.createElement('span');
+                span.innerText = line;
+                descEl.appendChild(span);
+              });
+              localStorage.setItem('miniphone_widget_cfg-ticket-desc', descEl.innerHTML);
+            }
           }
           hideModal();
         });
@@ -496,6 +657,14 @@
               modalNewsPreview.src = evt.target.result;
               modalNewsPreview.style.display = 'block';
               modalNewsPlaceholder.style.display = 'none';
+            } else if (currentUploadTarget === 'ticket1') {
+              modalTicket1Preview.src = evt.target.result;
+              modalTicket1Preview.style.display = 'block';
+              modalTicket1Placeholder.style.display = 'none';
+            } else if (currentUploadTarget === 'ticket2') {
+              modalTicket2Preview.src = evt.target.result;
+              modalTicket2Preview.style.display = 'block';
+              modalTicket2Placeholder.style.display = 'none';
             }
             fileInput.value = '';
           };
