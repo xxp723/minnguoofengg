@@ -1,13 +1,12 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
+<head><meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#EAE4D3" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="小手机" />
-  <title>民国纪事 - MiniPhone</title>
+  <title>民国纪事- MiniPhone</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="assets/icons/icon-192.png" type="image/png" />
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
@@ -16,7 +15,7 @@
 <body>
   <div class="phone-frame">
     <div class="screen" id="screen-root">
-      <!-- 顶部状态栏（可在设置中隐藏/显示） -->
+      <!--顶部状态栏（可在设置中隐藏/显示） -->
       <div id="top-status-bar" class="status-bar">
         <div class="status-left">
           <span id="sys-time">00:00</span>
@@ -24,8 +23,7 @@
         <div class="status-right">
           <div class="battery-icon">
             <div id="battery-level" class="battery-level" style="width: 100%;"></div>
-          </div>
-        </div>
+          </div></div>
       </div>
 
       <!-- 桌面容器：静态两页结构，可直接 file:// 预览 -->
@@ -52,36 +50,35 @@
               <div class="p1-news-title" id="cfg-news-title">民国日报</div>
               <div class="p1-news-content" id="cfg-news-content">
                 旧时光里的人事风烟，<br>皆可在此书写。<br>从右到左的竖排，<br>记录你的报纸头条。
-              </div>
-            </div>
+              </div></div>
           </div>
 
           <!-- 四个应用：闲谈、档案、茶馆、观书 -->
           <div class="p1-apps-row">
             <div class="app-icon" draggable="true" data-app-id="chat" title="闲谈">
               <button class="app-icon-btn" type="button" data-open-app="chat" aria-label="打开闲谈">
-                <span class="app-icon-glyph">闲</span>
+                <span class="app-icon-glyph"><svg width="28" height="28" viewBox="0 0 48 48" fill="none"><path d="M44 6H4v28h14l68l6-8h14V6Z" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><line x1="14" y1="18" x2="34" y2="18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="14" y1="26" x2="28" y2="26" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></span>
                 <img class="app-custom-img" data-app-img="chat" src="" style="display:none;" alt="闲谈" />
               </button>
               <span class="app-icon-label">闲谈</span>
             </div>
             <div class="app-icon" draggable="true" data-app-id="archive" title="档案">
               <button class="app-icon-btn" type="button" data-open-app="archive" aria-label="打开档案">
-                <span class="app-icon-glyph">档</span>
+                <span class="app-icon-glyph"><svg width="28" height="28" viewBox="0 0 48 48" fill="none"><rect x="4" y="10" width="40" height="6" rx="1" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M8 16v22h32V16" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><line x1="20" y1="26" x2="28" y2="26" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></span>
                 <img class="app-custom-img" data-app-img="archive" src="" style="display:none;" alt="档案" />
               </button>
               <span class="app-icon-label">档案</span>
             </div>
             <div class="app-icon" draggable="true" data-app-id="forum" title="茶馆">
               <button class="app-icon-btn" type="button" data-open-app="forum" aria-label="打开茶馆">
-                <span class="app-icon-glyph">茶</span>
+                <span class="app-icon-glyph"><svg width="28" height="28" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="12" r="6" stroke="currentColor" stroke-width="3"/><path d="M36 42c0-6.6-5.4-12-12-12S12 35.4 12 42" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="39" cy="14" r="4" stroke="currentColor" stroke-width="3"/><path d="M44 38c0-4-2.7-7-6-7" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="9" cy="14" r="4" stroke="currentColor" stroke-width="3"/><path d="M4 38c0-4 2.7-7 6-7" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></span>
                 <img class="app-custom-img" data-app-img="forum" src="" style="display:none;" alt="茶馆" />
               </button>
               <span class="app-icon-label">茶馆</span>
             </div>
             <div class="app-icon" draggable="true" data-app-id="reader" title="观书">
               <button class="app-icon-btn" type="button" data-open-app="reader" aria-label="打开观书">
-                <span class="app-icon-glyph">书</span>
+                <span class="app-icon-glyph"><svg width="28" height="28" viewBox="0 0 48 48" fill="none"><path d="M4 8h16c2.2 0 4 1.8 4 4v28c-2.2-2-5.4-2-8-2H4V8Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M44 8H28c-2.2 0-4 1.8-4 4v28c2.2-2 5.4-2 8-2h12V8Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg></span>
                 <img class="app-custom-img" data-app-img="reader" src="" style="display:none;" alt="观书" />
               </button>
               <span class="app-icon-label">观书</span>
@@ -118,7 +115,7 @@
               <div class="p2-ticket-brand" id="cfg-ticket-brand">浮生剧院</div>
               <div class="p2-ticket-img-box">
                 <img class="p2-ticket-img" id="widget-ticket-img" style="display:none;" alt="戏票图" />
-                <div class="p2-ticket-stamp" id="cfg-ticket-stamp">No.001925 凭券入场</div>
+                <div class="p2-ticket-stamp" id="cfg-ticket-stamp">No.001925凭券入场</div>
               </div>
               <div class="p2-ticket-text-zone">
                 <div class="p2-ticket-title" id="cfg-ticket-title">旧戏新梦</div>
@@ -135,21 +132,21 @@
           <div class="p2-apps-row">
             <div class="app-icon" draggable="true" data-app-id="doujin" title="戏笔">
               <button class="app-icon-btn" type="button" data-open-app="doujin" aria-label="打开戏笔">
-                <span class="app-icon-glyph">戏</span>
+                <span class="app-icon-glyph"><svg width="28" height="28" viewBox="0 0 48 48" fill="none"><path d="M7 42l3-12L34 6l6 6L16 36L7 42Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><line x1="30" y1="10" x2="38" y2="18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="10" y1="30" x2="18" y2="38" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></span>
                 <img class="app-custom-img" data-app-img="doujin" src="" style="display:none;" alt="戏笔" />
               </button>
               <span class="app-icon-label">戏笔</span>
             </div>
             <div class="app-icon" draggable="true" data-app-id="textgame" title="梦笺">
               <button class="app-icon-btn" type="button" data-open-app="textgame" aria-label="打开梦笺">
-                <span class="app-icon-glyph">梦</span>
+                <span class="app-icon-glyph"><svg width="28" height="28" viewBox="0 0 48 48" fill="none"><rect x="8" y="4" width="32" height="40" rx="2" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><line x1="16" y1="14" x2="32" y2="14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="16" y1="22" x2="32" y2="22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="16" y1="30" x2="26" y2="30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></span>
                 <img class="app-custom-img" data-app-img="textgame" src="" style="display:none;" alt="梦笺" />
               </button>
               <span class="app-icon-label">梦笺</span>
             </div>
             <div class="app-icon" draggable="true" data-app-id="game" title="游戏">
               <button class="app-icon-btn" type="button" data-open-app="game" aria-label="打开游戏">
-                <span class="app-icon-glyph">游</span>
+                <span class="app-icon-glyph"><svg width="28" height="28" viewBox="0 0 48 48" fill="none"><rect x="4" y="14" width="40" height="22" rx="8" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="16" cy="25" r="3" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="25" r="3" stroke="currentColor" stroke-width="3"/><line x1="23" y1="21" x2="25" y2="21" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="23" y1="29" x2="25" y2="29" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></span>
                 <img class="app-custom-img" data-app-img="game" src="" style="display:none;" alt="游戏" />
               </button>
               <span class="app-icon-label">游戏</span>
@@ -162,19 +159,19 @@
       <div id="dock-container" class="dock-container">
         <div class="app-icon dock-icon" data-app-id="worldbook">
           <button class="app-icon-btn dock-btn" type="button" data-open-app="worldbook">
-            <span class="app-icon-glyph">世</span>
+            <span class="app-icon-glyph"><svg width="28" height="28" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="3"/><ellipse cx="24" cy="24" rx="9" ry="20" stroke="currentColor" stroke-width="3"/><line x1="6" y1="18" x2="42" y2="18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="6" y1="30" x2="42" y2="30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></span>
             <img class="app-custom-img" data-dock-img="worldbook" src="" style="display:none;" alt="世情"/>
           </button>
         </div>
         <div class="app-icon dock-icon" data-app-id="memory">
           <button class="app-icon-btn dock-btn" type="button" data-open-app="memory">
-            <span class="app-icon-glyph">旧</span>
+            <span class="app-icon-glyph"><svg width="28" height="28" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="3"/><polyline points="24,14 24,24 32,30" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
             <img class="app-custom-img" data-dock-img="memory" src="" style="display:none;" alt="旧事"/>
           </button>
         </div>
         <div class="app-icon dock-icon" data-app-id="settings">
           <button class="app-icon-btn dock-btn" type="button" data-open-app="settings">
-            <span class="app-icon-glyph">设</span>
+            <span class="app-icon-glyph"><svg width="28" height="28" viewBox="0 0 48 48" fill="none"><path d="M18.3 6.1L1711.4a1313 0 0 0-4.4 2.5l-5.1-1.7L418.5l3.8 3.6a13 13 0 0 0 0 3.8L4 29.5l3.56.3l5.1-1.7a13 13 0 0 0 4.4 2.5l1.3 5.3h7.4l1.3-5.3a13 13 0 0 0 4.4-2.5l5.1 1.7l3.5-6.3l-3.8-3.6a13 13 0 0 0 0-3.8l3.8-3.6l-3.5-6.3l-5.1 1.7a13 13 0 0 0-4.4-2.5L25.7 6.1h-7.4Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="24" cy="24" r="5" stroke="currentColor" stroke-width="3"/></svg></span>
             <img class="app-custom-img" data-dock-img="settings" src="" style="display:none;" alt="设置"/>
           </button>
         </div>
@@ -265,8 +262,7 @@
               <div class="modal-field">
                 <label>戏票内容</label>
                 <textarea id="modal-ticket2-desc-input" rows="3"></textarea>
-              </div>
-              <div class="modal-field">
+              </div><div class="modal-field">
                 <label>印章内容</label>
                 <input id="modal-ticket2-stamp-input" type="text" />
               </div>
@@ -295,12 +291,15 @@
       const statusHidden = localStorage.getItem('miniphone_status_bar_hidden') === '1';
       if (statusHidden) document.body.classList.add('hide-status-bar');
 
+      // 全屏模式控制（与设置应用对接：localStorage miniphone_fullscreen = '1'）
+      const fullscreenOn = localStorage.getItem('miniphone_fullscreen') === '1';
+      if (fullscreenOn) document.body.classList.add('fullscreen-mode');
+
       // 壁纸（与设置应用对接：localStorage miniphone_wallpaper）
       const screen = $('screen-root');
       const savedWallpaper = localStorage.getItem('miniphone_wallpaper');
       if (screen && savedWallpaper) {
-        screen.style.backgroundImage = `url(${savedWallpaper})`;
-        screen.style.backgroundSize = 'cover';
+        screen.style.backgroundImage = `url(${savedWallpaper})`;screen.style.backgroundSize = 'cover';
         screen.style.backgroundPosition = 'center';
       }
 
@@ -316,7 +315,7 @@
         const day = days[now.getDay()];
 
         const timeStr = `${hh}:${mm}`;
-        const dateStr = `${year}年${month}月${date}日 星期${day}`;
+        const dateStr = `${year}年${month}月${date}日星期${day}`;
 
         const topTime = $('sys-time');
         const widgetTime = $('widget-time');
@@ -351,8 +350,7 @@
           const img = $('widget-avatar');
           const hint = $('widget-avatar-hint');
           if (img) { img.src = src; img.style.display = 'block'; }
-          if (hint) hint.style.display = 'none';
-          localStorage.setItem('miniphone_widget_avatar', src);
+          if (hint) hint.style.display = 'none';localStorage.setItem('miniphone_widget_avatar', src);
         } else if (target === 'ticket' || target === 'ticket2') {
           const img = $('widget-ticket-img');
           if (img) { img.src = src; img.style.display = 'block'; }
@@ -475,8 +473,7 @@
           } else {
             modalAvatarPreview.style.display = 'none';
             modalAvatarPlaceholder.style.display = 'block';
-          }
-          const desc = $('cfg-avatar-desc');
+          }const desc = $('cfg-avatar-desc');
           modalAvatarDescInput.value = desc ? desc.innerText : '';
         } else if (mode === 'news') {
           const img = $('widget-news-img');
@@ -518,14 +515,12 @@
           }
           modalTicket2Brand.value = $('cfg-ticket-brand')?.innerText || '';
           modalTicket2Title.value = $('cfg-ticket-title')?.innerText || '';
-          
           const descSpans = document.querySelectorAll('#cfg-ticket-desc span');
           let descText = '';
           descSpans.forEach(span => {
             descText += span.innerText + '\n';
           });
           modalTicket2Desc.value = descText.trim();
-          
           modalTicket2Stamp.value = $('cfg-ticket-stamp')?.innerText || '';
         }
       };
@@ -549,8 +544,7 @@
               modalAvatarPreview.src = url.trim();
               modalAvatarPreview.style.display = 'block';
               modalAvatarPlaceholder.style.display = 'none';
-            }
-            if (target === 'news') {
+            }if (target === 'news') {
               modalNewsPreview.src = url.trim();
               modalNewsPreview.style.display = 'block';
               modalNewsPlaceholder.style.display = 'none';
@@ -673,14 +667,13 @@
               modalTicket2Preview.src = evt.target.result;
               modalTicket2Preview.style.display = 'block';
               modalTicket2Placeholder.style.display = 'none';
-            }
-            fileInput.value = '';
+            }fileInput.value = '';
           };
           reader.readAsDataURL(file);
         }
       });
 
-      // 如果未加载主 JS，给应用按钮一个提示
+      // 如果未加载主JS，给应用按钮一个提示
       document.querySelectorAll('[data-open-app]').forEach(btn => {
         btn.addEventListener('click', () => {
           if (!window.__MINIPHONE_APP_READY__) {

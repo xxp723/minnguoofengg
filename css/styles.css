@@ -1115,3 +1115,16 @@ body.hide-status-bar #top-status-bar {
 .settings-detail__body::-webkit-scrollbar {
   display: none;
 }
+
+/* =========================
+   全屏显示模式
+   ========================= */
+body.fullscreen-mode .phone-frame {
+  width: 100vw;
+  height: 100dvh;
+  height: 100vh;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  margin: 0;
+}

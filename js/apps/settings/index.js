@@ -1,10 +1,10 @@
 /**
  * 文件名: js/apps/settings/index.js
  * 用途: 设置应用（卡片式分类界面）
- *       - 首页：4个圆角卡片式分类选项（仿iPhone扁平化）
+ *- 首页：4个圆角卡片式分类选项（仿iPhone扁平化）
  *       - 详情页：外观设置、API设置、数据设置、日志
  * 位置: /js/apps/settings/index.js
- * 架构层: 应用层（由 AppManager 动态加载）
+ * 架构层: 应用层（由AppManager 动态加载）
  */
 import { Logger } from '../../utils/Logger.js';
 
@@ -51,7 +51,7 @@ export async function mount(container, context) {
       <!-- 外观设置详情页 -->
       <div id="settings-appearance" class="settings-detail">
         <div class="settings-detail__header">
-          <button class="settings-detail__back">←</button>
+          <button class="settings-detail__back">\u2190</button>
           <h3 class="settings-detail__title">外观设置</h3>
         </div>
         <div class="settings-detail__body">
@@ -79,6 +79,14 @@ export async function mount(container, context) {
               <span>显示顶部状态栏</span>
             </label>
           </section>
+          <section class="ui-card">
+            <h3>全屏显示</h3>
+            <p class="ui-muted" style="margin-bottom: 10px;">去除小手机外框限制，以全屏模式显示</p>
+            <label style="display:flex;align-items:center;gap:10px;font-size:13px;">
+              <input id="setting-fullscreen" type="checkbox" ${localStorage.getItem('miniphone_fullscreen') === '1' ? 'checked' : ''}>
+              <span>启用全屏显示模式</span>
+            </label>
+          </section>
           <button class="ui-button primary" id="save-appearance" style="width: 100%; margin-top: 10px;">保存外观设置</button>
         </div>
       </div>
@@ -86,12 +94,12 @@ export async function mount(container, context) {
       <!-- API设置详情页 -->
       <div id="settings-api" class="settings-detail">
         <div class="settings-detail__header">
-          <button class="settings-detail__back">←</button>
+          <button class="settings-detail__back">\u2190</button>
           <h3 class="settings-detail__title">API设置</h3>
         </div>
         <div class="settings-detail__body">
           <section class="ui-card">
-            <h3>生图 API</h3>
+            <h3>生图API</h3>
             <p class="ui-muted" style="margin-bottom: 10px;">配置文生图接口</p>
             <div style="display:grid;gap:10px;">
               <input id="api-image-url" type="text" placeholder="生图 API Base URL" value="${current.api?.textToImage?.baseUrl || ''}">
@@ -113,12 +121,12 @@ export async function mount(container, context) {
       <!-- 数据设置详情页 -->
       <div id="settings-data" class="settings-detail">
         <div class="settings-detail__header">
-          <button class="settings-detail__back">←</button>
+          <button class="settings-detail__back">\u2190</button>
           <h3 class="settings-detail__title">数据设置</h3>
         </div>
         <div class="settings-detail__body">
           <section class="ui-card">
-            <h3>数据导入 / 导出</h3>
+            <h3>数据导入/ 导出</h3>
             <p class="ui-muted" style="margin-bottom: 10px;">导出或导入小手机本地数据（桌面配置、设置、记忆、应用数据、日志）</p>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
               <button class="ui-button" id="export-data">导出数据(JSON)</button>
@@ -134,7 +142,7 @@ export async function mount(container, context) {
       <!-- 日志详情页 -->
       <div id="settings-logs" class="settings-detail">
         <div class="settings-detail__header">
-          <button class="settings-detail__back">←</button>
+          <button class="settings-detail__back">\u2190</button>
           <h3 class="settings-detail__title">日志</h3>
         </div>
         <div class="settings-detail__body">
@@ -191,6 +199,7 @@ export async function mount(container, context) {
     const themeColor = container.querySelector('#setting-theme-color')?.value || '#4f46e5';
     const iconSize = Number(container.querySelector('#setting-icon-size')?.value || 56);
     const statusBarChecked = container.querySelector('#setting-status-bar')?.checked;
+    const fullscreenChecked = container.querySelector('#setting-fullscreen')?.checked;
 
     // 状态栏显示控制
     if (statusBarChecked) {
@@ -199,6 +208,15 @@ export async function mount(container, context) {
     } else {
       localStorage.setItem('miniphone_status_bar_hidden', '1');
       document.body.classList.add('hide-status-bar');
+    }
+
+    // 全屏显示控制
+    if (fullscreenChecked) {
+      localStorage.setItem('miniphone_fullscreen', '1');
+      document.body.classList.add('fullscreen-mode');
+    } else {
+      localStorage.removeItem('miniphone_fullscreen');
+      document.body.classList.remove('fullscreen-mode');
     }
 
     await settings.update({
@@ -239,8 +257,7 @@ export async function mount(container, context) {
     a.href = url;
     a.download = `miniphone-backup-${Date.now()}.json`;
     a.click();
-    URL.revokeObjectURL(url);
-  };
+    URL.revokeObjectURL(url);};
 
   // 数据导入
   const onImport = async (ev) => {
@@ -272,7 +289,7 @@ export async function mount(container, context) {
     }
     
     if (!filteredLogs.length) {
-      logEl.innerHTML = '<div style="text-align:center;color:#999;padding:20px;">暂无相关日志</div>';
+      logEl.innerHTML = '<div style="text-align:center;color:#999;padding:20px;">\u6682\u65E0\u76F8\u5173\u65E5\u5FD7</div>';
       return;
     }
     

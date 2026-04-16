@@ -17,7 +17,7 @@ export function createAppIcon(appMeta) {
   button.type = 'button';
   button.setAttribute('data-open-app', appMeta.id);
   button.setAttribute('aria-label', `打开${appMeta.name}`);
-  button.textContent = appMeta.icon;
+  button.innerHTML = appMeta.icon;
 
   const label = document.createElement('span');
   label.className = 'app-icon-label';
