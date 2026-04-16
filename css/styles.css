@@ -1043,7 +1043,7 @@ body.hide-status-bar #top-status-bar {
 
 .settings-card {
   background: var(--c-white-rice);
-  border: 1px solid var(--c-gray-light);
+  border:1px solid var(--c-gray-light);
   border-radius: 14px;
   padding: 14px 12px;
   display: flex;
@@ -1168,7 +1168,7 @@ body.fullscreen-mode .app-window {
 }
 
 /* =========================
-   iOS 风格 Toggle 开关
+   iOS风格滑动开关 (Toggle Switch)
    ========================= */
 .toggle-switch {
   position: relative;
@@ -1206,12 +1206,11 @@ body.fullscreen-mode .app-window {
   bottom: 3px;
   background-color: #fff;
   border-radius: 50%;
-  transition: transform 0.3s ease;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform 0.3s ease;box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 
 .toggle-switch input:checked + .toggle-slider {
-  background-color: #000;
+  background-color: #1a1a1a;
 }
 
 .toggle-switch input:checked + .toggle-slider::before {
