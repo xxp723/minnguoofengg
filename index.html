@@ -277,11 +277,28 @@
       <!-- 隐藏的图片上传表单 -->
       <input type="file" id="sys-file-upload" accept="image/*" style="display: none;" />
 
-      <!-- 编辑模式工具栏 -->
-      <div id="edit-mode-toolbar" class="edit-mode-toolbar">
-        <button id="edit-mode-add-btn" class="ui-button" style="background: var(--c-white-rice); border: 1px solid var(--c-border); color: var(--c-text-main);">＋ 添加组件</button>
-        <button id="edit-mode-done-btn" class="ui-button primary">完成</button>
+      <!-- 桌面编辑模式工具栏 -->
+      <div id="edit-toolbar" class="edit-toolbar">
+        <button type="button" class="edit-toolbar-btn primary" id="edit-btn-add">添加</button>
+        <button type="button" class="edit-toolbar-btn" id="edit-btn-reset">恢复默认</button>
+        <button type="button" class="edit-toolbar-btn" id="edit-btn-done">完成</button>
+        <button type="button" class="edit-toolbar-btn" id="edit-btn-close">关闭</button>
       </div>
+
+      <!-- 桌面编辑模式添加面板 -->
+      <div id="add-panel-mask" class="add-panel-mask"></div>
+      <div id="add-panel" class="add-panel">
+        <div class="add-panel-title">添加应用与组件</div>
+        <div class="add-panel-grid" id="add-panel-grid">
+          <!-- 动态渲染可用应用和组件 -->
+        </div>
+      </div>
+
+      <!-- 网格辅助线 -->
+      <div class="grid-lines" id="grid-lines"></div>
+
+      <!-- Toast 提示 -->
+      <div class="desktop-toast" id="desktop-toast"></div>
 
       <!-- 应用窗口容器 -->
       <div id="window-container" class="window-container"></div>

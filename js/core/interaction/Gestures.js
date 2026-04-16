@@ -50,12 +50,13 @@ export class Gestures {
 
   onPointerDown(event) {
     this.startX = event.clientX;
-    const iconEl = event.target.closest('.app-icon');
+    const targetEl = event.target.closest('.app-icon, .desktop-item, .desktop-page');
+
+    if (!targetEl) return;
 
     this.clearLongPressTimer();
     this.longPressTimer = setTimeout(() => {
-      const appId = iconEl ? iconEl.dataset.appId : null;
-      this.eventBus.emit('desktop:edit-mode', { appId, trigger: 'long-press' });
+      this.eventBus.emit('desktop:edit-mode');
     }, this.longPressDelay);
   }
 

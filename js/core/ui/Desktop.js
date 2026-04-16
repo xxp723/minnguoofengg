@@ -16,142 +16,14 @@ export class Desktop {
     this.container = container;
     this.eventBus = eventBus;
     this.appManager = appManager;
-    this.isEditMode = false;
 
     this.bindEvents();
   }
 
   bindEvents() {
     this.eventBus.on('desktop:changed', ({ config }) => {
-      // 保持编辑模式状态
-      const wasEditMode = this.isEditMode;
       this.render(config);
-      if (wasEditMode) {
-        // 重新进入以恢复UI状态
-        this.isEditMode = false;
-        this.enterEditMode();
-      }
     });
-
-    this.eventBus.on('desktop:edit-mode', () => {
-      this.enterEditMode();
-    });
-    
-    // 监听全局点击以退出编辑模式
-    document.addEventListener('click', (e) => {
-      if (!this.isEditMode) return;
-      
-      // 如果点击的是编辑模式相关的UI，则忽略
-      if (e.target.closest('.edit-mode-toolbar')) return;
-      if (e.target.closest('.delete-badge')) return;
-      if (e.target.closest('.widget-modal__panel')) return;
-      
-      // 如果点击的不是图标本身，退出编辑模式
-      if (!e.target.closest('.app-icon')) {
-        this.exitEditMode();
-      }
-    });
-    
-    // 监听添加应用事件
-    document.addEventListener('click', (e) => {
-      if (e.target.id === 'edit-mode-add-btn') {
-        this.showAddAppModal();
-      } else if (e.target.id === 'edit-mode-done-btn') {
-        this.exitEditMode();
-      }
-    });
-  }
-
-  showAddAppModal() {
-    let modal = document.getElementById('add-app-modal');
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'add-app-modal';
-      modal.className = 'widget-modal';
-      document.body.appendChild(modal);
-    }
-    
-    // 获取所有可用应用
-    const allApps = this.appManager.registry.getAll();
-    
-    // 获取当前桌面和Dock上已有的应用
-    const currentAppIds = new Set();
-    document.querySelectorAll('.app-icon').forEach(icon => {
-      if (icon.dataset.appId) currentAppIds.add(icon.dataset.appId);
-    });
-    
-    // 过滤出未添加的应用
-    const availableApps = allApps.filter(app => !currentAppIds.has(app.id));
-    
-    const appsHtml = availableApps.length > 0 ? availableApps.map(app => `
-      <div class="add-app-item" data-app-id="${app.id}">
-        <div class="add-app-icon">${app.icon}</div>
-        <div class="add-app-name">${app.name}</div>
-        <button class="add-app-btn">添加</button>
-      </div>
-    `).join('') : '<div class="add-app-empty">没有可添加的应用</div>';
-    
-    modal.innerHTML = `
-      <div class="widget-modal__mask"></div>
-      <div class="widget-modal__panel">
-        <div class="widget-modal__header">
-          <span>添加组件/应用</span>
-          <button class="widget-modal__close" id="add-app-modal-close">×</button>
-        </div>
-        <div class="widget-modal__body" style="max-height: 300px; overflow-y: auto;">
-          <div class="add-app-list">
-            ${appsHtml}
-          </div>
-        </div>
-      </div>
-    `;
-    
-    modal.classList.remove('hidden');
-    
-    modal.querySelector('#add-app-modal-close').addEventListener('click', () => {
-      modal.classList.add('hidden');
-    });
-    
-    modal.querySelectorAll('.add-app-item').forEach(item => {
-      item.querySelector('.add-app-btn').addEventListener('click', () => {
-        const appId = item.dataset.appId;
-        
-        // 确定当前在哪一页
-        const width = this.container.clientWidth || 1;
-        const scrollLeft = this.container.scrollLeft;
-        const pageIndex = Math.round(scrollLeft / width);
-        
-        // 发出添加应用事件，由 DesktopConfig 监听处理 (我们暂且通过模拟)
-        this.eventBus.emit('desktop:app-add', { appId, pageIndex });
-        
-        // 为了马上看到效果，这里如果不走流程我们就自己造 DOM
-        modal.classList.add('hidden');
-      });
-    });
-  }
-
-  enterEditMode() {
-    if (this.isEditMode) return;
-    this.isEditMode = true;
-    document.body.classList.add('is-edit-mode');
-    
-    // 显示工具栏
-    let toolbar = document.getElementById('edit-mode-toolbar');
-    if (toolbar) {
-      toolbar.classList.add('is-active');
-    }
-  }
-
-  exitEditMode() {
-    if (!this.isEditMode) return;
-    this.isEditMode = false;
-    document.body.classList.remove('is-edit-mode');
-    
-    // 隐藏工具栏
-    let toolbar = document.getElementById('edit-mode-toolbar');
-    if (toolbar) {
-      toolbar.classList.remove('is-active');
-    }
   }
 
   render(config) {
@@ -309,51 +181,10 @@ export class Desktop {
   }
 
   bindIconEvents() {
-    // 确保所有图标都有删除按钮，如果没有则添加
-    const allIcons = document.querySelectorAll('.app-icon');
-    allIcons.forEach(icon => {
-      if (icon.dataset.appId && !icon.querySelector('.delete-badge')) {
-        const badge = document.createElement('div');
-        badge.className = 'delete-badge';
-        badge.innerHTML = '×';
-        badge.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const appId = icon.dataset.appId;
-          
-          // 如果在 Dock 里，我们暂时不支持从 Dock 删除，或者需要特殊处理
-          if (icon.closest('#dock-container')) {
-             console.warn('Dock 栏图标暂不支持删除');
-             return;
-          }
-          
-          // 只有非核心应用才能删除 (可选逻辑，目前允许删除所有)
-          if (confirm(`确认要从桌面移除此应用吗？`)) {
-            // 需要调用 DesktopConfig.removeAppFromDesktop
-            // 由于 Desktop.js 没有直接引用 DesktopConfig，我们通过 EventBus 发出事件或直接操作 DOM
-            // 这里我们暂时发一个自定义事件，需要在外部（例如主程序）监听并调用逻辑
-            // 但为了简单，我们可以先在视觉上移除它，并更新 DOM（需要刷新或正确状态管理）
-            
-            // 为了正确状态同步，发出事件让 AppManager/DesktopConfig 处理
-            this.eventBus.emit('desktop:app-remove', { appId });
-            
-            // 乐观更新 UI
-            icon.remove();
-          }
-        });
-        icon.appendChild(badge);
-      }
-    });
-
     // 桌面内应用图标绑定
     const buttons = this.container.querySelectorAll('[data-open-app]');
     buttons.forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        // 在编辑模式下，点击图标不打开应用
-        if (this.isEditMode) {
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        }
+      btn.addEventListener('click', () => {
         const appId = btn.getAttribute('data-open-app');
         if (!appId) return;
         this.eventBus.emit('app:open', { appId });
@@ -366,12 +197,7 @@ export class Desktop {
       // 避免重复绑定
       if (btn.dataset.bound) return;
       btn.dataset.bound = "true";
-      btn.addEventListener('click', (e) => {
-        if (this.isEditMode) {
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        }
+      btn.addEventListener('click', () => {
         const appId = btn.getAttribute('data-open-app');
         if (!appId) return;
         this.eventBus.emit('app:open', { appId });

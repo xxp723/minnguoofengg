@@ -13,6 +13,7 @@
 import { Theme } from './core/ui/Theme.js';
 import { Desktop } from './core/ui/Desktop.js';
 import { WindowManager } from './core/ui/Window.js';
+import { DesktopEditMode } from './core/interaction/DesktopEditMode.js';
 
 import { EventBus } from './core/interaction/EventBus.js';
 import { DragDrop } from './core/interaction/DragDrop.js';
@@ -79,6 +80,14 @@ class MiniPhoneApp {
 
     /** @type {DragDrop} */
     this.dragDrop = new DragDrop(document.getElementById('desktop-container'), this.eventBus);
+    
+    /** @type {DesktopEditMode} */
+    this.desktopEditMode = new DesktopEditMode(
+      document.getElementById('desktop-container'), 
+      this.eventBus, 
+      this.appManager, 
+      this.dragDrop
+    );
   }
 
   async init() {
