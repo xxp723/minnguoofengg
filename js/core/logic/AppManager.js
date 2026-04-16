@@ -78,7 +78,8 @@ export class AppManager {
         eventBus: this.eventBus,
         globalMemory: this.globalMemory,
         settings: this.settings,
-        db: this.db
+        db: this.db,
+        windowManager: this.windowManager
       };
 
       const instance = await moduleRef.mount(contentEl, context);

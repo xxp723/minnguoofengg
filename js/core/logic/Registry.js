@@ -14,7 +14,7 @@
  */
 const ICONPARK_ICONS = {
   /* 设置 - Setting (齿轮) */
-  settings: '<svg width="28" height="28" viewBox="0 0 48 48" fill="none"><path d="M18.3 6.1L17 11.4a13 13 0 0 0-4.4 2.5l-5.1-1.7L4 18.5l3.8 3.6a13 13 0 0 0 0 3.8L4 29.5l3.5 6.3l5.1-1.7a13 13 0 0 0 4.4 2.5l1.3 5.3h7.4l1.3-5.3a13 13 0 0 0 4.4-2.5l5.1 1.7l3.5-6.3l-3.8-3.6a13 13 0 0 0 0-3.8l3.8-3.6l-3.5-6.3l-5.1 1.7a13 13 0 0 0-4.4-2.5L25.7 6.1h-7.4Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="24" cy="24" r="5" stroke="currentColor" stroke-width="3"/></svg>',
+  settings: '<svg width="28" height="28" viewBox="0 0 48 48" fill="none"><path transform="translate(2, 0)" d="M18.3 6.1L17 11.4a13 13 0 0 0-4.4 2.5l-5.1-1.7L4 18.5l3.8 3.6a13 13 0 0 0 0 3.8L4 29.5l3.5 6.3l5.1-1.7a13 13 0 0 0 4.4 2.5l1.3 5.3h7.4l1.3-5.3a13 13 0 0 0 4.4-2.5l5.1 1.7l3.5-6.3l-3.8-3.6a13 13 0 0 0 0-3.8l3.8-3.6l-3.5-6.3l-5.1 1.7a13 13 0 0 0-4.4-2.5L25.7 6.1h-7.4Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="24" cy="24" r="5" stroke="currentColor" stroke-width="3"/></svg>',
 
   /* 闲谈 - Chat (消息气泡) */
   chat: '<svg width="28" height="28" viewBox="0 0 48 48" fill="none"><path d="M44 6H4v28h14l6 8l6-8h14V6Z" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><line x1="14" y1="18" x2="34" y2="18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="14" y1="26" x2="28" y2="26" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',

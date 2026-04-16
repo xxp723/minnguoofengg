@@ -43,8 +43,16 @@ export class WindowManager {
     const header = document.createElement('header');
     header.className = 'app-window__header';
     header.innerHTML = `
+      <button class="app-window__back" type="button" aria-label="返回" style="opacity:0; pointer-events:none;">
+        <svg width="22" height="22" viewBox="0 0 48 48" fill="none"><path d="M16 12L32 24L16 36" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
       <div class="app-window__title">${appMeta.name}</div>
-      <button class="app-window__close" type="button" aria-label="关闭应用"><svg width="18" height="18" viewBox="0 0 48 48" fill="none"><path d="M24 44c11.046 0 20-8.954 20-20S35.046 4 24 4 4 12.954 4 24s8.954 20 20 20Z" stroke="currentColor" stroke-width="3"/><path d="M29.657 18.343 18.343 29.657M18.343 18.343l11.314 11.314" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="app-window__close" type="button" aria-label="关闭应用">
+        <svg width="22" height="22" viewBox="0 0 48 48" fill="none">
+          <rect x="14" y="4" width="20" height="40" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
+          <path d="M22 24v4" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     `;
 
     const content = document.createElement('div');
@@ -76,6 +84,32 @@ export class WindowManager {
     this.windows.forEach((win, id) => {
       win.classList.toggle('is-active', id === appId);
     });
+  }
+
+  setTitle(appId, title) {
+    const win = this.windows.get(appId);
+    if (!win) return;
+    const titleEl = win.querySelector('.app-window__title');
+    if (titleEl) titleEl.textContent = title;
+  }
+
+  setBackAction(appId, action) {
+    const win = this.windows.get(appId);
+    if (!win) return;
+    const backBtn = win.querySelector('.app-window__back');
+    if (!backBtn) return;
+    
+    const newBtn = backBtn.cloneNode(true);
+    backBtn.parentNode.replaceChild(newBtn, backBtn);
+    
+    if (action) {
+      newBtn.style.opacity = '1';
+      newBtn.style.pointerEvents = 'auto';
+      newBtn.addEventListener('click', action);
+    } else {
+      newBtn.style.opacity = '0';
+      newBtn.style.pointerEvents = 'none';
+    }
   }
 
   showError(appId, message) {

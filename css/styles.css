@@ -576,9 +576,18 @@ body.hide-status-bar #top-status-bar {
   font-size: 14px;
   font-weight: bold;
   letter-spacing: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.p1-ticket-arrows span {
+  display: block;
+  text-align: center;
+  width: 100%;
+  word-break: break-all;
 }
 .p1-ticket-arrow {
-  margin: 0 6px;
+  margin: 2px 0;
 }
 .p1-ticket-footer {
   display: flex;
@@ -758,11 +767,11 @@ body.hide-status-bar #top-status-bar {
 }
 
 .app-window__header {
-  height: 50px;
+  height: 64px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding: 0 18px;
+  justify-content: space-between;
+  padding: 12px 18px 0 18px;
   border-bottom: none;
   background: var(--c-white-rice);
   position: relative;
@@ -772,6 +781,11 @@ body.hide-status-bar #top-status-bar {
   position: absolute;
   left: 0;
   right: 0;
+  top: 12px;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   font-size: 16px;
   font-weight: bold;
@@ -779,9 +793,27 @@ body.hide-status-bar #top-status-bar {
   pointer-events: none;
 }
 
+.app-window__back {
+  border: 0;
+  background: transparent;
+  color: var(--c-text-main);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+  z-index: 2;
+}
+.app-window__back:active {
+  background: var(--c-gray-light);
+}
+
 .app-window__close {
   border: 0;
-  background: var(--c-gray-light);
+  background: transparent;
   color: var(--c-text-main);
   width: 32px;
   height: 32px;
@@ -793,9 +825,10 @@ body.hide-status-bar #top-status-bar {
   align-items: center;
   justify-content: center;
   transition: background 0.15s ease;
+  z-index: 2;
 }
 .app-window__close:active {
-  background: var(--c-milktea);
+  background: var(--c-gray-light);
 }
 
 .app-window__content {

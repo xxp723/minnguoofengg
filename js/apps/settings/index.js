@@ -17,7 +17,7 @@ const ICONS = {
 };
 
 export async function mount(container, context) {
-  const { settings, eventBus } = context;
+  const { settings, eventBus, windowManager, appId } = context;
   const current = await settings.getAll();
 
   // 当前页面状态
@@ -50,10 +50,6 @@ export async function mount(container, context) {
 
       <!-- 外观设置详情页 -->
       <div id="settings-appearance" class="settings-detail">
-        <div class="settings-detail__header">
-          <button class="settings-detail__back">\u2190</button>
-          <h3 class="settings-detail__title">外观设置</h3>
-        </div>
         <div class="settings-detail__body">
           <section class="ui-card">
             <h3>主题色</h3>
@@ -93,10 +89,6 @@ export async function mount(container, context) {
 
       <!-- API设置详情页 -->
       <div id="settings-api" class="settings-detail">
-        <div class="settings-detail__header">
-          <button class="settings-detail__back">\u2190</button>
-          <h3 class="settings-detail__title">API设置</h3>
-        </div>
         <div class="settings-detail__body">
           <section class="ui-card">
             <h3>生图API</h3>
@@ -120,10 +112,6 @@ export async function mount(container, context) {
 
       <!-- 数据设置详情页 -->
       <div id="settings-data" class="settings-detail">
-        <div class="settings-detail__header">
-          <button class="settings-detail__back">\u2190</button>
-          <h3 class="settings-detail__title">数据设置</h3>
-        </div>
         <div class="settings-detail__body">
           <section class="ui-card">
             <h3>数据导入/ 导出</h3>
@@ -141,10 +129,6 @@ export async function mount(container, context) {
 
       <!-- 日志详情页 -->
       <div id="settings-logs" class="settings-detail">
-        <div class="settings-detail__header">
-          <button class="settings-detail__back">\u2190</button>
-          <h3 class="settings-detail__title">日志</h3>
-        </div>
         <div class="settings-detail__body">
           <section class="ui-card">
             <h3>系统日志</h3>
@@ -162,8 +146,15 @@ export async function mount(container, context) {
 
   // 页面导航函数
   const navigateTo = (page) => {
-    const pages = ['home', 'appearance', 'api', 'data', 'logs'];
-    pages.forEach(p => {
+    const pages = {
+      'home': '设置',
+      'appearance': '外观设置',
+      'api': 'API设置',
+      'data': '数据设置',
+      'logs': '日志'
+    };
+
+    Object.keys(pages).forEach(p => {
       const el = container.querySelector(`#settings-${p}`);
       if (el) {
         if (p === page) {
@@ -176,6 +167,11 @@ export async function mount(container, context) {
       }
     });
 
+    if (windowManager) {
+      windowManager.setTitle(appId, pages[page]);
+      windowManager.setBackAction(appId, page === 'home' ? null : () => navigateTo('home'));
+    }
+
     currentPage = page;
   };
 
@@ -184,13 +180,6 @@ export async function mount(container, context) {
     card.addEventListener('click', () => {
       const page = card.dataset.page;
       navigateTo(page);
-    });
-  });
-
-  // 返回按钮事件
-  container.querySelectorAll('.settings-detail__back').forEach(btn => {
-    btn.addEventListener('click', () => {
-      navigateTo('home');
     });
   });
 
