@@ -13,7 +13,10 @@ const ICONS = {
   appearance: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><path d="M24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44Z" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round"/><path d="M24 4V24L39.5 37" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 4C24 4 36.2 8.4 39.5 37" fill="none" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14" cy="14" r="3" fill="#F97066"/><circle cx="10" cy="26" r="3" fill="#47B881"/><circle cx="16" cy="36" r="3" fill="#6C6EC7"/><circle cx="30" cy="16" r="3" fill="#FFCB47"/></svg>`,
   api: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><path d="M40 12L24 4L8 12V36L24 44L40 36V12Z" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round"/><path d="M24 44V24" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 12L24 24" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12L24 24" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 4V14" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   data: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><path d="M42 6H6V20H42V6Z" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round"/><path d="M42 28H6V42H42V28Z" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="13" cy="13" r="2" fill="#333"/><circle cx="13" cy="35" r="2" fill="#333"/><path d="M21 13H35" stroke="#333" stroke-width="3" stroke-linecap="round"/><path d="M21 35H35" stroke="#333" stroke-width="3" stroke-linecap="round"/><path d="M24 20V28" stroke="#333" stroke-width="3" stroke-linecap="round"/></svg>`,
-  logs: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><rect x="8" y="4" width="32" height="40" rx="2" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round"/><path d="M16 16H32" stroke="#333" stroke-width="3" stroke-linecap="round"/><path d="M16 24H32" stroke="#333" stroke-width="3" stroke-linecap="round"/><path d="M16 32H24" stroke="#333" stroke-width="3" stroke-linecap="round"/></svg>`
+  logs: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><rect x="8" y="4" width="32" height="40" rx="2" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round"/><path d="M16 16H32" stroke="#333" stroke-width="3" stroke-linecap="round"/><path d="M16 24H32" stroke="#333" stroke-width="3" stroke-linecap="round"/><path d="M16 32H24" stroke="#333" stroke-width="3" stroke-linecap="round"/></svg>`,
+  uiSettings: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><rect x="6" y="6" width="36" height="36" rx="3" stroke="#333" stroke-width="3" stroke-linejoin="round"/><path d="M6 18H42" stroke="#333" stroke-width="3" stroke-linecap="round"/><path d="M20 18V42" stroke="#333" stroke-width="3" stroke-linecap="round"/><circle cx="13" cy="12" r="2" fill="#F97066"/><circle cx="19" cy="12" r="2" fill="#FFCB47"/><circle cx="25" cy="12" r="2" fill="#47B881"/></svg>`,
+  wallpaper: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><rect x="6" y="6" width="36" height="36" rx="3" stroke="#333" stroke-width="3" stroke-linejoin="round"/><path d="M6 34L16 24L24 32L32 22L42 34" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="18" cy="16" r="4" fill="none" stroke="#333" stroke-width="3"/></svg>`,
+  iconSettings: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><rect x="6" y="6" width="14" height="14" rx="4" stroke="#333" stroke-width="3" stroke-linejoin="round"/><rect x="28" y="6" width="14" height="14" rx="4" stroke="#333" stroke-width="3" stroke-linejoin="round"/><rect x="6" y="28" width="14" height="14" rx="4" stroke="#333" stroke-width="3" stroke-linejoin="round"/><rect x="28" y="28" width="14" height="14" rx="4" stroke="#333" stroke-width="3" stroke-linejoin="round"/></svg>`
 };
 
 export async function mount(container, context) {
@@ -48,17 +51,69 @@ export async function mount(container, context) {
         </div>
       </div>
 
-      <!-- 外观设置详情页 -->
+      <!-- 外观设置 - 卡片式分类页 -->
       <div id="settings-appearance" class="settings-detail">
         <div class="settings-detail__body">
+          <div class="settings-cards-grid">
+            <div class="settings-card" data-page="ui-settings">
+              <div class="settings-card__icon">${ICONS.uiSettings}</div>
+              <h3 class="settings-card__title">界面设置</h3>
+            </div>
+            <div class="settings-card" data-page="wallpaper-settings">
+              <div class="settings-card__icon">${ICONS.wallpaper}</div>
+              <h3 class="settings-card__title">壁纸设置</h3>
+            </div>
+            <div class="settings-card" data-page="icon-settings">
+              <div class="settings-card__icon">${ICONS.iconSettings}</div>
+              <h3 class="settings-card__title">图标设置</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 界面设置详情页 -->
+      <div id="settings-ui-settings" class="settings-detail">
+        <div class="settings-detail__body">
           <section class="ui-card">
-            <h3>主题色</h3>
-            <p class="ui-muted" style="margin-bottom: 10px;">控制桌面主题色调</p>
-            <label style="display:flex;align-items:center;gap:10px;font-size:13px;">
-              <span style="min-width:70px;">主题色:</span>
-              <input id="setting-theme-color" type="color" value="${current.appearance?.themeColor || '#4f46e5'}">
+            <h3>顶部状态栏显示</h3>
+            <p class="ui-muted" style="margin-bottom: 10px;">控制顶部状态栏的显示与隐藏</p>
+            <label style="display:flex;align-items:center;justify-content:space-between;font-size:13px;">
+              <span>显示顶部状态栏</span>
+              <div class="toggle-switch">
+                <input id="setting-status-bar" type="checkbox" ${localStorage.getItem('miniphone_status_bar_hidden') === '1' ? '' : 'checked'}>
+                <span class="toggle-slider"></span>
+              </div>
             </label>
           </section>
+          <section class="ui-card">
+            <h3>全屏显示</h3>
+            <p class="ui-muted" style="margin-bottom: 10px;">去除小手机外框限制，以全屏模式显示</p>
+            <label style="display:flex;align-items:center;justify-content:space-between;font-size:13px;">
+              <span>启用全屏显示模式</span>
+              <div class="toggle-switch">
+                <input id="setting-fullscreen" type="checkbox" ${localStorage.getItem('miniphone_fullscreen') === '1' ? 'checked' : ''}>
+                <span class="toggle-slider"></span>
+              </div>
+            </label>
+          </section>
+          <button class="ui-button primary" id="save-ui-settings" style="width: 100%; margin-top: 10px;">保存界面设置</button>
+        </div>
+      </div>
+
+      <!-- 壁纸设置详情页 -->
+      <div id="settings-wallpaper-settings" class="settings-detail">
+        <div class="settings-detail__body">
+          <section class="ui-card">
+            <h3>壁纸设置</h3>
+            <p class="ui-muted" style="margin-bottom: 10px;">自定义桌面壁纸（即将开放）</p>
+            <div style="text-align:center;color:#B2967D;padding:30px 0;font-size:13px;">敬请期待</div>
+          </section>
+        </div>
+      </div>
+
+      <!-- 图标设置详情页 -->
+      <div id="settings-icon-settings" class="settings-detail">
+        <div class="settings-detail__body">
           <section class="ui-card">
             <h3>图标大小</h3>
             <p class="ui-muted" style="margin-bottom: 10px;">调整桌面图标尺寸</p>
@@ -67,23 +122,7 @@ export async function mount(container, context) {
               <input id="setting-icon-size" type="number" min="40" max="96" value="${current.appearance?.iconSize || 56}" style="flex:1;">
             </label>
           </section>
-          <section class="ui-card">
-            <h3>状态栏</h3>
-            <p class="ui-muted" style="margin-bottom: 10px;">控制顶部状态栏显示</p>
-            <label style="display:flex;align-items:center;gap:10px;font-size:13px;">
-              <input id="setting-status-bar" type="checkbox" ${localStorage.getItem('miniphone_status_bar_hidden') === '1' ? '' : 'checked'}>
-              <span>显示顶部状态栏</span>
-            </label>
-          </section>
-          <section class="ui-card">
-            <h3>全屏显示</h3>
-            <p class="ui-muted" style="margin-bottom: 10px;">去除小手机外框限制，以全屏模式显示</p>
-            <label style="display:flex;align-items:center;gap:10px;font-size:13px;">
-              <input id="setting-fullscreen" type="checkbox" ${localStorage.getItem('miniphone_fullscreen') === '1' ? 'checked' : ''}>
-              <span>启用全屏显示模式</span>
-            </label>
-          </section>
-          <button class="ui-button primary" id="save-appearance" style="width: 100%; margin-top: 10px;">保存外观设置</button>
+          <button class="ui-button primary" id="save-icon-settings" style="width: 100%; margin-top: 10px;">保存图标设置</button>
         </div>
       </div>
 
@@ -144,17 +183,24 @@ export async function mount(container, context) {
     </div>
   `;
 
+  // 页面配置：标题 + 返回目标
+  const pageConfig = {
+    'home':               { title: '设置',     parent: null },
+    'appearance':         { title: '外观设置', parent: 'home' },
+    'ui-settings':        { title: '界面设置', parent: 'appearance' },
+    'wallpaper-settings': { title: '壁纸设置', parent: 'appearance' },
+    'icon-settings':      { title: '图标设置', parent: 'appearance' },
+    'api':                { title: 'API设置',  parent: 'home' },
+    'data':               { title: '数据设置', parent: 'home' },
+    'logs':               { title: '日志',     parent: 'home' }
+  };
+
   // 页面导航函数
   const navigateTo = (page) => {
-    const pages = {
-      'home': '设置',
-      'appearance': '外观设置',
-      'api': 'API设置',
-      'data': '数据设置',
-      'logs': '日志'
-    };
+    const config = pageConfig[page];
+    if (!config) return;
 
-    Object.keys(pages).forEach(p => {
+    Object.keys(pageConfig).forEach(p => {
       const el = container.querySelector(`#settings-${p}`);
       if (el) {
         if (p === page) {
@@ -168,14 +214,14 @@ export async function mount(container, context) {
     });
 
     if (windowManager) {
-      windowManager.setTitle(appId, pages[page]);
-      windowManager.setBackAction(appId, page === 'home' ? null : () => navigateTo('home'));
+      windowManager.setTitle(appId, config.title);
+      windowManager.setBackAction(appId, config.parent ? () => navigateTo(config.parent) : null);
     }
 
     currentPage = page;
   };
 
-  // 卡片点击事件
+  // 卡片点击事件（首页 + 外观设置子页）
   container.querySelectorAll('.settings-card').forEach(card => {
     card.addEventListener('click', () => {
       const page = card.dataset.page;
@@ -183,10 +229,8 @@ export async function mount(container, context) {
     });
   });
 
-  // 外观设置保存
-  const onSaveAppearance = async () => {
-    const themeColor = container.querySelector('#setting-theme-color')?.value || '#4f46e5';
-    const iconSize = Number(container.querySelector('#setting-icon-size')?.value || 56);
+  // 界面设置保存（状态栏 + 全屏）
+  const onSaveUiSettings = async () => {
     const statusBarChecked = container.querySelector('#setting-status-bar')?.checked;
     const fullscreenChecked = container.querySelector('#setting-fullscreen')?.checked;
 
@@ -208,16 +252,22 @@ export async function mount(container, context) {
       document.body.classList.remove('fullscreen-mode');
     }
 
+    Logger.info('界面设置已保存');
+  };
+
+  // 图标设置保存
+  const onSaveIconSettings = async () => {
+    const iconSize = Number(container.querySelector('#setting-icon-size')?.value || 56);
+
     await settings.update({
       appearance: {
         ...(current.appearance || {}),
-        themeColor,
         iconSize
       }
     });
 
-    eventBus?.emit('settings:appearance-changed', { themeColor, iconSize });
-    Logger.info('外观设置已保存');
+    eventBus?.emit('settings:appearance-changed', { iconSize });
+    Logger.info('图标设置已保存');
   };
 
   // API设置保存
@@ -246,7 +296,8 @@ export async function mount(container, context) {
     a.href = url;
     a.download = `miniphone-backup-${Date.now()}.json`;
     a.click();
-    URL.revokeObjectURL(url);};
+    URL.revokeObjectURL(url);
+  };
 
   // 数据导入
   const onImport = async (ev) => {
@@ -297,7 +348,8 @@ export async function mount(container, context) {
   };
 
   // 绑定事件
-  container.querySelector('#save-appearance')?.addEventListener('click', onSaveAppearance);
+  container.querySelector('#save-ui-settings')?.addEventListener('click', onSaveUiSettings);
+  container.querySelector('#save-icon-settings')?.addEventListener('click', onSaveIconSettings);
   container.querySelector('#save-api')?.addEventListener('click', onSaveApi);
   container.querySelector('#export-data')?.addEventListener('click', onExport);
   container.querySelector('#import-file')?.addEventListener('change', onImport);

@@ -1,7 +1,7 @@
 /**
  * 文件名: css/styles.css
  * 用途: 民国旧报纸风格 UI 样式。
- *使用奶咖色、米黄色、米白色、浅灰色系。
+ *       使用奶咖色、米黄色、米白色、浅灰色系。
  */
 
 @font-face {
@@ -14,10 +14,10 @@
    全局变量（轻奢高级感）
    ========================= */
 :root {
-  --c-bg-wallpaper: #F5F1EA; /* Linen亚麻色壁纸 */
+  --c-bg-wallpaper: #F5F1EA; /* Linen 亚麻色壁纸 */
   --c-milktea: #D7C9B8;      /* Khaki 卡其色 */
   --c-milktea-trans: rgba(215, 201, 184, 0.5); /* Khaki 半透明 */
-  --c-white-rice: #F5F1EA;/* Linen 亚麻色 */
+  --c-white-rice: #F5F1EA;   /* Linen 亚麻色 */
   --c-gray-light: #D7C9B8;   /* Khaki 卡其色 */
   --c-text-main: #4A342A;    /* Espresso 浓缩咖啡字体 */
   --c-border: #7D5A44;       /* Cocoa 可可色边框 */
@@ -55,15 +55,6 @@ body.hide-status-bar #top-status-bar {
 }
 
 /* =========================
-   PWA 独立模式（添加到桌面后打开）
-   ========================= */
-@media all and (display-mode: standalone) {
-  html, body {
-    background: var(--c-bg-wallpaper);
-  }
-}
-
-/* =========================
    手机外框
    ========================= */
 .phone-frame {
@@ -82,7 +73,7 @@ body.hide-status-bar #top-status-bar {
   width: 100%;
   height: 100%;
   position: relative;
-  background: var(--c-bg-wallpaper); /* 默认壁纸，后续可被JS覆盖 */
+  background: var(--c-bg-wallpaper); /* 默认壁纸，后续可被 JS 覆盖 */
   background-size: cover;
   background-position: center;
 }
@@ -126,7 +117,8 @@ body.hide-status-bar #top-status-bar {
   top: 2px;
   width: 2px;
   height: 3px;
-  background: var(--c-text-main);border-radius: 0 1px 1px 0;
+  background: var(--c-text-main);
+  border-radius: 0 1px 1px 0;
 }
 .battery-level {
   height: 100%;
@@ -168,7 +160,7 @@ body.hide-status-bar #top-status-bar {
 }
 
 /* =========================
-   应用图标 (Flat2.0 扁平化)
+   应用图标 (Flat 2.0 扁平化)
    ========================= */
 .app-icon {
   display: flex;
@@ -203,7 +195,8 @@ body.hide-status-bar #top-status-bar {
   font-size: 20px;
   font-weight: bold;
   letter-spacing: 2px;
-  color: var(--c-text-main);z-index: 2;
+  color: var(--c-text-main);
+  z-index: 2;
   pointer-events: none;
   display: flex;
   align-items: center;
@@ -277,7 +270,7 @@ body.hide-status-bar #top-status-bar {
 /* =========================
    第一页 (Page 1) 布局
    ========================= */
-/*顶部时钟 */
+/* 顶部时钟 */
 .p1-clock-widget {
   text-align: center;
   margin-bottom: 20px;
@@ -295,7 +288,7 @@ body.hide-status-bar #top-status-bar {
   letter-spacing: 1px;
 }
 
-/* 中间组件区(左右并排) */
+/* 中间组件区 (左右并排) */
 .p1-widgets-row {
   display: flex;
   justify-content: space-between;
@@ -307,10 +300,10 @@ body.hide-status-bar #top-status-bar {
 /* 左侧：报纸文本组件 */
 .p1-news-widget {
   flex: 1;
-  aspect-ratio: 2/ 3;
+  aspect-ratio: 2 / 3;
   height: auto;
   background: var(--c-white-rice);
-  border:4px solid var(--c-border);
+  border: 4px solid var(--c-border);
   border-radius: 0;
   padding: 4px;
   display: flex;
@@ -337,7 +330,8 @@ body.hide-status-bar #top-status-bar {
   padding: 8px 8px 8px 8px;
   margin: 8px 8px 12px 8px;
   z-index: 1;
-  width: calc(100% - 16px);max-width: 6em;
+  width: calc(100% - 16px);
+  max-width: 6em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -420,7 +414,7 @@ body.hide-status-bar #top-status-bar {
   position: relative;
   box-shadow: 3px 3px 0px rgba(0,0,0,0.15);
   display: flex;
-  margin: 10px auto16px;
+  margin: 10px auto 16px;
 }
 .p2-ticket-inner {
   flex: 1;
@@ -432,7 +426,7 @@ body.hide-status-bar #top-status-bar {
   overflow: visible;
 }
 
-/* 左侧：剧院名(竖排奶咖色背景) */
+/* 左侧：剧院名 (竖排奶咖色背景) */
 .p2-ticket-brand {
   writing-mode: vertical-rl;
   text-orientation: upright;
@@ -470,7 +464,7 @@ body.hide-status-bar #top-status-bar {
   display: block;
 }
 
-/* 右侧：文字区(横向布局) */
+/* 右侧：文字区 (横向布局) */
 .p2-ticket-text-zone {
   flex: 1;
   display: flex;
@@ -489,7 +483,8 @@ body.hide-status-bar #top-status-bar {
   cursor: text;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;text-align: center;
+  white-space: nowrap;
+  text-align: center;
 }
 
 /* 右侧正文 */
@@ -522,11 +517,12 @@ body.hide-status-bar #top-status-bar {
   justify-items: start;
   column-gap: 20px;
   row-gap: 16px;
-  padding: 0 10px;margin-bottom: 16px;
+  padding: 0 10px;
+  margin-bottom: 16px;
 }
 
 /* =========================
-   民国车票 (Page 1extra)
+   民国车票 (Page 1 extra)
    ========================= */
 .p1-ticket-widget {
   width: 92%;
@@ -641,7 +637,8 @@ body.hide-status-bar #top-status-bar {
 }
 .widget-modal__header span {
   font-weight: bold;
-  letter-spacing: 1px;font-size: 16px;
+  letter-spacing: 1px;
+  font-size: 16px;
 }
 .widget-modal__close {
   border: 0;
@@ -706,7 +703,8 @@ body.hide-status-bar #top-status-bar {
 .modal-img-preview img {
   width: 100%;
   height: 100%;
-  object-fit: cover;display: block;
+  object-fit: cover;
+  display: block;
   border-radius: 10px;
 }
 .modal-img-placeholder {
@@ -774,7 +772,7 @@ body.hide-status-bar #top-status-bar {
   align-items: center;
   justify-content: space-between;
   padding: 12px 18px 0 18px;
-  border-bottom: 1px solid var(--c-milktea);
+  border-bottom: 1px solid var(--c-gray-light);
   background: var(--c-white-rice);
   position: relative;
 }
@@ -806,7 +804,8 @@ body.hide-status-bar #top-status-bar {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s ease;z-index: 2;
+  transition: background 0.15s ease;
+  z-index: 2;
 }
 .app-window__back:active {
   background: var(--c-gray-light);
@@ -862,7 +861,7 @@ body.hide-status-bar #top-status-bar {
 /* 卡片组件 */
 .ui-card {
   background: var(--c-white-rice);
-  border: 1px solid var(--c-milktea);
+  border: 1px solid var(--c-gray-light);
   border-radius: 16px;
   padding: 18px;
   margin-bottom: 12px;
@@ -925,7 +924,8 @@ body.hide-status-bar #top-status-bar {
   font-family: var(--font-retro);
   font-size: 13px;
   color: var(--c-text-main);
-  transition: border-color 0.15s ease;box-sizing: border-box;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
 }
 .ui-card input:focus,
 .ui-card textarea:focus,
@@ -974,11 +974,12 @@ body.hide-status-bar #top-status-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border: 1px solid var(--c-milktea);
+  border: none;
   background: var(--c-white-rice);
   padding: 14px 16px;
   border-radius: 16px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  margin-bottom: 12px;
 }
 .archive-title {
   display: flex;
@@ -1016,7 +1017,7 @@ body.hide-status-bar #top-status-bar {
   box-shadow: none;
 }
 .archive-card {
-  border: 1px solid var(--c-milktea);
+  border: none;
   background: var(--c-white-rice);
   border-radius: 14px;
   padding: 16px;
@@ -1042,7 +1043,7 @@ body.hide-status-bar #top-status-bar {
 
 .settings-card {
   background: var(--c-white-rice);
-  border: 1px solid var(--c-milktea);
+  border: 1px solid var(--c-gray-light);
   border-radius: 14px;
   padding: 14px 12px;
   display: flex;
@@ -1082,13 +1083,13 @@ body.hide-status-bar #top-status-bar {
 
 .settings-card__title {
   font-size: 13px;
-  font-weight:600;
+  font-weight: 600;
   letter-spacing: 0.3px;
   margin: 0;
   color: var(--c-text-main);
 }
 
-/*设置详情页 */
+/* 设置详情页 */
 .settings-detail {
   display: none;
   flex-direction: column;
@@ -1164,4 +1165,55 @@ body.fullscreen-mode .phone-frame {
 
 body.fullscreen-mode .app-window {
   top: 0;
+}
+
+/* =========================
+   iOS 风格 Toggle 开关
+   ========================= */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-switch .toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  border-radius: 28px;
+  transition: background-color 0.3s ease;
+}
+
+.toggle-switch .toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 22px;
+  width: 22px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #fff;
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: #000;
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(22px);
 }
