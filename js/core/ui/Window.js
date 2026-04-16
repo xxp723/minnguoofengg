@@ -47,10 +47,6 @@ export class WindowManager {
         <svg width="22" height="22" viewBox="0 0 48 48" fill="none"><path d="M16 12L32 24L16 36" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <div class="app-window__title">${appMeta.name}</div>
-      <div class="app-window__custom-actions" style="display:none; gap:5px; margin-right: 10px;">
-         <button class="icon-btn-modern import-btn" title="导入本地组件代码">↓</button>
-         <button class="icon-btn-modern export-btn" title="导出到本地">↑</button>
-      </div>
       <button class="app-window__close" type="button" aria-label="关闭应用">
         <svg width="22" height="22" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M10 4V44" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -98,16 +94,6 @@ export class WindowManager {
     if (!win) return;
     const titleEl = win.querySelector('.app-window__title');
     if (titleEl) titleEl.textContent = title;
-
-    // 根据标题显示/隐藏自定义组件的导入导出按钮
-    const customActions = win.querySelector('.app-window__custom-actions');
-    if (customActions) {
-      if (title === '自定义组件') {
-        customActions.style.display = 'flex';
-      } else {
-        customActions.style.display = 'none';
-      }
-    }
   }
 
   setBackAction(appId, action) {

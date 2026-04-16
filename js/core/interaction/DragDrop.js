@@ -1,7 +1,9 @@
 /**
  * 文件名: js/core/interaction/DragDrop.js
  * 用途: 桌面图标拖拽排序交互模块。
- *位置: /js/core/interaction/DragDrop.js
+ *       使用 Pointer Events 实现触摸和鼠标兼容的自由拖拽，
+ *       仅在编辑模式下生效。
+ * 位置: /js/core/interaction/DragDrop.js
  * 架构层: 交互层（Interaction Layer）
  */
 export class DragDrop {
@@ -12,135 +14,139 @@ export class DragDrop {
   constructor(desktopContainer, eventBus) {
     this.desktopContainer = desktopContainer;
     this.eventBus = eventBus;
-    this.draggingId = null;
-    this.draggingType = null; // 'app' or 'widget'
+    
+    // 我们绑定到全局 body 上以支持跨容器（桌面和Dock）拖拽
+    this.root = document.body;
+    
+    this.draggingAppId = null;
+    this.ghostEl = null;
+    this.originalIconEl = null;
+    this.startX = 0;
+    this.startY = 0;
+    this.isDragging = false;
+    this.dragThreshold = 5;
 
-    this.onDragStart = this.onDragStart.bind(this);
-    this.onDragOver = this.onDragOver.bind(this);
-    this.onDrop = this.onDrop.bind(this);
-    this.onDragEnd = this.onDragEnd.bind(this);
+    this.onPointerDown = this.onPointerDown.bind(this);
+    this.onPointerMove = this.onPointerMove.bind(this);
+    this.onPointerUp = this.onPointerUp.bind(this);
   }
 
   bind() {
-    if (!this.desktopContainer) return;
-
-    // 绑定到整个屏幕，以便支持 dock 和 desktop 之间的拖拽
-    const screen = this.desktopContainer.closest('.screen');
-    if (screen) {
-      screen.addEventListener('dragstart', this.onDragStart);
-      screen.addEventListener('dragover', this.onDragOver);
-      screen.addEventListener('drop', this.onDrop);
-      screen.addEventListener('dragend', this.onDragEnd);
-    }
+    this.root.addEventListener('pointerdown', this.onPointerDown);
   }
 
   unbind() {
-    if (!this.desktopContainer) return;
-
-    const screen = this.desktopContainer.closest('.screen');
-    if (screen) {
-      screen.removeEventListener('dragstart', this.onDragStart);
-      screen.removeEventListener('dragover', this.onDragOver);
-      screen.removeEventListener('drop', this.onDrop);
-      screen.removeEventListener('dragend', this.onDragEnd);
-    }
+    this.root.removeEventListener('pointerdown', this.onPointerDown);
+    this.root.removeEventListener('pointermove', this.onPointerMove);
+    this.root.removeEventListener('pointerup', this.onPointerUp);
+    this.root.removeEventListener('pointercancel', this.onPointerUp);
   }
 
-  onDragStart(event) {
-    // 只有在编辑模式下才允许拖拽
-    if (!document.body.classList.contains('desktop-edit-mode')) {
-      event.preventDefault();
-      return;
-    }
+  onPointerDown(event) {
+    // 仅在编辑模式下允许拖拽
+    if (!document.body.classList.contains('is-edit-mode')) return;
+    
+    // 忽略删除按钮的点击
+    if (event.target.closest('.delete-badge')) return;
 
     const iconEl = event.target.closest('.app-icon');
-    const widgetEl = event.target.closest('.desktop-widget-item');
+    if (!iconEl || !iconEl.dataset.appId) return;
+
+    this.draggingAppId = iconEl.dataset.appId;
+    this.originalIconEl = iconEl;
+    this.startX = event.clientX;
+    this.startY = event.clientY;
+    this.isDragging = false;
+
+    this.root.addEventListener('pointermove', this.onPointerMove);
+    this.root.addEventListener('pointerup', this.onPointerUp);
+    this.root.addEventListener('pointercancel', this.onPointerUp);
     
-    const dragEl = iconEl || widgetEl;
-    if (!dragEl) {
-      event.preventDefault();
-      return;
+    // 设置 pointer capture 确保我们能收到后续事件
+    try {
+      this.root.setPointerCapture(event.pointerId);
+    } catch (e) {}
+  }
+
+  onPointerMove(event) {
+    if (!this.draggingAppId || !this.originalIconEl) return;
+
+    const dx = event.clientX - this.startX;
+    const dy = event.clientY - this.startY;
+
+    if (!this.isDragging) {
+      if (Math.abs(dx) > this.dragThreshold || Math.abs(dy) > this.dragThreshold) {
+        this.isDragging = true;
+        this.createGhost(event.clientX, event.clientY);
+        this.originalIconEl.style.opacity = '0.3'; // 视觉上变淡
+      }
     }
 
-    if (iconEl) {
-      this.draggingId = iconEl.dataset.appId;
-      this.draggingType = 'app';
-    } else {
-      this.draggingId = widgetEl.dataset.widgetId;
-      this.draggingType = 'widget';
-    }
-
-    dragEl.classList.add('is-dragging');
-
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', JSON.stringify({ id: this.draggingId, type: this.draggingType }));
+    if (this.isDragging && this.ghostEl) {
+      // 移动幽灵元素，居中于指针
+      this.ghostEl.style.left = `${event.clientX}px`;
+      this.ghostEl.style.top = `${event.clientY}px`;
+      
+      // 检查下方元素以实现交互反馈（可选）
+      // 这里可以添加高亮目标位置的逻辑
     }
   }
 
-  onDragOver(event) {
-    if (!document.body.classList.contains('desktop-edit-mode')) return;
+  onPointerUp(event) {
+    this.root.removeEventListener('pointermove', this.onPointerMove);
+    this.root.removeEventListener('pointerup', this.onPointerUp);
+    this.root.removeEventListener('pointercancel', this.onPointerUp);
     
-    // 允许在桌面区域和 dock 区域放置
-    const isDesktopArea = event.target.closest('.desktop-page') || event.target.closest('.dock-container');
-    if (!isDesktopArea) return;
-    
-    event.preventDefault();
+    try {
+      this.root.releasePointerCapture(event.pointerId);
+    } catch (e) {}
 
-    if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = 'move';
+    if (this.isDragging && this.ghostEl) {
+      // 找到指针下方的元素（忽略幽灵元素本身）
+      this.ghostEl.style.display = 'none';
+      const targetEl = document.elementFromPoint(event.clientX, event.clientY);
+      this.ghostEl.style.display = 'block';
+
+      if (targetEl) {
+        const targetIcon = targetEl.closest('.app-icon');
+        if (targetIcon && targetIcon.dataset.appId && targetIcon.dataset.appId !== this.draggingAppId) {
+          // 触发交换事件
+          this.eventBus.emit('desktop:icon-move', {
+            fromAppId: this.draggingAppId,
+            toAppId: targetIcon.dataset.appId
+          });
+        }
+      }
     }
+
+    // 清理状态
+    if (this.originalIconEl) {
+      this.originalIconEl.style.opacity = '';
+    }
+    if (this.ghostEl) {
+      this.ghostEl.remove();
+      this.ghostEl = null;
+    }
+    
+    this.draggingAppId = null;
+    this.originalIconEl = null;
+    this.isDragging = false;
   }
 
-  onDrop(event) {
-    if (!document.body.classList.contains('desktop-edit-mode')) return;
-    if (!this.draggingId) return;
+  createGhost(x, y) {
+    this.ghostEl = this.originalIconEl.cloneNode(true);
+    this.ghostEl.classList.add('is-dragging-ghost');
+    this.ghostEl.style.position = 'fixed';
+    this.ghostEl.style.pointerEvents = 'none'; // 确保不阻止鼠标事件
+    this.ghostEl.style.zIndex = '9999';
+    this.ghostEl.style.transform = 'translate(-50%, -50%) scale(1.1)'; // 放大一点并居中
+    this.ghostEl.style.left = `${x}px`;
+    this.ghostEl.style.top = `${y}px`;
+    this.ghostEl.style.opacity = '0.9';
     
-    event.preventDefault();
-
-    let targetId = null;
-    let targetType = null;
-    let isDock = false;
-
-    const targetIcon = event.target.closest('.app-icon');
-    const targetWidget = event.target.closest('.desktop-widget-item');
-    const targetDock = event.target.closest('.dock-container');
-    const targetPage = event.target.closest('.desktop-page');
-
-    if (targetIcon) {
-      targetId = targetIcon.dataset.appId;
-      targetType = 'app';
-    } else if (targetWidget) {
-      targetId = targetWidget.dataset.widgetId;
-      targetType = 'widget';
-    }
+    // 如果是 Dock 里的图标，移除 dock-icon 类以防止样式冲突
+    this.ghostEl.classList.remove('dock-icon');
     
-    if (targetDock) isDock = true;
-    
-    let targetPageIndex = 0;
-    if (targetPage) {
-      const allPages = Array.from(this.desktopContainer.querySelectorAll('.desktop-page'));
-      targetPageIndex = allPages.indexOf(targetPage);
-    }
-
-    // 发送通用移动事件，由 Desktop.js 统一处理重新布局
-    this.eventBus.emit('desktop:element-move', {
-      sourceId: this.draggingId,
-      sourceType: this.draggingType,
-      targetId: targetId,
-      targetType: targetType,
-      targetPageIndex: targetPageIndex,
-      isDock: isDock
-    });
-  }
-
-  onDragEnd() {
-    const screen = this.desktopContainer.closest('.screen');
-    if (screen) {
-      const draggingEls = screen.querySelectorAll('.is-dragging');
-      draggingEls.forEach(el => el.classList.remove('is-dragging'));
-    }
-    this.draggingId = null;
-    this.draggingType = null;
+    document.body.appendChild(this.ghostEl);
   }
 }

@@ -67,71 +67,7 @@ export async function mount(container, context) {
               <div class="settings-card__icon">${ICONS.icon}</div>
               <h3 class="settings-card__title">图标设置</h3>
             </div>
-            <div class="settings-card" data-page="appearance-widget">
-              <div class="settings-card__icon">${ICONS.ui}</div>
-              <h3 class="settings-card__title">组件设置</h3>
-            </div>
           </div>
-        </div>
-      </div>
-
-      <!-- 组件设置子页面 -->
-      <div id="settings-appearance-widget" class="settings-detail">
-        <div class="settings-detail__body">
-          <div class="settings-cards-grid">
-            <div class="settings-card" data-page="widget-library">
-              <div class="settings-card__icon">${ICONS.ui}</div>
-              <h3 class="settings-card__title">组件库</h3>
-            </div>
-            <div class="settings-card" data-page="widget-custom">
-              <div class="settings-card__icon">${ICONS.logs}</div>
-              <h3 class="settings-card__title">自定义组件</h3>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 组件库详情页 -->
-      <div id="settings-widget-library" class="settings-detail">
-        <div class="settings-detail__body">
-          <section class="ui-card">
-            <h3>组件库</h3>
-            <p class="ui-muted" style="margin-bottom: 10px;">从开源社区添加匹配手机UI风格的组件</p>
-            <div id="library-items-container" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
-               <!-- 组件列表将由 JS 动态渲染 -->
-            </div>
-          </section>
-        </div>
-      </div>
-
-      <!-- 自定义组件详情页 -->
-      <div id="settings-widget-custom" class="settings-detail">
-        <div class="settings-detail__body">
-          <section class="ui-card">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-              <h3>自定义区域</h3>
-              <div style="display:flex;gap:8px;">
-                <button class="icon-btn-modern" id="import-widget-code" title="导入组件代码">↓</button>
-                <button class="icon-btn-modern" id="export-widget-code" title="导出组件代码">↑</button>
-              </div>
-            </div>
-            <p class="ui-muted" style="margin-bottom: 10px;">上传 CSS 代码实现自定义新式组件</p>
-            <textarea id="custom-widget-css" style="width:100%;height:150px;font-family:monospace;font-size:12px;padding:8px;border-radius:8px;border:1px solid #ddd;resize:none;" placeholder="/* 在此输入 CSS 代码 */"></textarea>
-            
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:15px;">
-              <span style="font-size: 13px;">预览新增自定义组件代码</span>
-              <label class="toggle-switch">
-                <input id="setting-widget-preview-toggle" type="checkbox">
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-            
-            <div id="widget-preview-area" style="display:none;margin-top:15px;padding:10px;background:#fff;border-radius:12px;min-height:80px;border:1px dashed #ccc;overflow:hidden;">
-               <div id="custom-preview-content">预览内容</div>
-            </div>
-
-            <button class="ui-button primary" id="add-custom-widget-btn" style="width: 100%; margin-top: 15px;">添加到组件库</button>
-          </section>
         </div>
       </div>
 
@@ -253,9 +189,6 @@ export async function mount(container, context) {
       'appearance-ui': '界面设置',
       'appearance-wallpaper': '壁纸设置',
       'appearance-icon': '图标设置',
-      'appearance-widget': '组件设置',
-      'widget-library': '组件库',
-      'widget-custom': '自定义组件',
       'api': 'API设置',
       'data': '数据设置',
       'logs': '日志'
@@ -267,9 +200,6 @@ export async function mount(container, context) {
       'appearance-ui': 'appearance',
       'appearance-wallpaper': 'appearance',
       'appearance-icon': 'appearance',
-      'appearance-widget': 'appearance',
-      'widget-library': 'appearance-widget',
-      'widget-custom': 'appearance-widget',
       'api': 'home',
       'data': 'home',
       'logs': 'home'
@@ -303,165 +233,6 @@ export async function mount(container, context) {
       navigateTo(page);
     });
   });
-
-  // ========== 组件设置相关逻辑 ==========
-  
-  // 渲染组件库列表
-  const renderWidgetLibrary = () => {
-    const listEl = container.querySelector('#library-items-container');
-    if (!listEl) return;
-    
-    // 5个现有组件 + 6个新组件（音乐等，仿手机风格）
-    const widgets = [
-      { id: 'clock', name: '时钟', desc: '显示当前时间' },
-      { id: 'avatar', name: '头像', desc: '显示个人头像' },
-      { id: 'news', name: '报纸', desc: '民国日报组件' },
-      { id: 'ticket1', name: '船票', desc: '长江航运船票' },
-      { id: 'ticket2', name: '戏票', desc: '浮生剧院戏票' },
-      { id: 'music', name: '音乐', desc: '复古唱片机风格' },
-      { id: 'weather', name: '天气', desc: '水墨风天气预报' },
-      { id: 'calendar', name: '日历', desc: '老黄历样式' },
-      { id: 'notes', name: '便签', desc: '信纸样式的便签' },
-      { id: 'photos', name: '相册', desc: '复古相框展示' },
-      { id: 'radio', name: '收音机', desc: '老式收音机电台' }
-    ];
-
-    listEl.innerHTML = widgets.map(w => `
-      <div class="widget-library-item" style="border:1px solid #ddd;border-radius:8px;padding:10px;text-align:center;background:#fff;">
-        <div style="font-weight:bold;margin-bottom:5px;">${w.name}</div>
-        <div style="font-size:10px;color:#666;margin-bottom:10px;">${w.desc}</div>
-        <button class="ui-button" style="padding:4px 8px;font-size:12px;" data-add-widget="${w.id}">添加</button>
-      </div>
-    `).join('');
-
-    // 绑定添加事件
-    listEl.querySelectorAll('[data-add-widget]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const type = btn.getAttribute('data-add-widget');
-        // 调用 eventBus 通知桌面添加组件
-        eventBus?.emit('desktop:add-widget', { type });
-        Logger.info(`已添加组件: ${type}`);
-      });
-    });
-  };
-
-  // 自定义组件预览切换
-  const previewToggle = container.querySelector('#setting-widget-preview-toggle');
-  const previewArea = container.querySelector('#widget-preview-area');
-  const cssTextarea = container.querySelector('#custom-widget-css');
-  const previewContent = container.querySelector('#custom-preview-content');
-
-  if (previewToggle) {
-    previewToggle.addEventListener('change', (e) => {
-      if (e.target.checked) {
-        previewArea.style.display = 'block';
-        // 简单将 CSS 注入到一个 style 标签中并展示预览
-        let styleEl = document.getElementById('custom-widget-preview-style');
-        if (!styleEl) {
-          styleEl = document.createElement('style');
-          styleEl.id = 'custom-widget-preview-style';
-          document.head.appendChild(styleEl);
-        }
-        styleEl.textContent = cssTextarea.value;
-        
-        // 渲染一个测试用的 div
-        previewContent.innerHTML = `<div class="custom-widget">自定义组件预览</div>`;
-      } else {
-        previewArea.style.display = 'none';
-      }
-    });
-  }
-
-  // 监听 CSS 改变时如果正在预览则实时更新
-  if (cssTextarea) {
-    cssTextarea.addEventListener('input', () => {
-      if (previewToggle && previewToggle.checked) {
-        const styleEl = document.getElementById('custom-widget-preview-style');
-        if (styleEl) styleEl.textContent = cssTextarea.value;
-      }
-    });
-  }
-
-  // 导入本地 CSS
-  const importCodeBtn = container.querySelector('#import-widget-code');
-  
-  // 处理导入逻辑
-  const handleImportCode = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.css,.txt';
-    input.onchange = e => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = ev => {
-          if (cssTextarea) cssTextarea.value = ev.target.result;
-        };
-        reader.readAsText(file);
-      }
-    };
-    input.click();
-  };
-
-  if (importCodeBtn) {
-    importCodeBtn.addEventListener('click', handleImportCode);
-  }
-
-  // 导出 CSS 到本地
-  const exportCodeBtn = container.querySelector('#export-widget-code');
-
-  // 处理导出逻辑
-  const handleExportCode = () => {
-    const cssContent = cssTextarea ? cssTextarea.value : '';
-    if (!cssContent) {
-      alert('没有代码可导出');
-      return;
-    }
-    const blob = new Blob([cssContent], { type: 'text/css' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `custom-widget-${Date.now()}.css`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  if (exportCodeBtn) {
-    exportCodeBtn.addEventListener('click', handleExportCode);
-  }
-
-  // 监听来自 window 层的全局自定义动作按钮事件
-  // (Window.js 中增加的按钮暂不支持直接绑定事件，可通过给 document 绑定委托来处理)
-  document.addEventListener('click', (e) => {
-    const target = e.target.closest('.app-window__custom-actions .import-btn');
-    if (target && currentPage === 'widget-custom') {
-      handleImportCode();
-    }
-    const targetExp = e.target.closest('.app-window__custom-actions .export-btn');
-    if (targetExp && currentPage === 'widget-custom') {
-      handleExportCode();
-    }
-  });
-
-  // 添加自定义组件到库/桌面
-  const addCustomWidgetBtn = container.querySelector('#add-custom-widget-btn');
-  if (addCustomWidgetBtn) {
-    addCustomWidgetBtn.addEventListener('click', () => {
-      const cssContent = cssTextarea ? cssTextarea.value : '';
-      if (!cssContent.trim()) {
-        alert('代码不能为空');
-        return;
-      }
-      // 此处将自定义 CSS 存储到 config，并通知添加
-      eventBus?.emit('desktop:add-custom-widget', { css: cssContent });
-      Logger.info('自定义组件添加成功');
-      alert('自定义组件已添加到桌面/配置中');
-    });
-  }
-
-  // 初始化组件库
-  renderWidgetLibrary();
-
 
   // 界面设置保存（状态栏 + 全屏）
   const onSaveUiSettings = async () => {
