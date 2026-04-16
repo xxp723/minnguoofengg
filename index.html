@@ -279,12 +279,24 @@
 
       <!-- 桌面编辑模式工具栏 -->
       <div id="edit-toolbar" class="edit-toolbar">
-        <button type="button" class="edit-toolbar-btn primary" id="edit-btn-add">添加</button>
-        <button type="button" class="edit-toolbar-btn" id="edit-btn-add-page">新增页</button>
-        <button type="button" class="edit-toolbar-btn" id="edit-btn-remove-page">删当前页</button>
-        <button type="button" class="edit-toolbar-btn" id="edit-btn-reset">恢复默认</button>
-        <button type="button" class="edit-toolbar-btn" id="edit-btn-done">完成</button>
-        <button type="button" class="edit-toolbar-btn" id="edit-btn-close">关闭</button>
+        <button type="button" class="edit-toolbar-btn primary" id="edit-btn-add" title="添加应用/组件" aria-label="添加应用/组件">
+          <span class="edit-toolbar-icon">＋</span>
+        </button>
+        <button type="button" class="edit-toolbar-btn" id="edit-btn-add-page" title="新增桌面页" aria-label="新增桌面页">
+          <span class="edit-toolbar-icon">▤</span>
+        </button>
+        <button type="button" class="edit-toolbar-btn" id="edit-btn-remove-page" title="删除当前页" aria-label="删除当前页">
+          <span class="edit-toolbar-icon">－</span>
+        </button>
+        <button type="button" class="edit-toolbar-btn" id="edit-btn-reset" title="恢复默认布局" aria-label="恢复默认布局">
+          <span class="edit-toolbar-icon">↺</span>
+        </button>
+        <button type="button" class="edit-toolbar-btn" id="edit-btn-done" title="完成并保存" aria-label="完成并保存">
+          <span class="edit-toolbar-icon">✓</span>
+        </button>
+        <button type="button" class="edit-toolbar-btn" id="edit-btn-close" title="关闭并放弃修改" aria-label="关闭并放弃修改">
+          <span class="edit-toolbar-icon">✕</span>
+        </button>
       </div>
 
       <!-- 桌面编辑模式添加面板 -->

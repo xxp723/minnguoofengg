@@ -12,11 +12,11 @@ export class DesktopEditMode {
     this.eventBus = eventBus;
     this.appManager = appManager;
     this.dragDrop = dragDrop;
-    
+
     this.isEditMode = false;
     this.gridCols = 4;
     this.gridRows = 6;
-    
+
     // UI 元素
     this.toolbar = document.getElementById('edit-toolbar');
     this.btnAdd = document.getElementById('edit-btn-add');
@@ -31,8 +31,18 @@ export class DesktopEditMode {
     this.toastEl = document.getElementById('desktop-toast');
 
     // 状态数据
-    this.layout = {}; 
+    this.layout = {};
+    this.savedLayoutSnapshot = {};
     this.currentPageId = 'page-1';
+
+    // 可添加组件元数据
+    this.widgetLibrary = [
+      { id: 'clock', name: '时钟', icon: '🕰', selector: '.p1-clock-widget', colSpan: 4, rowSpan: 1 },
+      { id: 'avatar', name: '头像框', icon: '🖼', selector: '.p1-avatar-widget', colSpan: 2, rowSpan: 2 },
+      { id: 'news', name: '报纸', icon: '📰', selector: '.p1-news-widget', colSpan: 2, rowSpan: 2 },
+      { id: 'ticket1', name: '船票', icon: '🎫', selector: '.p1-ticket-widget', colSpan: 4, rowSpan: 2 },
+      { id: 'ticket2', name: '戏票', icon: '🎟', selector: '.p2-ticket-widget', colSpan: 4, rowSpan: 2 }
+    ];
 
     this.bindEvents();
     this.loadLayout();
@@ -57,8 +67,8 @@ export class DesktopEditMode {
 
     if (this.btnClose) {
       this.btnClose.addEventListener('click', () => {
-        // 关闭时不保存，重新加载之前的布局
-        this.loadLayout();
+        // 关闭时不保存：恢复到最近一次已保存（或初始化）的快照
+        this.layout = this.cloneLayout(this.savedLayoutSnapshot);
         this.applyLayoutToDOM();
         this.exitEditMode();
       });
@@ -67,8 +77,8 @@ export class DesktopEditMode {
     if (this.btnReset) {
       this.btnReset.addEventListener('click', () => {
         if (confirm('确定要恢复默认布局吗？所有自定义位置将被重置。')) {
-          localStorage.removeItem('miniphone_desktop_layout');
-          this.loadLayout();
+          // 重置仅作用于当前编辑态；只有点“完成”才会真正保存
+          this.initDefaultLayout();
           this.applyLayoutToDOM();
           this.showToast('已恢复默认布局');
         }
@@ -86,25 +96,29 @@ export class DesktopEditMode {
     if (this.btnRemovePage) {
       this.btnRemovePage.addEventListener('click', () => this.removeCurrentDesktopPage());
     }
-    
+
     if (this.addPanelMask) {
       this.addPanelMask.addEventListener('click', () => this.hideAddPanel());
     }
+  }
+
+  cloneLayout(layout) {
+    return JSON.parse(JSON.stringify(layout || {}));
   }
 
   enterEditMode() {
     if (this.isEditMode) return;
     this.isEditMode = true;
     document.body.classList.add('is-edit-mode');
-    
-    // 把现有的 DOM 转换为绝对定位布局，或者应用已保存的布局
+
+    // 应用当前 layout 到 DOM
     this.applyLayoutToDOM();
 
     // 激活 DragDrop 的自由拖拽
     if (this.dragDrop) {
       this.dragDrop.enableFreeDrag(this);
     }
-    
+
     // 给所有元素添加删除按钮
     this.attachDeleteButtons();
   }
@@ -114,7 +128,7 @@ export class DesktopEditMode {
     this.isEditMode = false;
     document.body.classList.remove('is-edit-mode');
     this.hideAddPanel();
-    
+
     if (this.dragDrop) {
       this.dragDrop.disableFreeDrag();
     }
@@ -131,57 +145,96 @@ export class DesktopEditMode {
 
   attachDeleteButtons() {
     const items = this.desktopContainer.querySelectorAll('.desktop-item');
-    items.forEach(item => {
-      if (!item.querySelector('.edit-delete-btn')) {
-        const btn = document.createElement('div');
-        btn.className = 'edit-delete-btn';
-        btn.innerHTML = '×';
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          this.removeItem(item);
-        });
-        item.appendChild(btn);
-      }
+    items.forEach((item) => this.ensureDeleteButton(item));
+  }
+
+  ensureDeleteButton(item) {
+    if (item.querySelector('.edit-delete-btn')) return;
+    const btn = document.createElement('div');
+    btn.className = 'edit-delete-btn';
+    btn.innerHTML = '×';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      this.removeItem(item);
     });
+    item.appendChild(btn);
   }
 
   removeItem(itemEl) {
     const pageEl = itemEl.closest('.desktop-page');
     if (!pageEl) return;
-    
-    const pageId = pageEl.getAttribute('data-page-id');
-    const itemId = itemEl.getAttribute('data-item-id');
-    
-    itemEl.style.transform = 'scale(0)';
-    setTimeout(() => {
-      itemEl.remove();
-      this.updateLayoutDataFromDOM();
-      this.showToast('已移除');
-    }, 200);
+
+    // 逻辑删除：隐藏而不是 remove，确保“关闭”可恢复、可重新添加
+    itemEl.style.display = 'none';
+    this.updateLayoutDataFromDOM();
+    this.positionItemsDOM();
+    this.showToast('已移除');
+  }
+
+  isItemInLayout(itemId) {
+    return Object.values(this.layout).some((items) =>
+      (items || []).some((item) => item.id === itemId)
+    );
+  }
+
+  getWidgetMeta(id) {
+    return this.widgetLibrary.find((w) => w.id === id) || null;
+  }
+
+  getWidgetElementById(id) {
+    let el = this.desktopContainer.querySelector(`.desktop-item[data-item-id="${id}"]`);
+    if (el) return el;
+
+    const meta = this.getWidgetMeta(id);
+    if (!meta) return null;
+
+    el = this.desktopContainer.querySelector(meta.selector);
+    return el || null;
   }
 
   showAddPanel() {
     if (!this.addPanel || !this.addPanelGrid) return;
-    
-    // 渲染所有可用的应用
+
+    this.updateLayoutDataFromDOM();
+
+    // 可添加应用（去重）
     const apps = this.appManager.registry.getAll();
-    this.addPanelGrid.innerHTML = apps.map(app => `
+    const availableApps = apps.filter((app) => !this.isItemInLayout(`app-${app.id}`));
+
+    // 可添加组件（去重）
+    const availableWidgets = this.widgetLibrary.filter((w) => !this.isItemInLayout(w.id));
+
+    const appHtml = availableApps.map((app) => `
       <div class="add-panel-item" data-add-type="app" data-add-id="${app.id}">
         <div class="app-icon-btn">
           <span class="app-icon-glyph">${app.icon || ''}</span>
         </div>
         <span>${app.name}</span>
       </div>
-    `).join('');
+    `);
+
+    const widgetHtml = availableWidgets.map((widget) => `
+      <div class="add-panel-item" data-add-type="widget" data-add-id="${widget.id}">
+        <div class="app-icon-btn">
+          <span class="app-icon-glyph">${widget.icon}</span>
+        </div>
+        <span>${widget.name}</span>
+      </div>
+    `);
+
+    const allHtml = [...appHtml, ...widgetHtml];
+    this.addPanelGrid.innerHTML = allHtml.length
+      ? allHtml.join('')
+      : `<div style="grid-column:1/-1;text-align:center;color:#7D5A44;">当前没有可添加的应用或组件</div>`;
 
     // 绑定添加事件
-    this.addPanelGrid.querySelectorAll('.add-panel-item').forEach(item => {
+    this.addPanelGrid.querySelectorAll('.add-panel-item').forEach((item) => {
       item.addEventListener('click', () => {
         const type = item.getAttribute('data-add-type');
         const id = item.getAttribute('data-add-id');
-        this.addItemToDesktop(type, id);
-        this.hideAddPanel();
+        const added = this.addItemToDesktop(type, id);
+        if (added) this.hideAddPanel();
       });
     });
 
@@ -268,63 +321,162 @@ export class DesktopEditMode {
     this.layout = nextLayout;
   }
 
-  addItemToDesktop(type, id) {
-    const pageEl = this.desktopContainer.querySelector(`.desktop-page[data-page-id="${this.currentPageId}"]`);
-    if (!pageEl) return;
+  createAppItemElement(app) {
+    if (!app) return null;
 
-    // 找一个空闲位置
-    const pos = this.findFreeSpot(this.currentPageId, 1, 1);
-    if (!pos) {
-      this.showToast('当前页面空间不足');
-      return;
+    const customImg = localStorage.getItem(`miniphone_app_icon_${app.id}`);
+    const imgStyle = customImg ? '' : 'display:none;';
+    const btnClass = customImg ? 'app-icon-btn has-img' : 'app-icon-btn';
+
+    const itemEl = document.createElement('div');
+    itemEl.className = 'app-icon desktop-item absolute-layout';
+    itemEl.setAttribute('data-item-id', `app-${app.id}`);
+    itemEl.setAttribute('data-item-type', 'app');
+    itemEl.setAttribute('data-app-id', app.id);
+
+    itemEl.innerHTML = `
+      <button class="${btnClass}" type="button" data-open-app="${app.id}">
+        <span class="app-icon-glyph">${app.icon || ''}</span>
+        <img class="app-custom-img" src="${customImg || ''}" style="${imgStyle}" alt="${app.name}" />
+      </button>
+      <span class="app-icon-label">${app.name}</span>
+      <div class="edit-delete-btn">×</div>
+    `;
+
+    const deleteBtn = itemEl.querySelector('.edit-delete-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this.removeItem(itemEl);
+      });
     }
 
+    const openBtn = itemEl.querySelector('[data-open-app]');
+    if (openBtn) {
+      openBtn.addEventListener('click', () => {
+        if (!this.isEditMode) {
+          this.eventBus.emit('app:open', { appId: app.id });
+        }
+      });
+    }
+
+    return itemEl;
+  }
+
+  addItemToDesktop(type, id) {
+    const pageEl = this.desktopContainer.querySelector(`.desktop-page[data-page-id="${this.currentPageId}"]`);
+    if (!pageEl) return false;
+
+    this.updateLayoutDataFromDOM();
+
     if (type === 'app') {
+      const itemId = `app-${id}`;
+      if (this.isItemInLayout(itemId)) {
+        this.showToast('该应用已在桌面上');
+        return false;
+      }
+
       const app = this.appManager.registry.get(id);
-      if (!app) return;
-      
-      const customImg = localStorage.getItem(`miniphone_app_icon_${app.id}`);
-      const imgStyle = customImg ? '' : 'display:none;';
-      const btnClass = customImg ? 'app-icon-btn has-img' : 'app-icon-btn';
-      
-      const itemEl = document.createElement('div');
-      itemEl.className = 'app-icon desktop-item absolute-layout';
-      itemEl.setAttribute('data-item-id', `app-${app.id}`);
+      if (!app) return false;
+
+      const colSpan = 1;
+      const rowSpan = 1;
+      const pos = this.findFreeSpot(this.currentPageId, colSpan, rowSpan);
+      if (!pos) {
+        this.showToast('当前页面空间不足');
+        return false;
+      }
+
+      let itemEl = this.desktopContainer.querySelector(`.desktop-item[data-item-id="${itemId}"]`);
+      if (!itemEl) {
+        itemEl = this.createAppItemElement(app);
+      }
+      if (!itemEl) return false;
+
+      if (itemEl.parentElement !== pageEl) {
+        pageEl.appendChild(itemEl);
+      }
+
+      itemEl.style.display = '';
+      itemEl.classList.add('desktop-item', 'absolute-layout');
+      itemEl.setAttribute('data-item-id', itemId);
       itemEl.setAttribute('data-item-type', 'app');
       itemEl.setAttribute('data-app-id', app.id);
       itemEl.setAttribute('data-col', pos.col);
       itemEl.setAttribute('data-row', pos.row);
-      itemEl.setAttribute('data-colspan', '1');
-      itemEl.setAttribute('data-rowspan', '1');
-      
-      itemEl.innerHTML = `
-        <button class="${btnClass}" type="button" data-open-app="${app.id}">
-          <span class="app-icon-glyph">${app.icon || ''}</span>
-          <img class="app-custom-img" src="${customImg || ''}" style="${imgStyle}" alt="${app.name}" />
-        </button>
-        <span class="app-icon-label">${app.name}</span>
-        <div class="edit-delete-btn">×</div>
-      `;
-      
-      // 绑定删除事件
-      itemEl.querySelector('.edit-delete-btn').addEventListener('click', (e) => {
-        e.stopPropagation(); e.preventDefault();
-        this.removeItem(itemEl);
-      });
+      itemEl.setAttribute('data-colspan', String(colSpan));
+      itemEl.setAttribute('data-rowspan', String(rowSpan));
 
-      pageEl.appendChild(itemEl);
-      this.dragDrop.makeElementDraggable(itemEl, this);
+      this.ensureDeleteButton(itemEl);
+
+      if (this.dragDrop) {
+        this.dragDrop.makeElementDraggable(itemEl, this);
+      }
+
       this.updateLayoutDataFromDOM();
-      this.positionItemsDOM(); // 重新计算所有位置
+      this.positionItemsDOM();
       this.showToast('已添加');
+      return true;
     }
+
+    if (type === 'widget') {
+      const itemId = id;
+      if (this.isItemInLayout(itemId)) {
+        this.showToast('该组件已在桌面上');
+        return false;
+      }
+
+      const meta = this.getWidgetMeta(id);
+      if (!meta) return false;
+
+      const colSpan = meta.colSpan || 1;
+      const rowSpan = meta.rowSpan || 1;
+      const pos = this.findFreeSpot(this.currentPageId, colSpan, rowSpan);
+      if (!pos) {
+        this.showToast('当前页面空间不足');
+        return false;
+      }
+
+      const itemEl = this.getWidgetElementById(id);
+      if (!itemEl) {
+        this.showToast('未找到可恢复的组件');
+        return false;
+      }
+
+      if (itemEl.parentElement !== pageEl) {
+        pageEl.appendChild(itemEl);
+      }
+
+      itemEl.style.display = '';
+      itemEl.classList.add('desktop-item', 'absolute-layout');
+      itemEl.setAttribute('data-item-id', itemId);
+      itemEl.setAttribute('data-item-type', 'widget');
+      itemEl.setAttribute('data-col', pos.col);
+      itemEl.setAttribute('data-row', pos.row);
+      itemEl.setAttribute('data-colspan', String(colSpan));
+      itemEl.setAttribute('data-rowspan', String(rowSpan));
+
+      this.ensureDeleteButton(itemEl);
+
+      if (this.dragDrop) {
+        this.dragDrop.makeElementDraggable(itemEl, this);
+      }
+
+      this.updateLayoutDataFromDOM();
+      this.positionItemsDOM();
+      this.showToast('已添加');
+      return true;
+    }
+
+    return false;
   }
 
   findFreeSpot(pageId, colSpan, rowSpan) {
     const pageData = this.layout[pageId] || [];
     const grid = Array(this.gridRows).fill().map(() => Array(this.gridCols).fill(false));
-    
-    pageData.forEach(item => {
+
+    pageData.forEach((item) => {
       for (let r = 0; r < item.rowSpan; r++) {
         for (let c = 0; c < item.colSpan; c++) {
           if (item.row + r < this.gridRows && item.col + c < this.gridCols) {
@@ -349,7 +501,8 @@ export class DesktopEditMode {
         if (isFree) return { col: c, row: r };
       }
     }
-    return null; // 没有空闲位置
+
+    return null;
   }
 
   // --- 布局保存与恢复核心 ---
@@ -359,8 +512,6 @@ export class DesktopEditMode {
     if (saved) {
       try {
         this.layout = JSON.parse(saved);
-        // 初始化时如果已有自定义布局，静默应用
-        this.applyLayoutToDOM(true);
       } catch (e) {
         Logger.error('解析桌面布局失败', e);
         this.initDefaultLayout();
@@ -368,74 +519,49 @@ export class DesktopEditMode {
     } else {
       this.initDefaultLayout();
     }
+
+    this.savedLayoutSnapshot = this.cloneLayout(this.layout);
+    this.applyLayoutToDOM(true);
   }
 
   saveLayout() {
     this.updateLayoutDataFromDOM();
     localStorage.setItem('miniphone_desktop_layout', JSON.stringify(this.layout));
+    this.savedLayoutSnapshot = this.cloneLayout(this.layout);
   }
 
   initDefaultLayout() {
-    // 根据当前 DOM 提取默认布局
+    // 默认布局：只保留应用，不包含组件
     this.layout = {};
     const pages = this.desktopContainer.querySelectorAll('.desktop-page');
-    pages.forEach(page => {
+
+    pages.forEach((page) => {
       const pageId = page.getAttribute('data-page-id');
       this.layout[pageId] = [];
-      
-      // 提取 Widget
-      const widgets = [
-        { selector: '.p1-clock-widget', id: 'clock', col: 0, row: 0, colSpan: 4, rowSpan: 1 },
-        { selector: '.p1-avatar-widget', id: 'avatar', col: 0, row: 1, colSpan: 2, rowSpan: 2 },
-        { selector: '.p1-news-widget', id: 'news', col: 2, row: 1, colSpan: 2, rowSpan: 2 },
-        { selector: '.p1-ticket-widget', id: 'ticket1', col: 0, row: 4, colSpan: 4, rowSpan: 2 },
-        { selector: '.p2-ticket-widget', id: 'ticket2', col: 0, row: 0, colSpan: 4, rowSpan: 2 }
-      ];
 
-      widgets.forEach(w => {
-        const el = page.querySelector(w.selector);
-        if (el) {
-          el.classList.add('desktop-item', 'absolute-layout');
-          el.setAttribute('data-item-id', w.id);
-          el.setAttribute('data-item-type', 'widget');
-          el.setAttribute('data-col', w.col);
-          el.setAttribute('data-row', w.row);
-          el.setAttribute('data-colspan', w.colSpan);
-          el.setAttribute('data-rowspan', w.rowSpan);
-          
-          this.layout[pageId].push({
-            id: w.id, type: 'widget',
-            col: w.col, row: w.row, colSpan: w.colSpan, rowSpan: w.rowSpan
-          });
-        }
-      });
+      const apps = Array.from(page.querySelectorAll('.app-icon[data-app-id]'));
+      apps.forEach((appEl, index) => {
+        const appId = appEl.getAttribute('data-app-id');
+        const col = index % this.gridCols;
+        const row = Math.floor(index / this.gridCols);
 
-      // 提取 Apps
-      const appRows = page.querySelectorAll('.p1-apps-row, .p2-apps-row');
-      let defaultAppRowStart = pageId === 'page-1' ? 3 : 2;
-      let appCol = 0;
-      
-      appRows.forEach(row => {
-        const apps = row.querySelectorAll('.app-icon');
-        apps.forEach(appEl => {
-          const appId = appEl.getAttribute('data-app-id');
-          if (appCol >= 4) { appCol = 0; defaultAppRowStart++; }
-          
-          appEl.classList.add('desktop-item', 'absolute-layout');
-          appEl.setAttribute('data-item-id', `app-${appId}`);
-          appEl.setAttribute('data-item-type', 'app');
-          appEl.setAttribute('data-app-id', appId);
-          appEl.setAttribute('data-col', appCol);
-          appEl.setAttribute('data-row', defaultAppRowStart);
-          appEl.setAttribute('data-colspan', 1);
-          appEl.setAttribute('data-rowspan', 1);
-          
-          this.layout[pageId].push({
-            id: `app-${appId}`, type: 'app', appId: appId,
-            col: appCol, row: defaultAppRowStart, colSpan: 1, rowSpan: 1
-          });
-          
-          appCol++;
+        appEl.classList.add('desktop-item', 'absolute-layout');
+        appEl.setAttribute('data-item-id', `app-${appId}`);
+        appEl.setAttribute('data-item-type', 'app');
+        appEl.setAttribute('data-app-id', appId);
+        appEl.setAttribute('data-col', String(col));
+        appEl.setAttribute('data-row', String(row));
+        appEl.setAttribute('data-colspan', '1');
+        appEl.setAttribute('data-rowspan', '1');
+
+        this.layout[pageId].push({
+          id: `app-${appId}`,
+          type: 'app',
+          appId,
+          col,
+          row,
+          colSpan: 1,
+          rowSpan: 1
         });
       });
     });
@@ -447,28 +573,26 @@ export class DesktopEditMode {
     // 先清理原有的排版容器 (p1-widgets-row, p1-apps-row 等)
     // 把里面的 item 提取到 page 直属下面
     const pages = this.desktopContainer.querySelectorAll('.desktop-page');
-    pages.forEach(page => {
+    pages.forEach((page) => {
       const pageId = page.getAttribute('data-page-id');
       const layoutItems = this.layout[pageId] || [];
-      
+
       // 提取嵌套的元素到直接层级，并扁平化
       const wrappers = page.querySelectorAll('.p1-widgets-row, .p1-apps-row, .p2-apps-row');
-      wrappers.forEach(w => {
-        while(w.firstChild) page.insertBefore(w.firstChild, w);
+      wrappers.forEach((w) => {
+        while (w.firstChild) page.insertBefore(w.firstChild, w);
         w.remove();
       });
 
-      // 遍历所有可能的项，如果不在 layout 中则隐藏或移除
       const allItems = page.querySelectorAll('.p1-clock-widget, .p1-avatar-widget, .p1-news-widget, .p1-ticket-widget, .p2-ticket-widget, .app-icon');
-      
-      // 建立 DOM 映射
       const domMap = {};
-      allItems.forEach(el => {
-        if (el.classList.contains('p1-clock-widget')) domMap['clock'] = el;
-        else if (el.classList.contains('p1-avatar-widget')) domMap['avatar'] = el;
-        else if (el.classList.contains('p1-news-widget')) domMap['news'] = el;
-        else if (el.classList.contains('p1-ticket-widget')) domMap['ticket1'] = el;
-        else if (el.classList.contains('p2-ticket-widget')) domMap['ticket2'] = el;
+
+      allItems.forEach((el) => {
+        if (el.classList.contains('p1-clock-widget')) domMap.clock = el;
+        else if (el.classList.contains('p1-avatar-widget')) domMap.avatar = el;
+        else if (el.classList.contains('p1-news-widget')) domMap.news = el;
+        else if (el.classList.contains('p1-ticket-widget')) domMap.ticket1 = el;
+        else if (el.classList.contains('p2-ticket-widget')) domMap.ticket2 = el;
         else if (el.classList.contains('app-icon')) {
           const appId = el.getAttribute('data-app-id');
           if (appId) domMap[`app-${appId}`] = el;
@@ -476,53 +600,75 @@ export class DesktopEditMode {
       });
 
       // 应用 layout 数据
-      layoutItems.forEach(itemData => {
-        const el = domMap[itemData.id];
+      layoutItems.forEach((itemData) => {
+        let el = domMap[itemData.id];
+
+        if (!el && itemData.type === 'app' && itemData.appId) {
+          const app = this.appManager.registry.get(itemData.appId);
+          const created = this.createAppItemElement(app);
+          if (created) {
+            page.appendChild(created);
+            el = created;
+            domMap[itemData.id] = created;
+          }
+        }
+
+        if (!el && itemData.type === 'widget') {
+          const widgetEl = this.getWidgetElementById(itemData.id);
+          if (widgetEl) {
+            if (widgetEl.parentElement !== page) page.appendChild(widgetEl);
+            el = widgetEl;
+            domMap[itemData.id] = widgetEl;
+          }
+        }
+
         if (el) {
+          el.style.display = '';
           el.classList.add('desktop-item', 'absolute-layout');
           el.setAttribute('data-item-id', itemData.id);
           el.setAttribute('data-item-type', itemData.type);
           if (itemData.appId) el.setAttribute('data-app-id', itemData.appId);
-          el.setAttribute('data-col', itemData.col);
-          el.setAttribute('data-row', itemData.row);
-          el.setAttribute('data-colspan', itemData.colSpan);
-          el.setAttribute('data-rowspan', itemData.rowSpan);
-          // 标记已处理
+          el.setAttribute('data-col', String(itemData.col));
+          el.setAttribute('data-row', String(itemData.row));
+          el.setAttribute('data-colspan', String(itemData.colSpan));
+          el.setAttribute('data-rowspan', String(itemData.rowSpan));
           delete domMap[itemData.id];
-        } else if (itemData.type === 'app') {
-          // 如果是 app 且 DOM 中没有，则尝试创建（可能是新添加保存后重新加载的）
-          // （此处简化，依赖初始化时 HTML 结构完整）
         }
       });
 
-      // 未在 layout 中的元素，隐藏它们
-      Object.values(domMap).forEach(el => {
+      // 未在 layout 中的元素隐藏
+      Object.values(domMap).forEach((el) => {
         el.style.display = 'none';
       });
     });
 
     this.positionItemsDOM();
+
+    // 初次加载后，校正当前页 id（防止页面状态不同步）
+    if (initialLoad) {
+      const width = this.desktopContainer.clientWidth || 1;
+      const pageIndex = Math.round(this.desktopContainer.scrollLeft / width);
+      this.currentPageId = `page-${pageIndex + 1}`;
+    }
   }
 
   positionItemsDOM() {
     // 根据 data-col, data-row 计算绝对定位
-    // 假设网格：左右 margin 20px, 每页可用宽度 clientWidth - 40
-    // 格子高度设为定值 90px
     const marginX = 20;
     const marginY = 15;
     const gridH = 90;
 
     const pages = this.desktopContainer.querySelectorAll('.desktop-page');
-    pages.forEach(page => {
+    pages.forEach((page) => {
       const w = page.clientWidth;
-      if(w === 0) return; // 隐藏状态不计算
-      
+      if (w === 0) return;
+
       const gridW = (w - marginX * 2) / this.gridCols;
 
       const items = page.querySelectorAll('.desktop-item.absolute-layout');
-      items.forEach(item => {
+      items.forEach((item) => {
         if (item.style.display === 'none') return;
-        
+
         const col = parseInt(item.getAttribute('data-col')) || 0;
         const row = parseInt(item.getAttribute('data-row')) || 0;
         const colSpan = parseInt(item.getAttribute('data-colspan')) || 1;
@@ -538,7 +684,7 @@ export class DesktopEditMode {
         item.style.top = `${top}px`;
         item.style.width = `${width}px`;
         item.style.height = `${height}px`;
-        
+
         // 特殊处理应用图标居中
         if (item.classList.contains('app-icon')) {
           item.style.justifyContent = 'flex-start';
@@ -551,20 +697,20 @@ export class DesktopEditMode {
   updateLayoutDataFromDOM() {
     this.layout = {};
     const pages = this.desktopContainer.querySelectorAll('.desktop-page');
-    pages.forEach(page => {
+    pages.forEach((page) => {
       const pageId = page.getAttribute('data-page-id');
       this.layout[pageId] = [];
       const items = page.querySelectorAll('.desktop-item.absolute-layout');
-      items.forEach(item => {
+      items.forEach((item) => {
         if (item.style.display === 'none') return;
         this.layout[pageId].push({
           id: item.getAttribute('data-item-id'),
           type: item.getAttribute('data-item-type'),
           appId: item.getAttribute('data-app-id'),
-          col: parseInt(item.getAttribute('data-col')),
-          row: parseInt(item.getAttribute('data-row')),
-          colSpan: parseInt(item.getAttribute('data-colspan')),
-          rowSpan: parseInt(item.getAttribute('data-rowspan'))
+          col: parseInt(item.getAttribute('data-col')) || 0,
+          row: parseInt(item.getAttribute('data-row')) || 0,
+          colSpan: parseInt(item.getAttribute('data-colspan')) || 1,
+          rowSpan: parseInt(item.getAttribute('data-rowspan')) || 1
         });
       });
     });

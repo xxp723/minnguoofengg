@@ -920,15 +920,15 @@ body.is-edit-mode .edit-delete-btn {
 
 .edit-toolbar {
   position: absolute;
-  top: calc(var(--status-bar-height) + 10px);
   left: 50%;
-  transform: translateX(-50%) translateY(-150%);
+  bottom: calc(var(--dock-height) + 10px);
+  transform: translateX(-50%) translateY(140%);
   display: flex;
-  gap: 15px;
-  background: rgba(245, 241, 234, 0.85); /* 奶咖色半透明 */
+  gap: 8px;
+  background: rgba(245, 241, 234, 0.92);
   backdrop-filter: blur(10px);
-  padding: 10px 20px;
-  border-radius: 20px;
+  padding: 8px 10px;
+  border-radius: 16px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.15);
   z-index: 500;
   opacity: 0;
@@ -944,23 +944,41 @@ body.is-edit-mode .edit-toolbar {
 }
 
 .edit-toolbar-btn {
-  background: transparent;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   border: none;
-  font-family: var(--font-retro);
-  font-size: 15px;
-  font-weight: bold;
+  border-radius: 10px;
+  background: transparent;
   color: var(--c-text-main);
   cursor: pointer;
-  padding: 4px;
-  transition: opacity 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-retro);
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1;
+  transition: opacity 0.2s, background 0.2s, transform 0.15s;
 }
 
 .edit-toolbar-btn:active {
-  opacity: 0.6;
+  opacity: 0.8;
+  transform: scale(0.94);
 }
 
 .edit-toolbar-btn.primary {
-  color: #d35400; /* 突出显示 */
+  color: #d35400;
+  background: rgba(211, 84, 0, 0.08);
+}
+
+.edit-toolbar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 /* 添加面板 */
