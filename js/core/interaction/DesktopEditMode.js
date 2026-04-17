@@ -126,6 +126,9 @@ export class DesktopEditMode {
     this.isEditMode = true;
     document.body.classList.add('is-edit-mode');
 
+    // [模块标注] 唯一性与重叠预清理模块：进入编辑模式先清理桌面/Dock重复与重叠脏数据
+    this.sanitizeLayoutForUniquenessAndOverlap();
+
     // 应用当前 layout 到 DOM
     this.applyLayoutToDOM();
     this.applyDockStateToDOM();
@@ -416,6 +419,79 @@ export class DesktopEditMode {
     }
   }
 
+  // [模块标注] 唯一性与重叠清理模块：桌面(全部页)+Dock 每个应用只允许存在一个，且桌面布局不允许重叠保存
+  sanitizeLayoutForUniquenessAndOverlap() {
+    this.dockState = this.dedupeDockState(this.dockState || []);
+
+    const dockSet = new Set(this.dockState || []);
+    const seenAppIds = new Set(dockSet);
+    const nextLayout = {};
+
+    const isOverlap = (a, b) => (
+      a.col < b.col + b.colSpan
+      && a.col + a.colSpan > b.col
+      && a.row < b.row + b.rowSpan
+      && a.row + a.rowSpan > b.row
+    );
+
+    Object.entries(this.layout || {}).forEach(([pageId, items]) => {
+      const pageItems = [];
+
+      (items || []).forEach((item) => {
+        if (!item?.id) return;
+
+        const normalized = {
+          id: item.id,
+          type: item.type || 'app',
+          appId: item.appId || null,
+          col: parseInt(item.col, 10) || 0,
+          row: parseInt(item.row, 10) || 0,
+          colSpan: parseInt(item.colSpan, 10) || 1,
+          rowSpan: parseInt(item.rowSpan, 10) || 1
+        };
+
+        if (normalized.type === 'app' && normalized.appId) {
+          if (seenAppIds.has(normalized.appId)) return;
+        }
+
+        const conflict = pageItems.some((existing) => isOverlap(normalized, existing));
+        if (conflict) return;
+
+        pageItems.push(normalized);
+
+        if (normalized.type === 'app' && normalized.appId) {
+          seenAppIds.add(normalized.appId);
+        }
+      });
+
+      nextLayout[pageId] = pageItems;
+    });
+
+    this.layout = nextLayout;
+  }
+
+  // [模块标注] 桌面重复节点清理模块：隐藏桌面中重复应用节点，以及与 Dock 冲突的桌面应用节点
+  sanitizeDesktopDomDuplicates() {
+    const dockSet = new Set(this.dockState || []);
+    const seenDesktopAppIds = new Set();
+    const items = this.desktopContainer.querySelectorAll('.desktop-page .app-icon[data-app-id]');
+
+    items.forEach((item) => {
+      const appId = item.getAttribute('data-app-id');
+      if (!appId) return;
+
+      const duplicated = seenDesktopAppIds.has(appId);
+      const inDock = dockSet.has(appId);
+
+      if (duplicated || inDock) {
+        item.style.display = 'none';
+        return;
+      }
+
+      seenDesktopAppIds.add(appId);
+    });
+  }
+
   loadDockState() {
     const saved = localStorage.getItem('miniphone_dock_layout');
     if (saved) {
@@ -526,8 +602,18 @@ export class DesktopEditMode {
     const appId = itemEl.getAttribute('data-app-id');
     if (!appId) return;
 
+    // [模块标注] 移除同步修复模块：显示“已移除”时同步清理 Dock 状态和桌面残留
     this.dockState = (this.dockState || []).filter((id) => id !== appId);
+    this.removeAppFromLayout(appId);
+
+    const desktopItems = this.desktopContainer.querySelectorAll(`.desktop-page .desktop-item[data-app-id="${appId}"]`);
+    desktopItems.forEach((item) => {
+      item.style.display = 'none';
+    });
+
     this.applyDockStateToDOM();
+    this.updateLayoutDataFromDOM();
+    this.positionItemsDOM();
     this.showToast('已移除');
   }
 
@@ -797,8 +883,21 @@ export class DesktopEditMode {
     const pageEl = itemEl.closest('.desktop-page');
     if (!pageEl) return;
 
-    // 逻辑删除：隐藏而不是 remove，确保“关闭”可恢复、可重新添加
-    itemEl.style.display = 'none';
+    const itemType = itemEl.getAttribute('data-item-type');
+    const appId = itemEl.getAttribute('data-app-id');
+    const itemId = itemEl.getAttribute('data-item-id');
+
+    // [模块标注] 移除同步修复模块：显示“已移除”时同步清理桌面重复残留，避免看见已移除但仍保留
+    if (itemType === 'app' && appId) {
+      this.removeAppFromLayout(appId);
+      const sameAppItems = this.desktopContainer.querySelectorAll(`.desktop-page .desktop-item[data-app-id="${appId}"]`);
+      sameAppItems.forEach((item) => {
+        item.style.display = 'none';
+      });
+    } else if (itemId) {
+      itemEl.style.display = 'none';
+    }
+
     this.updateLayoutDataFromDOM();
     this.positionItemsDOM();
     this.showToast('已移除');
@@ -1060,7 +1159,9 @@ export class DesktopEditMode {
 
     if (type === 'app') {
       const itemId = `app-${id}`;
-      if (this.isItemInLayout(itemId)) {
+      const dockAppSet = this.getActiveDockAppIdSet();
+
+      if (dockAppSet.has(id) || this.isItemInLayout(itemId)) {
         this.showToast('该应用已在桌面上');
         return false;
       }
@@ -1095,6 +1196,10 @@ export class DesktopEditMode {
       itemEl.setAttribute('data-row', pos.row);
       itemEl.setAttribute('data-colspan', String(colSpan));
       itemEl.setAttribute('data-rowspan', String(rowSpan));
+
+      // [模块标注] 桌面名称显示修复模块：桌面上的应用必须显示应用名称
+      const labelEl = itemEl.querySelector('.app-icon-label');
+      if (labelEl) labelEl.style.display = '';
 
       this.ensureDeleteButton(itemEl);
 
@@ -1208,12 +1313,20 @@ export class DesktopEditMode {
       this.initDefaultLayout();
     }
 
+    // [模块标注] 唯一性与重叠清理模块：加载历史布局后先清理重复与重叠
+    this.sanitizeLayoutForUniquenessAndOverlap();
+
     this.savedLayoutSnapshot = this.cloneLayout(this.layout);
     this.applyLayoutToDOM(true);
   }
 
   saveLayout() {
     this.updateLayoutDataFromDOM();
+
+    // [模块标注] 保存前一致性模块：保存前再次清理唯一性与重叠问题，避免重叠被写入已保存桌面
+    this.sanitizeLayoutForUniquenessAndOverlap();
+    this.applyLayoutToDOM();
+
     localStorage.setItem('miniphone_desktop_layout', JSON.stringify(this.layout));
     this.savedLayoutSnapshot = this.cloneLayout(this.layout);
 
@@ -1276,23 +1389,34 @@ export class DesktopEditMode {
       });
 
       const allItems = page.querySelectorAll('.p1-clock-widget, .p1-avatar-widget, .p1-news-widget, .p1-ticket-widget, .p2-ticket-widget, .app-icon');
-      const domMap = {};
+      const domMap = new Map();
+      const duplicates = [];
 
       allItems.forEach((el) => {
-        if (el.classList.contains('p1-clock-widget')) domMap.clock = el;
-        else if (el.classList.contains('p1-avatar-widget')) domMap.avatar = el;
-        else if (el.classList.contains('p1-news-widget')) domMap.news = el;
-        else if (el.classList.contains('p1-ticket-widget')) domMap.ticket1 = el;
-        else if (el.classList.contains('p2-ticket-widget')) domMap.ticket2 = el;
+        let key = null;
+        if (el.classList.contains('p1-clock-widget')) key = 'clock';
+        else if (el.classList.contains('p1-avatar-widget')) key = 'avatar';
+        else if (el.classList.contains('p1-news-widget')) key = 'news';
+        else if (el.classList.contains('p1-ticket-widget')) key = 'ticket1';
+        else if (el.classList.contains('p2-ticket-widget')) key = 'ticket2';
         else if (el.classList.contains('app-icon')) {
           const appId = el.getAttribute('data-app-id');
-          if (appId) domMap[`app-${appId}`] = el;
+          if (appId) key = `app-${appId}`;
         }
+
+        if (!key) return;
+
+        if (domMap.has(key)) {
+          duplicates.push(el);
+          return;
+        }
+
+        domMap.set(key, el);
       });
 
       // 应用 layout 数据
       layoutItems.forEach((itemData) => {
-        let el = domMap[itemData.id];
+        let el = domMap.get(itemData.id);
 
         if (!el && itemData.type === 'app' && itemData.appId) {
           const app = this.appManager.registry.get(itemData.appId);
@@ -1300,7 +1424,7 @@ export class DesktopEditMode {
           if (created) {
             page.appendChild(created);
             el = created;
-            domMap[itemData.id] = created;
+            domMap.set(itemData.id, created);
           }
         }
 
@@ -1309,7 +1433,7 @@ export class DesktopEditMode {
           if (widgetEl) {
             if (widgetEl.parentElement !== page) page.appendChild(widgetEl);
             el = widgetEl;
-            domMap[itemData.id] = widgetEl;
+            domMap.set(itemData.id, widgetEl);
           }
         }
 
@@ -1323,16 +1447,28 @@ export class DesktopEditMode {
           el.setAttribute('data-row', String(itemData.row));
           el.setAttribute('data-colspan', String(itemData.colSpan));
           el.setAttribute('data-rowspan', String(itemData.rowSpan));
-          delete domMap[itemData.id];
+
+          // [模块标注] 桌面名称显示修复模块：桌面区应用始终显示名称
+          if (itemData.type === 'app') {
+            const labelEl = el.querySelector('.app-icon-label');
+            if (labelEl) labelEl.style.display = '';
+          }
+
+          domMap.delete(itemData.id);
         }
       });
 
+      duplicates.forEach((el) => {
+        el.style.display = 'none';
+      });
+
       // 未在 layout 中的元素隐藏
-      Object.values(domMap).forEach((el) => {
+      Array.from(domMap.values()).forEach((el) => {
         el.style.display = 'none';
       });
     });
 
+    this.sanitizeDesktopDomDuplicates();
     this.positionItemsDOM();
 
     // 初次加载后，校正当前页 id（防止页面状态不同步）
@@ -1386,15 +1522,30 @@ export class DesktopEditMode {
   }
 
   updateLayoutDataFromDOM() {
-    this.layout = {};
+    this.sanitizeDockDomDuplicates();
+    this.dockState = this.dedupeDockState(this.dockState || []);
+
+    const dockSet = new Set(this.dockState || []);
+    const globalSeenAppIds = new Set(dockSet);
+    const nextLayout = {};
+
+    const isOverlap = (a, b) => (
+      a.col < b.col + b.colSpan
+      && a.col + a.colSpan > b.col
+      && a.row < b.row + b.rowSpan
+      && a.row + a.rowSpan > b.row
+    );
+
     const pages = this.desktopContainer.querySelectorAll('.desktop-page');
     pages.forEach((page) => {
       const pageId = page.getAttribute('data-page-id');
-      this.layout[pageId] = [];
+      nextLayout[pageId] = [];
       const items = page.querySelectorAll('.desktop-item.absolute-layout');
+
       items.forEach((item) => {
         if (item.style.display === 'none') return;
-        this.layout[pageId].push({
+
+        const itemData = {
           id: item.getAttribute('data-item-id'),
           type: item.getAttribute('data-item-type'),
           appId: item.getAttribute('data-app-id'),
@@ -1402,8 +1553,41 @@ export class DesktopEditMode {
           row: parseInt(item.getAttribute('data-row')) || 0,
           colSpan: parseInt(item.getAttribute('data-colspan')) || 1,
           rowSpan: parseInt(item.getAttribute('data-rowspan')) || 1
-        });
+        };
+
+        if (!itemData.id) {
+          item.style.display = 'none';
+          return;
+        }
+
+        if (itemData.type === 'app' && itemData.appId) {
+          // [模块标注] 应用全局唯一模块：桌面和 Dock 合并后，同一应用只保留一个
+          if (globalSeenAppIds.has(itemData.appId)) {
+            item.style.display = 'none';
+            return;
+          }
+
+          // [模块标注] 桌面名称显示修复模块：采样桌面应用时强制显示名称
+          const labelEl = item.querySelector('.app-icon-label');
+          if (labelEl) labelEl.style.display = '';
+        }
+
+        // [模块标注] 重叠阻止模块：若当前项与页面已有项重叠，则不纳入保存布局
+        const conflict = nextLayout[pageId].some((existing) => isOverlap(itemData, existing));
+        if (conflict) {
+          item.style.display = 'none';
+          return;
+        }
+
+        nextLayout[pageId].push(itemData);
+
+        if (itemData.type === 'app' && itemData.appId) {
+          globalSeenAppIds.add(itemData.appId);
+        }
       });
     });
+
+    this.layout = nextLayout;
+    this.sanitizeLayoutForUniquenessAndOverlap();
   }
 }
