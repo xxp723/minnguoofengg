@@ -448,10 +448,18 @@ export class DesktopEditMode {
     });
 
     const dockSet = new Set(this.dockState || []);
+    const visibleAppIds = new Set();
     this.getDockItems().forEach((item) => {
       const appId = item.getAttribute('data-app-id');
-      item.style.display = dockSet.has(appId) ? '' : 'none';
-      if (dockSet.has(appId)) this.ensureDockDeleteButton(item);
+
+      // [模块标注] Dock唯一实例清理模块：同一 appId 在 Dock 中只允许显示一个
+      const shouldShow = !!appId && dockSet.has(appId) && !visibleAppIds.has(appId);
+      item.style.display = shouldShow ? '' : 'none';
+
+      if (shouldShow) {
+        visibleAppIds.add(appId);
+        this.ensureDockDeleteButton(item);
+      }
     });
   }
 
@@ -617,6 +625,17 @@ export class DesktopEditMode {
 
     draggedDesktopEl.style.display = '';
     this.normalizeDockItemElement(draggedDesktopEl);
+
+    // [模块标注] 拖入Dock唯一性保护模块：拖入前先清理 Dock 内同 appId 的重复节点
+    if (this.dockContainer) {
+      const sameAppDockItems = this.getDockItems().filter((item) => (
+        item.getAttribute('data-app-id') === appId && item !== draggedDesktopEl
+      ));
+      sameAppDockItems.forEach((item) => {
+        item.style.display = 'none';
+      });
+    }
+
     if (this.dockContainer && draggedDesktopEl.parentElement !== this.dockContainer) {
       this.dockContainer.appendChild(draggedDesktopEl);
     }
