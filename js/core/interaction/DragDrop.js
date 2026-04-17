@@ -13,6 +13,7 @@ export class DragDrop {
     this.editMode = null;
 
     this.activeDrag = null;
+    this.lastPointer = null;
     this.pageSwitchThrottleMs = 260;
     this.lastPageSwitchAt = 0;
 
@@ -32,12 +33,12 @@ export class DragDrop {
 
   enableFreeDrag(editModeInstance) {
     this.editMode = editModeInstance;
-    const items = this.desktopContainer.querySelectorAll('.desktop-item');
+    const items = document.querySelectorAll('.desktop-item, #dock-container .app-icon[data-app-id]');
     items.forEach((item) => this.makeElementDraggable(item, this.editMode));
   }
 
   disableFreeDrag() {
-    const items = this.desktopContainer.querySelectorAll('.desktop-item');
+    const items = document.querySelectorAll('.desktop-item, #dock-container .app-icon[data-app-id]');
     items.forEach((item) => {
       item.removeEventListener('touchstart', this.onStart);
       item.removeEventListener('mousedown', this.onStart);
@@ -46,7 +47,10 @@ export class DragDrop {
   }
 
   makeElementDraggable(el, editMode) {
+    if (!el) return;
     if (!this.editMode) this.editMode = editMode;
+    el.removeEventListener('touchstart', this.onStart);
+    el.removeEventListener('mousedown', this.onStart);
     el.addEventListener('touchstart', this.onStart, { passive: false });
     el.addEventListener('mousedown', this.onStart);
   }
@@ -67,7 +71,7 @@ export class DragDrop {
   }
 
   trySwitchPage(pointer) {
-    if (!this.activeDrag) return;
+    if (!this.activeDrag || this.activeDrag.isDockItem) return;
 
     const now = Date.now();
     if (now - this.lastPageSwitchAt < this.pageSwitchThrottleMs) return;
@@ -130,25 +134,56 @@ export class DragDrop {
     e.stopPropagation();
 
     const target = e.currentTarget;
-    if (!target.classList.contains('desktop-item')) return;
+    const isDesktopItem = target.classList.contains('desktop-item');
+    const isDockItem = !!target.closest('#dock-container');
+    if (!isDesktopItem && !isDockItem) return;
 
     const pointer = e.type.includes('touch') ? e.touches[0] : e;
-
-    // 获取初始位置和偏移
     const rect = target.getBoundingClientRect();
-    const parentRect = target.parentElement.getBoundingClientRect();
+    const pageEl = target.closest('.desktop-page');
+    const parentForDesktop = pageEl || target.parentElement;
+    const parentRect = parentForDesktop ? parentForDesktop.getBoundingClientRect() : rect;
+
+    const appId = target.getAttribute('data-app-id') || null;
+    const sourceCol = parseInt(target.getAttribute('data-col'), 10);
+    const sourceRow = parseInt(target.getAttribute('data-row'), 10);
 
     this.activeDrag = {
       el: target,
+      isDockItem,
+      appId,
+      sourcePageId: pageEl ? pageEl.getAttribute('data-page-id') : null,
+      sourceCol: Number.isFinite(sourceCol) ? sourceCol : null,
+      sourceRow: Number.isFinite(sourceRow) ? sourceRow : null,
+      sourceDockIndex: isDockItem && this.editMode && typeof this.editMode.getDockIndexByAppId === 'function'
+        ? this.editMode.getDockIndexByAppId(appId)
+        : null,
+
       startX: pointer.clientX,
       startY: pointer.clientY,
       initialLeft: rect.left - parentRect.left,
       initialTop: rect.top - parentRect.top,
       colSpan: parseInt(target.getAttribute('data-colspan')) || 1,
       rowSpan: parseInt(target.getAttribute('data-rowspan')) || 1,
-      pageEl: target.closest('.desktop-page'),
-      parentRect: parentRect
+      pageEl,
+      parentRect,
+
+      dockRect: isDockItem ? rect : null,
+      dockOriginalStyle: isDockItem ? {
+        position: target.style.position || '',
+        left: target.style.left || '',
+        top: target.style.top || '',
+        width: target.style.width || '',
+        height: target.style.height || '',
+        zIndex: target.style.zIndex || '',
+        pointerEvents: target.style.pointerEvents || ''
+      } : null
     };
+
+    if (isDockItem) {
+      target.style.width = `${rect.width}px`;
+      target.style.height = `${rect.height}px`;
+    }
 
     target.classList.add('is-dragging');
 
@@ -163,6 +198,12 @@ export class DragDrop {
     e.preventDefault();
 
     const pointer = e.type.includes('touch') ? e.touches[0] : e;
+    this.lastPointer = pointer;
+
+    if (this.activeDrag.isDockItem) {
+      this.moveDockDragGhost(pointer);
+      return;
+    }
 
     // 先尝试切页（拖到左右边缘）
     this.trySwitchPage(pointer);
@@ -192,15 +233,120 @@ export class DragDrop {
     document.removeEventListener('mousemove', this.onMove);
     document.removeEventListener('mouseup', this.onEnd);
 
-    const el = this.activeDrag.el;
+    const drag = this.activeDrag;
+    const el = drag.el;
+    const pointer = this.lastPointer;
+    let handled = false;
+
     el.classList.remove('is-dragging');
 
-    this.snapToGrid();
+    if (drag.isDockItem) {
+      handled = this.handleDockDrop(pointer);
+      this.restoreDockItemStyle();
+      if (!handled && this.editMode && typeof this.editMode.applyDockStateToDOM === 'function') {
+        this.editMode.applyDockStateToDOM();
+      }
+    } else {
+      handled = this.handleDesktopDrop(pointer);
+      if (!handled) {
+        this.snapToGrid();
+      }
+    }
 
     this.activeDrag = null;
+    this.lastPointer = null;
+  }
+
+  moveDockDragGhost(pointer) {
+    if (!this.activeDrag) return;
+    const { el, dockRect } = this.activeDrag;
+    const width = dockRect?.width || el.offsetWidth || 56;
+    const height = dockRect?.height || el.offsetHeight || 56;
+
+    el.style.position = 'fixed';
+    el.style.left = `${pointer.clientX - width / 2}px`;
+    el.style.top = `${pointer.clientY - height / 2}px`;
+    el.style.width = `${width}px`;
+    el.style.height = `${height}px`;
+    el.style.zIndex = '9999';
+    el.style.pointerEvents = 'none';
+  }
+
+  restoreDockItemStyle() {
+    if (!this.activeDrag || !this.activeDrag.isDockItem) return;
+    const { el, dockOriginalStyle } = this.activeDrag;
+    if (!dockOriginalStyle) return;
+
+    el.style.position = dockOriginalStyle.position;
+    el.style.left = dockOriginalStyle.left;
+    el.style.top = dockOriginalStyle.top;
+    el.style.width = dockOriginalStyle.width;
+    el.style.height = dockOriginalStyle.height;
+    el.style.zIndex = dockOriginalStyle.zIndex;
+    el.style.pointerEvents = dockOriginalStyle.pointerEvents;
+  }
+
+  isPointerInsideRect(pointer, rect) {
+    if (!pointer || !rect) return false;
+    return pointer.clientX >= rect.left
+      && pointer.clientX <= rect.right
+      && pointer.clientY >= rect.top
+      && pointer.clientY <= rect.bottom;
+  }
+
+  handleDesktopDrop(pointer) {
+    if (!this.activeDrag || !pointer || !this.editMode) return false;
+    const appId = this.activeDrag.appId;
+    if (!appId) return false;
+
+    const dock = document.getElementById('dock-container');
+    if (!dock) return false;
+
+    const dockRect = dock.getBoundingClientRect();
+    const insideDock = this.isPointerInsideRect(pointer, dockRect);
+    if (!insideDock) return false;
+
+    if (typeof this.editMode.handleDesktopDropToDock === 'function') {
+      return !!this.editMode.handleDesktopDropToDock({
+        appId,
+        fromPageId: this.activeDrag.sourcePageId,
+        fromCol: this.activeDrag.sourceCol,
+        fromRow: this.activeDrag.sourceRow,
+        pointer
+      });
+    }
+
+    return false;
+  }
+
+  handleDockDrop(pointer) {
+    if (!this.activeDrag || !pointer || !this.editMode) return false;
+    const appId = this.activeDrag.appId;
+    if (!appId) return false;
+
+    const dock = document.getElementById('dock-container');
+    const dockRect = dock ? dock.getBoundingClientRect() : null;
+    const insideDock = this.isPointerInsideRect(pointer, dockRect);
+    if (insideDock && typeof this.editMode.reorderDockItemByPointer === 'function') {
+      return !!this.editMode.reorderDockItemByPointer(appId, pointer);
+    }
+
+    const desktopRect = this.desktopContainer.getBoundingClientRect();
+    const insideDesktop = this.isPointerInsideRect(pointer, desktopRect);
+    if (insideDesktop && typeof this.editMode.handleDockDropToDesktop === 'function') {
+      return !!this.editMode.handleDockDropToDesktop({
+        appId,
+        sourceDockIndex: this.activeDrag.sourceDockIndex,
+        pointer
+      });
+    }
+
+    return false;
   }
 
   snapToGrid() {
+    if (!this.activeDrag || this.activeDrag.isDockItem) return;
+
     const { el, pageEl, colSpan, rowSpan, parentRect } = this.activeDrag;
 
     const marginX = 20;

@@ -282,10 +282,101 @@ export class DesktopEditMode {
   }
 
   // =========================
-  // Dock 编辑模式（显示/隐藏）
+  // Dock 编辑模式（排序/互换/显示）
   // =========================
   getDockItems() {
     return Array.from(document.querySelectorAll('#dock-container .app-icon[data-app-id]'));
+  }
+
+  dedupeDockState(list) {
+    const result = [];
+    const seen = new Set();
+    (list || []).forEach((id) => {
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      result.push(id);
+    });
+    return result;
+  }
+
+  getDockIndexByAppId(appId) {
+    return (this.dockState || []).indexOf(appId);
+  }
+
+  getDockTargetAppIdByPointer(pointer, excludeAppId = null) {
+    if (!pointer) return null;
+    const visible = this.getDockItems().filter((item) => item.style.display !== 'none');
+    for (const item of visible) {
+      const appId = item.getAttribute('data-app-id');
+      if (!appId || appId === excludeAppId) continue;
+      const rect = item.getBoundingClientRect();
+      const inside = pointer.clientX >= rect.left
+        && pointer.clientX <= rect.right
+        && pointer.clientY >= rect.top
+        && pointer.clientY <= rect.bottom;
+      if (inside) return appId;
+    }
+    return null;
+  }
+
+  getDockInsertIndexByPointer(pointer, excludeAppId = null) {
+    if (!pointer) return (this.dockState || []).length;
+
+    const visible = this.getDockItems()
+      .filter((item) => item.style.display !== 'none')
+      .filter((item) => item.getAttribute('data-app-id') !== excludeAppId);
+
+    if (visible.length === 0) return 0;
+
+    for (let i = 0; i < visible.length; i++) {
+      const rect = visible[i].getBoundingClientRect();
+      const mid = rect.left + rect.width / 2;
+      if (pointer.clientX < mid) return i;
+    }
+
+    return visible.length;
+  }
+
+  normalizeDockItemElement(itemEl) {
+    if (!itemEl) return;
+    itemEl.classList.add('dock-icon');
+    itemEl.classList.remove('desktop-item', 'absolute-layout');
+    itemEl.removeAttribute('data-item-id');
+    itemEl.removeAttribute('data-item-type');
+    itemEl.removeAttribute('data-col');
+    itemEl.removeAttribute('data-row');
+    itemEl.removeAttribute('data-colspan');
+    itemEl.removeAttribute('data-rowspan');
+
+    itemEl.style.position = '';
+    itemEl.style.left = '';
+    itemEl.style.top = '';
+    itemEl.style.width = '';
+    itemEl.style.height = '';
+    itemEl.style.paddingTop = '';
+    itemEl.style.justifyContent = '';
+    itemEl.style.display = '';
+  }
+
+  normalizeDesktopAppElement(itemEl, pageId, col, row) {
+    if (!itemEl) return;
+    const appId = itemEl.getAttribute('data-app-id');
+    if (!appId) return;
+
+    itemEl.classList.add('desktop-item', 'absolute-layout');
+    itemEl.classList.remove('dock-icon');
+    itemEl.setAttribute('data-item-id', `app-${appId}`);
+    itemEl.setAttribute('data-item-type', 'app');
+    itemEl.setAttribute('data-col', String(col));
+    itemEl.setAttribute('data-row', String(row));
+    itemEl.setAttribute('data-colspan', '1');
+    itemEl.setAttribute('data-rowspan', '1');
+    itemEl.style.display = '';
+
+    const pageEl = this.desktopContainer.querySelector(`.desktop-page[data-page-id="${pageId}"]`);
+    if (pageEl && itemEl.parentElement !== pageEl) {
+      pageEl.appendChild(itemEl);
+    }
   }
 
   loadDockState() {
@@ -293,7 +384,7 @@ export class DesktopEditMode {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        this.dockState = Array.isArray(parsed) ? parsed : [];
+        this.dockState = this.dedupeDockState(Array.isArray(parsed) ? parsed : []);
       } catch (e) {
         Logger.error('解析 Dock 布局失败', e);
         this.initDefaultDockState();
@@ -307,34 +398,65 @@ export class DesktopEditMode {
   }
 
   initDefaultDockState() {
-    this.dockState = this.getDockItems()
-      .map((item) => item.getAttribute('data-app-id'))
-      .filter(Boolean);
+    this.dockState = this.dedupeDockState(
+      this.getDockItems()
+        .map((item) => item.getAttribute('data-app-id'))
+        .filter(Boolean)
+    );
   }
 
   updateDockDataFromDOM() {
-    this.dockState = this.getDockItems()
-      .filter((item) => item.style.display !== 'none')
-      .map((item) => item.getAttribute('data-app-id'))
-      .filter(Boolean);
+    this.dockState = this.dedupeDockState(
+      this.getDockItems()
+        .filter((item) => item.style.display !== 'none')
+        .map((item) => item.getAttribute('data-app-id'))
+        .filter(Boolean)
+    );
   }
 
   applyDockStateToDOM() {
+    if (!this.dockContainer) return;
+
+    this.dockState = this.dedupeDockState(this.dockState || []);
+    const allItems = this.getDockItems();
+    const map = new Map();
+    allItems.forEach((item) => {
+      const appId = item.getAttribute('data-app-id');
+      if (!appId || map.has(appId)) return;
+      map.set(appId, item);
+    });
+
+    const orderedVisible = [];
+    this.dockState.forEach((appId) => {
+      const item = map.get(appId);
+      if (!item) return;
+      this.normalizeDockItemElement(item);
+      orderedVisible.push(item);
+    });
+
+    orderedVisible.forEach((item) => this.dockContainer.appendChild(item));
+    allItems.forEach((item) => {
+      if (!orderedVisible.includes(item)) this.dockContainer.appendChild(item);
+    });
+
     const dockSet = new Set(this.dockState || []);
     this.getDockItems().forEach((item) => {
       const appId = item.getAttribute('data-app-id');
       item.style.display = dockSet.has(appId) ? '' : 'none';
+      if (dockSet.has(appId)) this.ensureDockDeleteButton(item);
     });
   }
 
   saveDockState() {
-    this.updateDockDataFromDOM();
+    this.dockState = this.dedupeDockState(this.dockState || []);
     localStorage.setItem('miniphone_dock_layout', JSON.stringify(this.dockState));
     this.savedDockSnapshot = [...this.dockState];
   }
 
   ensureDockDeleteButton(item) {
-    if (item.querySelector('.edit-delete-btn')) return;
+    const old = item.querySelector('.edit-delete-btn');
+    if (old) old.remove();
+
     const btn = document.createElement('div');
     btn.className = 'edit-delete-btn';
     btn.innerHTML = '×';
@@ -347,14 +469,232 @@ export class DesktopEditMode {
   }
 
   attachDockDeleteButtons() {
-    this.getDockItems().forEach((item) => this.ensureDockDeleteButton(item));
+    this.getDockItems().forEach((item) => {
+      if (item.style.display === 'none') return;
+      this.ensureDockDeleteButton(item);
+    });
   }
 
   removeDockItem(itemEl) {
     if (!itemEl) return;
-    itemEl.style.display = 'none';
-    this.updateDockDataFromDOM();
+    const appId = itemEl.getAttribute('data-app-id');
+    if (!appId) return;
+
+    this.dockState = (this.dockState || []).filter((id) => id !== appId);
+    this.applyDockStateToDOM();
     this.showToast('已移除');
+  }
+
+  reorderDockItemByPointer(appId, pointer) {
+    if (!appId) return false;
+    const oldIndex = this.getDockIndexByAppId(appId);
+    if (oldIndex < 0) return false;
+
+    const next = (this.dockState || []).filter((id) => id !== appId);
+    const insertIndex = this.getDockInsertIndexByPointer(pointer, appId);
+    const safeIndex = Math.max(0, Math.min(insertIndex, next.length));
+    next.splice(safeIndex, 0, appId);
+
+    this.dockState = this.dedupeDockState(next);
+    this.applyDockStateToDOM();
+    return true;
+  }
+
+  removeAppFromLayout(appId) {
+    const itemId = `app-${appId}`;
+    let removed = null;
+
+    Object.entries(this.layout).forEach(([pageId, items]) => {
+      const arr = items || [];
+      const idx = arr.findIndex((i) => i.id === itemId);
+      if (idx < 0) return;
+
+      const hit = arr[idx];
+      removed = {
+        pageId,
+        col: hit.col,
+        row: hit.row
+      };
+      arr.splice(idx, 1);
+      this.layout[pageId] = arr;
+    });
+
+    return removed;
+  }
+
+  upsertAppInLayout(pageId, appId, col, row) {
+    if (!pageId || !appId) return;
+    if (!this.layout[pageId]) this.layout[pageId] = [];
+
+    const itemId = `app-${appId}`;
+    const pageItems = this.layout[pageId];
+    const found = pageItems.find((i) => i.id === itemId);
+
+    if (found) {
+      found.type = 'app';
+      found.appId = appId;
+      found.col = col;
+      found.row = row;
+      found.colSpan = 1;
+      found.rowSpan = 1;
+      return;
+    }
+
+    pageItems.push({
+      id: itemId,
+      type: 'app',
+      appId,
+      col,
+      row,
+      colSpan: 1,
+      rowSpan: 1
+    });
+  }
+
+  getDesktopAppItemAt(pageId, col, row, excludeAppId = null) {
+    const items = this.layout[pageId] || [];
+    return items.find((item) => {
+      if (item.type !== 'app' || !item.appId) return false;
+      if (excludeAppId && item.appId === excludeAppId) return false;
+      return item.col === col && item.row === row;
+    }) || null;
+  }
+
+  getDesktopPageByPointer(pointer) {
+    if (!pointer) return null;
+    const pages = Array.from(this.desktopContainer.querySelectorAll('.desktop-page'));
+    for (const page of pages) {
+      const rect = page.getBoundingClientRect();
+      const inside = pointer.clientX >= rect.left
+        && pointer.clientX <= rect.right
+        && pointer.clientY >= rect.top
+        && pointer.clientY <= rect.bottom;
+      if (inside) return page;
+    }
+    return null;
+  }
+
+  pointerToGrid(pageEl, pointer, colSpan = 1, rowSpan = 1) {
+    if (!pageEl || !pointer) return null;
+
+    const marginX = 20;
+    const marginY = 15;
+    const gridH = 90;
+    const pageRect = pageEl.getBoundingClientRect();
+    const gridW = (pageRect.width - marginX * 2) / this.gridCols;
+
+    let targetCol = Math.floor((pointer.clientX - pageRect.left - marginX) / gridW);
+    let targetRow = Math.floor((pointer.clientY - pageRect.top - marginY) / gridH);
+
+    targetCol = Math.max(0, Math.min(targetCol, this.gridCols - colSpan));
+    targetRow = Math.max(0, Math.min(targetRow, this.gridRows - rowSpan));
+
+    return { col: targetCol, row: targetRow };
+  }
+
+  handleDesktopDropToDock({ appId, fromPageId, fromCol, fromRow, pointer }) {
+    if (!appId) return false;
+
+    const draggedDesktopEl = this.desktopContainer.querySelector(
+      `.desktop-page .desktop-item[data-app-id="${appId}"]`
+    );
+    if (!draggedDesktopEl) return false;
+
+    const targetDockAppId = this.getDockTargetAppIdByPointer(pointer, appId);
+    const sourcePos = this.removeAppFromLayout(appId) || {
+      pageId: fromPageId || this.currentPageId,
+      col: Number.isFinite(fromCol) ? fromCol : 0,
+      row: Number.isFinite(fromRow) ? fromRow : 0
+    };
+
+    draggedDesktopEl.style.display = '';
+    this.normalizeDockItemElement(draggedDesktopEl);
+    if (this.dockContainer && draggedDesktopEl.parentElement !== this.dockContainer) {
+      this.dockContainer.appendChild(draggedDesktopEl);
+    }
+    this.ensureDockDeleteButton(draggedDesktopEl);
+
+    let nextDock = (this.dockState || []).filter((id) => id !== appId);
+
+    if (targetDockAppId) {
+      const targetIndex = nextDock.indexOf(targetDockAppId);
+      const safeDockIndex = targetIndex >= 0 ? targetIndex : nextDock.length;
+      nextDock.splice(safeDockIndex, 0, appId);
+
+      const targetDockEl = this.dockContainer?.querySelector(`.app-icon[data-app-id="${targetDockAppId}"]`);
+      if (targetDockEl) {
+        this.dockState = this.dedupeDockState(nextDock);
+        this.dockState = this.dockState.filter((id) => id !== targetDockAppId);
+
+        this.normalizeDesktopAppElement(targetDockEl, sourcePos.pageId, sourcePos.col, sourcePos.row);
+        this.ensureDeleteButton(targetDockEl);
+        this.upsertAppInLayout(sourcePos.pageId, targetDockAppId, sourcePos.col, sourcePos.row);
+
+        if (this.dragDrop) this.dragDrop.makeElementDraggable(targetDockEl, this);
+      }
+    } else {
+      const insertIndex = this.getDockInsertIndexByPointer(pointer, appId);
+      const safeIndex = Math.max(0, Math.min(insertIndex, nextDock.length));
+      nextDock.splice(safeIndex, 0, appId);
+    }
+
+    this.dockState = this.dedupeDockState(nextDock);
+    this.applyDockStateToDOM();
+    this.positionItemsDOM();
+
+    if (this.dragDrop) this.dragDrop.makeElementDraggable(draggedDesktopEl, this);
+    return true;
+  }
+
+  handleDockDropToDesktop({ appId, sourceDockIndex, pointer }) {
+    if (!appId || !pointer) return false;
+
+    const pageEl = this.getDesktopPageByPointer(pointer);
+    if (!pageEl) return false;
+    const pageId = pageEl.getAttribute('data-page-id');
+    if (!pageId) return false;
+
+    const cell = this.pointerToGrid(pageEl, pointer, 1, 1);
+    if (!cell) return false;
+
+    const dragDockEl = this.dockContainer?.querySelector(`.app-icon[data-app-id="${appId}"]`);
+    if (!dragDockEl) return false;
+
+    const targetDesktop = this.getDesktopAppItemAt(pageId, cell.col, cell.row, appId);
+
+    let nextDock = (this.dockState || []).filter((id) => id !== appId);
+
+    if (targetDesktop?.appId) {
+      const targetAppId = targetDesktop.appId;
+      this.removeAppFromLayout(targetAppId);
+
+      const insertIndex = Number.isFinite(sourceDockIndex) ? sourceDockIndex : nextDock.length;
+      const safeIndex = Math.max(0, Math.min(insertIndex, nextDock.length));
+      nextDock.splice(safeIndex, 0, targetAppId);
+
+      const targetDesktopEl = this.desktopContainer.querySelector(
+        `.desktop-page .desktop-item[data-app-id="${targetAppId}"]`
+      );
+      if (targetDesktopEl) {
+        this.normalizeDockItemElement(targetDesktopEl);
+        if (this.dockContainer && targetDesktopEl.parentElement !== this.dockContainer) {
+          this.dockContainer.appendChild(targetDesktopEl);
+        }
+        this.ensureDockDeleteButton(targetDesktopEl);
+        if (this.dragDrop) this.dragDrop.makeElementDraggable(targetDesktopEl, this);
+      }
+    }
+
+    this.normalizeDesktopAppElement(dragDockEl, pageId, cell.col, cell.row);
+    this.ensureDeleteButton(dragDockEl);
+    this.upsertAppInLayout(pageId, appId, cell.col, cell.row);
+
+    this.dockState = this.dedupeDockState(nextDock);
+    this.applyDockStateToDOM();
+    this.positionItemsDOM();
+
+    if (this.dragDrop) this.dragDrop.makeElementDraggable(dragDockEl, this);
+    return true;
   }
 
   enableDockEditState() {
@@ -368,13 +708,7 @@ export class DesktopEditMode {
   }
 
   getActiveDockAppIdSet() {
-    const set = new Set();
-    this.getDockItems().forEach((item) => {
-      const appId = item.getAttribute('data-app-id');
-      if (!appId) return;
-      if (item.style.display === 'none') return;
-      set.add(appId);
-    });
+    const set = new Set(this.dockState || []);
     return set;
   }
 
@@ -387,7 +721,9 @@ export class DesktopEditMode {
   }
 
   ensureDeleteButton(item) {
-    if (item.querySelector('.edit-delete-btn')) return;
+    const old = item.querySelector('.edit-delete-btn');
+    if (old) old.remove();
+
     const btn = document.createElement('div');
     btn.className = 'edit-delete-btn';
     btn.innerHTML = '×';
