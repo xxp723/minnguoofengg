@@ -174,6 +174,17 @@ export class Desktop {
           btn?.classList.add('has-img');
         }
       });
+
+      // [模块标注] 桌面应用名称显示修复模块：桌面应用显示名称，DOCK 栏应用隐藏名称
+      this.container.querySelectorAll('.app-icon[data-app-id]').forEach((el) => {
+        const label = el.querySelector('.app-icon-label');
+        if (label) label.style.display = '';
+      });
+
+      document.querySelectorAll('#dock-container .app-icon[data-app-id]').forEach((el) => {
+        const label = el.querySelector('.app-icon-label');
+        if (label) label.style.display = 'none';
+      });
     }
 
     this.bindIconEvents();
