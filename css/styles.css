@@ -941,6 +941,15 @@ body.is-edit-mode #dock-container.is-edit-mode .app-icon .edit-delete-btn {
   border-radius: 10px;
 }
 
+.app-window--widget-custom .app-window__actions {
+  gap: 10px;
+  margin-right: 42px;
+}
+
+.app-window--widget-custom .app-window__title {
+  padding: 0 112px 0 54px;
+}
+
 .app-window__content {
   flex: 1;
   overflow: auto;
@@ -1698,6 +1707,47 @@ body.fullscreen-mode .app-window {
   background: linear-gradient(180deg, rgba(255,255,255,0.72) 0%, rgba(245,241,234,0.96) 100%);
   padding: 14px;
   box-shadow: 0 6px 18px rgba(74, 52, 42, 0.06);
+  position: relative;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.component-library-grid.is-selection-mode .component-library-card {
+  cursor: pointer;
+}
+
+.component-library-card.is-selectable:active {
+  transform: scale(0.985);
+}
+
+.component-library-card.is-selected {
+  border-color: rgba(74, 52, 42, 0.34);
+  box-shadow: 0 10px 24px rgba(74, 52, 42, 0.1);
+}
+
+.component-library-card__select-indicator {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(74, 52, 42, 0.08);
+  color: rgba(74, 52, 42, 0.28);
+  border: 1px solid rgba(125, 90, 68, 0.16);
+  z-index: 1;
+}
+
+.component-library-grid.is-selection-mode .component-library-card__select-indicator {
+  display: inline-flex;
+}
+
+.component-library-card.is-selected .component-library-card__select-indicator {
+  background: var(--c-text-main);
+  color: var(--c-white-rice);
+  border-color: var(--c-text-main);
 }
 
 .component-library-card__head {
@@ -1764,6 +1814,42 @@ body.fullscreen-mode .app-window {
   font-size: 12px;
   line-height: 1.6;
   color: #8f7a66;
+}
+
+.component-library-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.component-library-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ui-button.danger {
+  background: #c0392b;
+  color: #fff;
+}
+
+.ui-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.modal-help-text {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #8f7a66;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(215, 201, 184, 0.14);
 }
 
 .custom-widget-spec {
@@ -2180,6 +2266,19 @@ body.fullscreen-mode .app-window {
 }
 
 @media (max-width: 360px) {
+  .component-library-section-head {
+    flex-direction: column;
+  }
+
+  .component-library-controls {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .component-library-controls .ui-button {
+    width: 100%;
+  }
+
   .custom-widget-toolbar {
     flex-direction: column;
     align-items: flex-start;

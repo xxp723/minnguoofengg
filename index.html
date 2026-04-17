@@ -267,6 +267,121 @@
                 <input id="modal-ticket2-stamp-input" type="text" />
               </div>
             </div>
+
+            <div class="modal-section" data-modal-section="music">
+              <div class="modal-field">
+                <label>音乐标题</label>
+                <input id="modal-music-title-input" type="text" placeholder="请输入音乐标题" />
+              </div>
+              <div class="modal-field">
+                <label>说明文字</label>
+                <textarea id="modal-music-subtitle-input" rows="2" placeholder="请输入说明文字"></textarea>
+              </div>
+              <div class="modal-field">
+                <label>封面图片</label>
+                <div class="modal-img-preview">
+                  <img id="modal-music-cover-preview" style="display:none;" alt="封面预览" />
+                  <div class="modal-img-placeholder" id="modal-music-cover-placeholder">尚未设置</div>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button type="button" class="modal-btn" id="modal-music-cover-upload">上传/URL</button>
+                  <button type="button" class="modal-btn" id="modal-music-cover-delete" style="background:#c0392b;color:#fff;">删除图片</button>
+                </div>
+              </div>
+              <div class="modal-field">
+                <label>音频文件</label>
+                <input id="modal-music-audio-name" type="text" placeholder="未导入音频" readonly />
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button type="button" class="modal-btn" id="modal-music-audio-upload">上传/URL</button>
+                  <button type="button" class="modal-btn" id="modal-music-audio-delete" style="background:#c0392b;color:#fff;">删除音频</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-section" data-modal-section="calendar">
+              <div class="modal-field">
+                <label>日历标题</label>
+                <input id="modal-calendar-title-input" type="text" placeholder="请输入日历标题" />
+              </div>
+              <div class="modal-field">
+                <label>日程内容</label>
+                <textarea id="modal-calendar-lines-input" rows="5" placeholder="每行一条日程"></textarea>
+              </div>
+            </div>
+
+            <div class="modal-section" data-modal-section="polaroid">
+              <div class="modal-field">
+                <label>拍立得标题</label>
+                <input id="modal-polaroid-title-input" type="text" placeholder="请输入标题" />
+              </div>
+              <div class="modal-field">
+                <label>说明文字</label>
+                <textarea id="modal-polaroid-subtitle-input" rows="2" placeholder="请输入说明文字"></textarea>
+              </div>
+              <div class="modal-field">
+                <label>图片</label>
+                <div class="modal-img-preview">
+                  <img id="modal-polaroid-image-preview" style="display:none;" alt="拍立得预览" />
+                  <div class="modal-img-placeholder" id="modal-polaroid-image-placeholder">尚未设置</div>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button type="button" class="modal-btn" id="modal-polaroid-image-upload">上传/URL</button>
+                  <button type="button" class="modal-btn" id="modal-polaroid-image-delete" style="background:#c0392b;color:#fff;">删除图片</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-section" data-modal-section="profile">
+              <div class="modal-field">
+                <label>名称</label>
+                <input id="modal-profile-name-input" type="text" placeholder="请输入名称" />
+              </div>
+              <div class="modal-field">
+                <label>副标题</label>
+                <input id="modal-profile-role-input" type="text" placeholder="请输入副标题" />
+              </div>
+              <div class="modal-field">
+                <label>标签</label>
+                <textarea id="modal-profile-tags-input" rows="4" placeholder="每行一个标签"></textarea>
+              </div>
+            </div>
+
+            <div class="modal-section" data-modal-section="todo">
+              <div class="modal-field">
+                <label>标题</label>
+                <input id="modal-todo-title-input" type="text" placeholder="请输入标题" />
+              </div>
+              <div class="modal-field">
+                <label>待办事项</label>
+                <textarea id="modal-todo-items-input" rows="5" placeholder="每行一条；已完成项可用 [x] 开头"></textarea>
+              </div>
+            </div>
+
+            <div class="modal-section" data-modal-section="memo">
+              <div class="modal-field">
+                <label>标题</label>
+                <input id="modal-memo-title-input" type="text" placeholder="请输入标题" />
+              </div>
+              <div class="modal-field">
+                <label>便签内容</label>
+                <textarea id="modal-memo-lines-input" rows="5" placeholder="每行一条内容"></textarea>
+              </div>
+            </div>
+
+            <div class="modal-section" data-modal-section="custom">
+              <div class="modal-field">
+                <label>组件名称</label>
+                <input id="modal-custom-name-input" type="text" placeholder="请输入组件名称" />
+              </div>
+              <div class="modal-field">
+                <label>组件代码</label>
+                <textarea id="modal-custom-source-input" rows="10" placeholder="请编辑 JSON 组件代码"></textarea>
+              </div>
+              <div class="modal-field">
+                <label>说明</label>
+                <div class="modal-help-text">保存后会同步更新该自定义组件在组件库与已放置到桌面的显示内容。</div>
+              </div>
+            </div>
           </div>
           <div class="widget-modal__footer">
             <button type="button" class="modal-btn primary" id="widget-modal-save">保存</button>

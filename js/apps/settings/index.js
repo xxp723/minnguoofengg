@@ -36,6 +36,10 @@ const ICONS = {
   export: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18"><path d="M24 30V6" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 20L24 30L34 20" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 38H38" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M14 30V38H34V30" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`,
   previewToggle: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18"><path d="M4 24C8 16 15 12 24 12C33 12 40 16 44 24C40 32 33 36 24 36C15 36 8 32 4 24Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="24" cy="24" r="6" stroke="currentColor" stroke-width="3"/></svg>`,
   saveWidget: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18"><path d="M10 8H34L40 14V40H10V8Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M16 8V18H30V8" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M16 30H32" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M16 24H24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+  multiSelect: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18"><rect x="6" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="3"/><path d="M12 14L14.5 16.5L18 12" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><rect x="6" y="28" width="12" height="12" rx="2" stroke="currentColor" stroke-width="3"/><rect x="28" y="8" width="14" height="14" rx="2" stroke="currentColor" stroke-width="3"/><rect x="28" y="28" width="14" height="14" rx="2" stroke="currentColor" stroke-width="3"/></svg>`,
+  delete: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18"><path d="M9 10H39" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M20 20V33" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M28 20V33" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M14 10L16 39H32L34 10" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M19 10V6H29V10" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`,
+  closeSmall: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18"><path d="M14 14L34 34" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M34 14L14 34" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+  checkmark: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path d="M10 25L20 34L38 14" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   clockWidget: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="24" cy="24" r="16" stroke="#333" stroke-width="3"/><path d="M24 15V24L30 28" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   avatarWidget: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect x="10" y="6" width="28" height="36" rx="6" stroke="#333" stroke-width="3"/><circle cx="24" cy="18" r="6" stroke="#333" stroke-width="3"/><path d="M16 34C18 29.5 21 28 24 28C27 28 30 29.5 32 34" stroke="#333" stroke-width="3" stroke-linecap="round"/></svg>`,
   newsWidget: `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="20" height="20"><path d="M10 10H34V38H14C11.7909 38 10 36.2091 10 34V10Z" stroke="#333" stroke-width="3" stroke-linejoin="round"/><path d="M34 14H38V34C38 36.2091 36.2091 38 34 38" stroke="#333" stroke-width="3" stroke-linejoin="round"/><path d="M16 18H28" stroke="#333" stroke-width="3" stroke-linecap="round"/><path d="M16 24H28" stroke="#333" stroke-width="3" stroke-linecap="round"/><path d="M16 30H24" stroke="#333" stroke-width="3" stroke-linecap="round"/></svg>`,
@@ -138,6 +142,8 @@ export async function mount(container, context) {
     if (!windowManager?.setHeaderActions) return;
 
     if (page === 'appearance-widget-custom') {
+      const win = windowManager.windows?.get?.(appId);
+      win?.classList.add('app-window--widget-custom');
       windowManager.setHeaderActions(appId, [
         {
           label: '导入本地组件代码文件',
@@ -155,6 +161,8 @@ export async function mount(container, context) {
       return;
     }
 
+    const win = windowManager.windows?.get?.(appId);
+    win?.classList.remove('app-window--widget-custom');
     windowManager.setHeaderActions(appId, []);
   };
 
@@ -202,7 +210,7 @@ export async function mount(container, context) {
       'appearance-icon': '图标设置',
       'appearance-widget': '组件设置',
       'appearance-widget-library': '组件库',
-      'appearance-widget-custom': '自定义组件',
+      'appearance-widget-custom': '自定义',
       api: 'API设置',
       data: '数据设置',
       logs: '日志'
@@ -258,7 +266,7 @@ export async function mount(container, context) {
   });
 
   // 绑定拆分后的模块事件
-  bindAppearanceEvents(container, { settings, eventBus, current });
+  bindAppearanceEvents(container, { settings, eventBus, current, icons: ICONS });
   bindApiEvents(container, { settings });
   bindDataEvents(container, { settings });
   bindLogsEvents(container);

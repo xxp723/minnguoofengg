@@ -65,6 +65,7 @@ export class DesktopEditMode {
     this.loadLayout();
     this.loadDockState();
     this.initToolbarDrag();
+    this.initManagedWidgetModal();
   }
 
   bindEvents() {
@@ -288,6 +289,420 @@ export class DesktopEditMode {
     } catch (_) {
       // 忽略坏数据
     }
+  }
+
+  initManagedWidgetModal() {
+    this.widgetModal = document.getElementById('widget-modal');
+    this.widgetModalTitle = document.getElementById('widget-modal-title');
+    this.widgetModalSave = document.getElementById('widget-modal-save');
+    this.widgetModalClose = document.getElementById('widget-modal-close');
+    this.widgetModalMask = this.widgetModal?.querySelector('.widget-modal__mask') || null;
+    this.widgetModalSections = Array.from(document.querySelectorAll('.modal-section'));
+    this.widgetModalState = null;
+
+    if (this.widgetModalClose && !this.widgetModalClose.dataset.desktopEditBound) {
+      this.widgetModalClose.dataset.desktopEditBound = 'true';
+      this.widgetModalClose.addEventListener('click', () => {
+        if (this.widgetModalState?.owner !== 'desktop-edit-mode') return;
+        this.hideManagedWidgetModal();
+      });
+    }
+
+    if (this.widgetModalMask && !this.widgetModalMask.dataset.desktopEditBound) {
+      this.widgetModalMask.dataset.desktopEditBound = 'true';
+      this.widgetModalMask.addEventListener('click', () => {
+        if (this.widgetModalState?.owner !== 'desktop-edit-mode') return;
+        this.hideManagedWidgetModal();
+      });
+    }
+
+    if (this.widgetModalSave && !this.widgetModalSave.dataset.desktopEditBound) {
+      this.widgetModalSave.dataset.desktopEditBound = 'true';
+      this.widgetModalSave.addEventListener('click', async () => {
+        if (this.widgetModalState?.owner !== 'desktop-edit-mode') return;
+        const submit = this.widgetModalState?.onSave;
+        if (typeof submit === 'function') {
+          await submit();
+        }
+      });
+    }
+  }
+
+  showManagedWidgetSection(mode) {
+    if (!this.widgetModalSections?.length) return;
+    this.widgetModalSections.forEach((sec) => sec.classList.remove('is-active'));
+    const target = document.querySelector(`.modal-section[data-modal-section="${mode}"]`);
+    if (target) target.classList.add('is-active');
+  }
+
+  openManagedWidgetModal({ mode, title, onOpen, onSave }) {
+    if (!this.widgetModal || !mode) return;
+    this.widgetModalState = {
+      owner: 'desktop-edit-mode',
+      mode,
+      onSave
+    };
+    this.widgetModalTitle.textContent = title || '编辑组件';
+    this.showManagedWidgetSection(mode);
+    this.widgetModal.classList.remove('hidden');
+    this.widgetModal.setAttribute('aria-hidden', 'false');
+    if (typeof onOpen === 'function') onOpen();
+  }
+
+  hideManagedWidgetModal() {
+    if (!this.widgetModal) return;
+    this.widgetModal.classList.add('hidden');
+    this.widgetModal.setAttribute('aria-hidden', 'true');
+    this.widgetModalState = null;
+  }
+
+  setModalImagePreview(previewEl, placeholderEl, src) {
+    if (!previewEl || !placeholderEl) return;
+    if (src) {
+      previewEl.src = src;
+      previewEl.style.display = 'block';
+      placeholderEl.style.display = 'none';
+      return;
+    }
+    previewEl.removeAttribute('src');
+    previewEl.style.display = 'none';
+    placeholderEl.style.display = 'block';
+  }
+
+  async chooseResourceForManagedModal(label, accept, urlHint) {
+    const useLocal = window.confirm(`点击“确定”从本地导入${label}，点击“取消”输入${urlHint || 'URL 链接'}`);
+    if (useLocal) {
+      return await this.pickLocalResource(accept);
+    }
+
+    const url = window.prompt(`请输入${label}的URL链接：`);
+    if (!url || !url.trim()) return null;
+    const cleanUrl = url.trim();
+    return {
+      src: cleanUrl,
+      name: cleanUrl.split('/').pop() || label
+    };
+  }
+
+  bindManagedModalAction(elementId, handler) {
+    const el = document.getElementById(elementId);
+    if (!el || el.dataset.desktopEditActionBound === 'true') return;
+    el.dataset.desktopEditActionBound = 'true';
+    el.addEventListener('click', async (event) => {
+      if (this.widgetModalState?.owner !== 'desktop-edit-mode') return;
+      event.preventDefault();
+      await handler();
+    });
+  }
+
+  getCustomWidgetStorageList() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('miniphone_custom_widgets') || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  saveCustomWidgetStorageList(list) {
+    localStorage.setItem('miniphone_custom_widgets', JSON.stringify(Array.isArray(list) ? list : []));
+  }
+
+  updateCustomWidgetDefinition(nextConfig) {
+    if (!nextConfig?.id) return;
+    const list = this.getCustomWidgetStorageList();
+    const nextList = list.map((item) => item.id === nextConfig.id ? { ...item, ...nextConfig } : item);
+    this.saveCustomWidgetStorageList(nextList);
+    this.eventBus?.emit?.('desktop:custom-widgets-changed', { widgets: nextList });
+  }
+
+  refreshCustomWidgetElement(widgetId) {
+    if (!widgetId) return;
+    const node = this.desktopContainer.querySelector(`.widget-custom-card[data-custom-widget-id="${widgetId}"]`);
+    if (!node) return;
+    const meta = this.getWidgetMeta(widgetId);
+    if (!meta?.customConfig) return;
+
+    node.innerHTML = `
+      <div class="widget-surface widget-surface--custom">
+        <div class="widget-renderer">
+          <style>${meta.customConfig.css || ''}</style>
+          ${meta.customConfig.html || ''}
+        </div>
+      </div>
+    `;
+    node.setAttribute('data-custom-widget-id', meta.customConfig.id);
+    node.dataset.customWidgetSource = meta.customConfig.source || '';
+    this.bindCustomWidgetInteractions(meta, node);
+  }
+
+  openBuiltinWidgetModal(id, el) {
+    const current = this.loadBuiltinWidgetState(id);
+
+    if (id === 'music') {
+      const titleInput = document.getElementById('modal-music-title-input');
+      const subtitleInput = document.getElementById('modal-music-subtitle-input');
+      const audioNameInput = document.getElementById('modal-music-audio-name');
+      const coverPreview = document.getElementById('modal-music-cover-preview');
+      const coverPlaceholder = document.getElementById('modal-music-cover-placeholder');
+      const draft = { ...current };
+
+      this.openManagedWidgetModal({
+        mode: 'music',
+        title: '编辑音乐组件',
+        onOpen: () => {
+          if (titleInput) titleInput.value = current.title || '';
+          if (subtitleInput) subtitleInput.value = current.subtitle || '';
+          if (audioNameInput) audioNameInput.value = current.audioName || '';
+          this.setModalImagePreview(coverPreview, coverPlaceholder, current.coverSrc || '');
+        },
+        onSave: async () => {
+          const next = this.saveBuiltinWidgetState(id, {
+            ...draft,
+            title: titleInput?.value?.trim() || '旧梦留声机',
+            subtitle: subtitleInput?.value?.trim() || '点击卡片编辑封面与音频'
+          });
+          this.renderBuiltinWidgetElement(id, el);
+          this.bindBuiltinWidgetInteractions(id, el);
+          this.showToast('音乐组件已更新');
+          this.hideManagedWidgetModal();
+          return next;
+        }
+      });
+
+      this.bindManagedModalAction('modal-music-cover-upload', async () => {
+        const media = await this.chooseResourceForManagedModal('音乐封面图片', 'image/*', '图片 URL');
+        if (!media?.src) return;
+        draft.coverSrc = media.src;
+        this.setModalImagePreview(coverPreview, coverPlaceholder, draft.coverSrc);
+      });
+
+      this.bindManagedModalAction('modal-music-cover-delete', async () => {
+        draft.coverSrc = '';
+        this.setModalImagePreview(coverPreview, coverPlaceholder, '');
+      });
+
+      this.bindManagedModalAction('modal-music-audio-upload', async () => {
+        const media = await this.chooseResourceForManagedModal('音频文件', '.mp3,.wav,audio/mpeg,audio/wav', '音频 URL');
+        if (!media?.src) return;
+        draft.audioSrc = media.src;
+        draft.audioName = media.name || '已导入音频';
+        draft.progress = 0;
+        if (audioNameInput) audioNameInput.value = draft.audioName;
+      });
+
+      this.bindManagedModalAction('modal-music-audio-delete', async () => {
+        draft.audioSrc = '';
+        draft.audioName = '';
+        draft.progress = 0;
+        if (audioNameInput) audioNameInput.value = '';
+      });
+
+      return;
+    }
+
+    if (id === 'calendar') {
+      const titleInput = document.getElementById('modal-calendar-title-input');
+      const linesInput = document.getElementById('modal-calendar-lines-input');
+
+      this.openManagedWidgetModal({
+        mode: 'calendar',
+        title: '编辑日历组件',
+        onOpen: () => {
+          if (titleInput) titleInput.value = current.title || '';
+          if (linesInput) linesInput.value = Array.isArray(current.lines) ? current.lines.join('\n') : '';
+        },
+        onSave: async () => {
+          this.saveBuiltinWidgetState(id, {
+            title: titleInput?.value?.trim() || '今日行程',
+            lines: (linesInput?.value || '').split('\n').map((line) => line.trim()).filter(Boolean)
+          });
+          this.renderBuiltinWidgetElement(id, el);
+          this.bindBuiltinWidgetInteractions(id, el);
+          this.showToast('日历组件已更新');
+          this.hideManagedWidgetModal();
+        }
+      });
+      return;
+    }
+
+    if (id === 'polaroid') {
+      const titleInput = document.getElementById('modal-polaroid-title-input');
+      const subtitleInput = document.getElementById('modal-polaroid-subtitle-input');
+      const preview = document.getElementById('modal-polaroid-image-preview');
+      const placeholder = document.getElementById('modal-polaroid-image-placeholder');
+      const draft = { ...current };
+
+      this.openManagedWidgetModal({
+        mode: 'polaroid',
+        title: '编辑拍立得组件',
+        onOpen: () => {
+          if (titleInput) titleInput.value = current.title || '';
+          if (subtitleInput) subtitleInput.value = current.subtitle || '';
+          this.setModalImagePreview(preview, placeholder, current.imageSrc || '');
+        },
+        onSave: async () => {
+          this.saveBuiltinWidgetState(id, {
+            ...draft,
+            title: titleInput?.value?.trim() || '昨日底片',
+            subtitle: subtitleInput?.value?.trim() || '把此刻留在桌面上'
+          });
+          this.renderBuiltinWidgetElement(id, el);
+          this.bindBuiltinWidgetInteractions(id, el);
+          this.showToast('拍立得组件已更新');
+          this.hideManagedWidgetModal();
+        }
+      });
+
+      this.bindManagedModalAction('modal-polaroid-image-upload', async () => {
+        const media = await this.chooseResourceForManagedModal('拍立得图片', 'image/*', '图片 URL');
+        if (!media?.src) return;
+        draft.imageSrc = media.src;
+        this.setModalImagePreview(preview, placeholder, draft.imageSrc);
+      });
+
+      this.bindManagedModalAction('modal-polaroid-image-delete', async () => {
+        draft.imageSrc = '';
+        this.setModalImagePreview(preview, placeholder, '');
+      });
+
+      return;
+    }
+
+    if (id === 'profile') {
+      const nameInput = document.getElementById('modal-profile-name-input');
+      const roleInput = document.getElementById('modal-profile-role-input');
+      const tagsInput = document.getElementById('modal-profile-tags-input');
+
+      this.openManagedWidgetModal({
+        mode: 'profile',
+        title: '编辑个人名片组件',
+        onOpen: () => {
+          if (nameInput) nameInput.value = current.name || '';
+          if (roleInput) roleInput.value = current.role || '';
+          if (tagsInput) tagsInput.value = Array.isArray(current.tags) ? current.tags.join('\n') : '';
+        },
+        onSave: async () => {
+          this.saveBuiltinWidgetState(id, {
+            name: nameInput?.value?.trim() || 'MiniPhone',
+            role: roleInput?.value?.trim() || '系统默认组件',
+            tags: (tagsInput?.value || '').split(/\n|，|,/).map((tag) => tag.trim()).filter(Boolean)
+          });
+          this.renderBuiltinWidgetElement(id, el);
+          this.bindBuiltinWidgetInteractions(id, el);
+          this.showToast('个人名片组件已更新');
+          this.hideManagedWidgetModal();
+        }
+      });
+      return;
+    }
+
+    if (id === 'todo') {
+      const titleInput = document.getElementById('modal-todo-title-input');
+      const itemsInput = document.getElementById('modal-todo-items-input');
+
+      this.openManagedWidgetModal({
+        mode: 'todo',
+        title: '编辑待办事项组件',
+        onOpen: () => {
+          if (titleInput) titleInput.value = current.title || '';
+          if (itemsInput) itemsInput.value = Array.isArray(current.items) ? current.items.join('\n') : '';
+        },
+        onSave: async () => {
+          this.saveBuiltinWidgetState(id, {
+            title: titleInput?.value?.trim() || '今日待办',
+            items: (itemsInput?.value || '').split('\n').map((line) => line.trim()).filter(Boolean)
+          });
+          this.renderBuiltinWidgetElement(id, el);
+          this.bindBuiltinWidgetInteractions(id, el);
+          this.showToast('待办组件已更新');
+          this.hideManagedWidgetModal();
+        }
+      });
+      return;
+    }
+
+    if (id === 'memo') {
+      const titleInput = document.getElementById('modal-memo-title-input');
+      const linesInput = document.getElementById('modal-memo-lines-input');
+
+      this.openManagedWidgetModal({
+        mode: 'memo',
+        title: '编辑快捷标签组件',
+        onOpen: () => {
+          if (titleInput) titleInput.value = current.title || '';
+          if (linesInput) linesInput.value = Array.isArray(current.lines) ? current.lines.join('\n') : '';
+        },
+        onSave: async () => {
+          this.saveBuiltinWidgetState(id, {
+            title: titleInput?.value?.trim() || '灵感速记',
+            lines: (linesInput?.value || '').split('\n').map((line) => line.trim()).filter(Boolean)
+          });
+          this.renderBuiltinWidgetElement(id, el);
+          this.bindBuiltinWidgetInteractions(id, el);
+          this.showToast('快捷标签组件已更新');
+          this.hideManagedWidgetModal();
+        }
+      });
+    }
+  }
+
+  bindCustomWidgetInteractions(meta, el) {
+    if (!el || !meta?.customConfig) return;
+    el.setAttribute('data-custom-widget-id', meta.customConfig.id);
+    el.dataset.customWidgetSource = meta.customConfig.source || '';
+
+    if (el.dataset.customWidgetInteractionBound === 'true') return;
+    el.dataset.customWidgetInteractionBound = 'true';
+
+    el.addEventListener('click', (event) => {
+      if (this.isEditMode) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.openCustomWidgetModal(meta.customConfig.id);
+    });
+  }
+
+  openCustomWidgetModal(widgetId) {
+    const widgets = this.getCustomWidgetStorageList();
+    const current = widgets.find((item) => item.id === widgetId);
+    if (!current) return;
+
+    const nameInput = document.getElementById('modal-custom-name-input');
+    const sourceInput = document.getElementById('modal-custom-source-input');
+
+    this.openManagedWidgetModal({
+      mode: 'custom',
+      title: `编辑 ${current.name}`,
+      onOpen: () => {
+        if (nameInput) nameInput.value = current.name || '';
+        if (sourceInput) sourceInput.value = current.source || JSON.stringify(current, null, 2);
+      },
+      onSave: async () => {
+        try {
+          const parsed = JSON.parse(sourceInput?.value || '{}');
+          const next = {
+            ...current,
+            ...parsed,
+            id: current.id,
+            name: nameInput?.value?.trim() || parsed.name || current.name,
+            source: sourceInput?.value || current.source || ''
+          };
+
+          if (!next.html || !next.css) {
+            this.showToast('组件代码需包含 html 与 css');
+            return;
+          }
+
+          this.updateCustomWidgetDefinition(next);
+          this.refreshCustomWidgetElement(widgetId);
+          this.showToast('自定义组件已更新');
+          this.hideManagedWidgetModal();
+        } catch (_) {
+          this.showToast('组件代码不是有效 JSON');
+        }
+      }
+    });
   }
 
   // =========================
@@ -1204,7 +1619,7 @@ export class DesktopEditMode {
 
         event.preventDefault();
         event.stopPropagation();
-        void this.openBuiltinWidgetEditor(widgetId, el);
+        this.openBuiltinWidgetModal(widgetId, el);
       });
     }
 
@@ -1309,142 +1724,6 @@ export class DesktopEditMode {
     }
   }
 
-  async openBuiltinWidgetEditor(id, el) {
-    if (id === 'music') {
-      const current = this.loadBuiltinWidgetState(id);
-      const title = prompt('请输入音乐组件标题：', current.title || '');
-      if (title === null) return;
-      const subtitle = prompt('请输入音乐组件说明文字：', current.subtitle || '');
-      if (subtitle === null) return;
-
-      const next = {
-        ...current,
-        title: title.trim() || '未命名音乐',
-        subtitle: subtitle.trim() || '点击卡片编辑封面与音频'
-      };
-
-      const coverAction = prompt('封面操作：1=保持当前，2=更换图片（本地/URL），3=删除图片', '1');
-      if (coverAction === '2') {
-        const media = await this.pickResourceFromLocalOrUrl('音乐封面图片', 'image/*', '图片 URL');
-        if (media?.src) next.coverSrc = media.src;
-      } else if (coverAction === '3') {
-        next.coverSrc = '';
-      }
-
-      const audioAction = prompt('音频操作：1=保持当前，2=更换音频（本地 mp3/wav 或 URL），3=删除音频', '1');
-      if (audioAction === '2') {
-        const media = await this.pickResourceFromLocalOrUrl('音频文件', '.mp3,.wav,audio/mpeg,audio/wav', '音频 URL');
-        if (media?.src) {
-          next.audioSrc = media.src;
-          next.audioName = media.name || '已导入音频';
-          next.progress = 0;
-        }
-      } else if (audioAction === '3') {
-        next.audioSrc = '';
-        next.audioName = '';
-        next.progress = 0;
-      }
-
-      this.saveBuiltinWidgetState(id, next);
-      this.renderBuiltinWidgetElement(id, el);
-      this.showToast('音乐组件已更新');
-      return;
-    }
-
-    if (id === 'calendar') {
-      const current = this.loadBuiltinWidgetState(id);
-      const title = prompt('请输入日历组件标题：', current.title || '');
-      if (title === null) return;
-      const lines = prompt('请输入日历内容，每行一条：', (current.lines || []).join('\n'));
-      if (lines === null) return;
-
-      this.saveBuiltinWidgetState(id, {
-        title: title.trim() || '今日行程',
-        lines: lines.split('\n').map((line) => line.trim()).filter(Boolean)
-      });
-      this.renderBuiltinWidgetElement(id, el);
-      this.showToast('日历组件已更新');
-      return;
-    }
-
-    if (id === 'polaroid') {
-      const current = this.loadBuiltinWidgetState(id);
-      const title = prompt('请输入拍立得标题：', current.title || '');
-      if (title === null) return;
-      const subtitle = prompt('请输入拍立得说明文字：', current.subtitle || '');
-      if (subtitle === null) return;
-
-      const next = {
-        ...current,
-        title: title.trim() || '未命名拍立得',
-        subtitle: subtitle.trim() || '点击卡片编辑图片与文字'
-      };
-
-      const imageAction = prompt('图片操作：1=保持当前，2=更换图片（本地/URL），3=删除图片', '1');
-      if (imageAction === '2') {
-        const media = await this.pickResourceFromLocalOrUrl('拍立得图片', 'image/*', '图片 URL');
-        if (media?.src) next.imageSrc = media.src;
-      } else if (imageAction === '3') {
-        next.imageSrc = '';
-      }
-
-      this.saveBuiltinWidgetState(id, next);
-      this.renderBuiltinWidgetElement(id, el);
-      this.showToast('拍立得组件已更新');
-      return;
-    }
-
-    if (id === 'profile') {
-      const current = this.loadBuiltinWidgetState(id);
-      const name = prompt('请输入个人名片名称：', current.name || '');
-      if (name === null) return;
-      const role = prompt('请输入个人名片副标题：', current.role || '');
-      if (role === null) return;
-      const tags = prompt('请输入标签，使用换行或逗号分隔：', Array.isArray(current.tags) ? current.tags.join('\n') : '');
-      if (tags === null) return;
-
-      this.saveBuiltinWidgetState(id, {
-        name: name.trim() || 'MiniPhone',
-        role: role.trim() || '系统默认组件',
-        tags: tags.split(/\n|，|,/).map((tag) => tag.trim()).filter(Boolean)
-      });
-      this.renderBuiltinWidgetElement(id, el);
-      this.showToast('个人名片组件已更新');
-      return;
-    }
-
-    if (id === 'todo') {
-      const current = this.loadBuiltinWidgetState(id);
-      const title = prompt('请输入待办事项标题：', current.title || '');
-      if (title === null) return;
-      const items = prompt('请输入待办内容，每行一条；已完成可用 [x] 开头：', Array.isArray(current.items) ? current.items.join('\n') : '');
-      if (items === null) return;
-
-      this.saveBuiltinWidgetState(id, {
-        title: title.trim() || '今日待办',
-        items: items.split('\n').map((line) => line.trim()).filter(Boolean)
-      });
-      this.renderBuiltinWidgetElement(id, el);
-      this.showToast('待办组件已更新');
-      return;
-    }
-
-    if (id === 'memo') {
-      const current = this.loadBuiltinWidgetState(id);
-      const title = prompt('请输入快捷便签标题：', current.title || '');
-      if (title === null) return;
-      const lines = prompt('请输入便签内容，每行一条：', Array.isArray(current.lines) ? current.lines.join('\n') : '');
-      if (lines === null) return;
-
-      this.saveBuiltinWidgetState(id, {
-        title: title.trim() || '灵感速记',
-        lines: lines.split('\n').map((line) => line.trim()).filter(Boolean)
-      });
-      this.renderBuiltinWidgetElement(id, el);
-      this.showToast('快捷便签组件已更新');
-    }
-  }
-
   createBuiltinWidgetElement(id) {
     const el = document.createElement('div');
     return this.renderBuiltinWidgetElement(id, el);
@@ -1457,6 +1736,7 @@ export class DesktopEditMode {
     const el = document.createElement('div');
     el.className = 'desktop-widget-card desktop-item absolute-layout widget-custom-card';
     el.setAttribute('data-custom-widget-id', config.id);
+    el.dataset.customWidgetSource = config.source || '';
     el.innerHTML = `
       <div class="widget-surface widget-surface--custom">
         <div class="widget-renderer">
@@ -1465,6 +1745,7 @@ export class DesktopEditMode {
         </div>
       </div>
     `;
+    this.bindCustomWidgetInteractions(meta, el);
     return el;
   }
 

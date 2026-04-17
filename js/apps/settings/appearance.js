@@ -103,7 +103,7 @@ function renderCustomWidgetPreview(parsed) {
   `;
 }
 
-function renderCustomWidgetLibraryItems() {
+function renderCustomWidgetLibraryItems(icons) {
   const widgets = getSavedCustomWidgets();
 
   if (!widgets.length) {
@@ -111,16 +111,23 @@ function renderCustomWidgetLibraryItems() {
   }
 
   return widgets.map((widget) => `
-    <article class="component-library-card component-library-card--custom">
+    <article
+      class="component-library-card component-library-card--custom"
+      data-custom-widget-id="${widget.id}"
+      tabindex="0"
+      role="button"
+      aria-label="自定义组件：${widget.name}"
+    >
+      <div class="component-library-card__select-indicator">${icons.checkmark}</div>
       <div class="component-library-card__head">
         <div class="component-library-card__badge">自定义</div>
         <div class="component-library-card__size">${widget.width}×${widget.height}</div>
       </div>
       <div class="component-library-card__title-row">
-        <div class="component-library-card__icon">${widget.iconSvg || '✦'}</div>
+        <div class="component-library-card__icon">${widget.iconSvg || icons.widgetCustom}</div>
         <div>
           <h4 class="component-library-card__title">${widget.name}</h4>
-          <p class="component-library-card__desc">已加入组件库，可在桌面编辑模式中添加与排列。</p>
+          <p class="component-library-card__desc">已加入组件库，可在桌面编辑模式中添加与排列。长按卡片可单独删除，也可使用多选删除。</p>
         </div>
       </div>
     </article>
@@ -220,7 +227,7 @@ export function renderAppearanceSections({ current, icons }) {
             </div>
             <div class="settings-card" data-page="appearance-widget-custom">
               <div class="settings-card__icon">${icons.widgetCustom}</div>
-              <h3 class="settings-card__title">自定义组件</h3>
+              <h3 class="settings-card__title">自定义</h3>
             </div>
           </div>
         </div>
@@ -371,7 +378,7 @@ export function renderAppearanceSections({ current, icons }) {
                 <div class="component-library-card__title-row">
                   <div class="component-library-card__icon">${icons.memoWidget}</div>
                   <div>
-                    <h4 class="component-library-card__title">快捷便签</h4>
+                    <h4 class="component-library-card__title">快捷标签</h4>
                     <p class="component-library-card__desc">仿轻量记事卡片，用来显示摘要与关键词。</p>
                   </div>
                 </div>
@@ -380,21 +387,30 @@ export function renderAppearanceSections({ current, icons }) {
           </section>
 
           <section class="ui-card">
-            <h3>已导入的自定义组件</h3>
-            <p class="ui-muted" style="margin-bottom: 10px;">这里会展示你从“自定义组件”保存进组件库的项目，它们同样会出现在桌面编辑模式中。</p>
+            <div class="component-library-section-head">
+              <div>
+                <h3>已导入的自定义组件</h3>
+                <p class="ui-muted" style="margin-bottom: 0;">这里会展示你从“自定义”保存进组件库的项目，它们同样会出现在桌面编辑模式中。长按可单独删除，也可多选后批量删除。</p>
+              </div>
+              <div class="component-library-controls">
+                <button class="ui-button" type="button" id="custom-widget-select-toggle">${icons.multiSelect}<span>多选删除</span></button>
+                <button class="ui-button" type="button" id="custom-widget-select-cancel" style="display:none;">${icons.closeSmall}<span>取消</span></button>
+                <button class="ui-button danger" type="button" id="custom-widget-bulk-delete" style="display:none;">${icons.delete}<span>删除已选</span></button>
+              </div>
+            </div>
             <div id="custom-widget-library-list" class="component-library-grid">
-              ${renderCustomWidgetLibraryItems()}
+              ${renderCustomWidgetLibraryItems(icons)}
             </div>
           </section>
         </div>
       </div>
 
-      <!-- [模块标注] 自定义组件页 -->
+      <!-- [模块标注] 自定义页 -->
       <div id="settings-appearance-widget-custom" class="settings-detail">
         <div class="settings-detail__body">
           <section class="ui-card">
             <h3>自定义组件代码样式</h3>
-            <p class="ui-muted" style="margin-bottom: 10px;">支持导入 / 导出本地组件代码文件。请使用 JSON 模板定义组件信息，并在 css 中只编写组件内部样式，避免污染全局样式。</p>
+            <p class="ui-muted" style="margin-bottom: 10px;">支持导入 / 导出本地组件代码文件。请使用 JSON 模板定义组件信息，并在 css 中只编写组件内部样式，避免污染全局样式。已导入的自定义组件在桌面上单击后，也会使用统一弹窗风格进行编辑。</p>
             <div class="custom-widget-spec">
               <div class="custom-widget-spec__item"><strong>id：</strong> 唯一标识，建议使用 <code>custom-</code> 前缀</div>
               <div class="custom-widget-spec__item"><strong>name：</strong> 组件名称，将显示在组件库与桌面编辑面板</div>
@@ -440,11 +456,143 @@ export function renderAppearanceSections({ current, icons }) {
   `;
 }
 
-export function bindAppearanceEvents(container, { settings, eventBus, current }) {
+export function bindAppearanceEvents(container, { settings, eventBus, current, icons }) {
+  let isSelectionMode = false;
+  let selectedWidgetIds = new Set();
+
+  const getCustomWidgetCards = () => Array.from(container.querySelectorAll('[data-custom-widget-id]'));
+
+  const emitCustomWidgetsChanged = (widgets) => {
+    eventBus?.emit('desktop:custom-widgets-changed', { widgets });
+  };
+
+  const updateBulkDeleteButtonState = () => {
+    const bulkDeleteBtn = container.querySelector('#custom-widget-bulk-delete');
+    if (!bulkDeleteBtn) return;
+    const count = selectedWidgetIds.size;
+    bulkDeleteBtn.disabled = count === 0;
+    bulkDeleteBtn.innerHTML = `${icons.delete}<span>${count > 0 ? `删除已选（${count}）` : '删除已选'}</span>`;
+  };
+
+  const renderSelectionState = () => {
+    const list = container.querySelector('#custom-widget-library-list');
+    const selectToggle = container.querySelector('#custom-widget-select-toggle');
+    const cancelBtn = container.querySelector('#custom-widget-select-cancel');
+    const bulkDeleteBtn = container.querySelector('#custom-widget-bulk-delete');
+
+    if (list) {
+      list.classList.toggle('is-selection-mode', isSelectionMode);
+    }
+
+    if (selectToggle) {
+      selectToggle.style.display = isSelectionMode ? 'none' : '';
+    }
+    if (cancelBtn) {
+      cancelBtn.style.display = isSelectionMode ? '' : 'none';
+    }
+    if (bulkDeleteBtn) {
+      bulkDeleteBtn.style.display = isSelectionMode ? '' : 'none';
+    }
+
+    getCustomWidgetCards().forEach((card) => {
+      const widgetId = card.getAttribute('data-custom-widget-id');
+      const checked = !!widgetId && selectedWidgetIds.has(widgetId);
+      card.classList.toggle('is-selectable', isSelectionMode);
+      card.classList.toggle('is-selected', checked);
+      card.setAttribute('aria-pressed', checked ? 'true' : 'false');
+    });
+
+    updateBulkDeleteButtonState();
+  };
+
+  const toggleWidgetSelection = (widgetId) => {
+    if (!widgetId) return;
+    if (selectedWidgetIds.has(widgetId)) {
+      selectedWidgetIds.delete(widgetId);
+    } else {
+      selectedWidgetIds.add(widgetId);
+    }
+    renderSelectionState();
+  };
+
+  const deleteCustomWidgets = (widgetIds) => {
+    const ids = Array.from(new Set((widgetIds || []).filter(Boolean)));
+    if (!ids.length) return;
+
+    const saved = getSavedCustomWidgets();
+    const next = saved.filter((item) => !ids.includes(item.id));
+    saveCustomWidgets(next);
+    selectedWidgetIds = new Set([...selectedWidgetIds].filter((id) => !ids.includes(id)));
+    updateCustomWidgetLibraryList();
+    emitCustomWidgetsChanged(next);
+    Logger.info(`已删除 ${ids.length} 个自定义组件`);
+  };
+
+  const bindCustomWidgetLibraryInteractions = () => {
+    getCustomWidgetCards().forEach((card) => {
+      let pressTimer = null;
+      let longPressTriggered = false;
+
+      const clearPressTimer = () => {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+        }
+      };
+
+      const widgetId = card.getAttribute('data-custom-widget-id');
+
+      card.addEventListener('click', (event) => {
+        event.preventDefault();
+        if (!widgetId) return;
+
+        if (isSelectionMode) {
+          toggleWidgetSelection(widgetId);
+          return;
+        }
+
+        if (longPressTriggered) {
+          longPressTriggered = false;
+        }
+      });
+
+      const startPress = () => {
+        if (isSelectionMode || !widgetId) return;
+        clearPressTimer();
+        pressTimer = setTimeout(() => {
+          longPressTriggered = true;
+          const currentWidgets = getSavedCustomWidgets();
+          const hit = currentWidgets.find((item) => item.id === widgetId);
+          if (!hit) return;
+          const confirmed = window.confirm(`确定要删除组件“${hit.name}”吗？此操作只删除该自定义组件。`);
+          if (confirmed) {
+            deleteCustomWidgets([widgetId]);
+          }
+        }, 550);
+      };
+
+      card.addEventListener('mousedown', startPress);
+      card.addEventListener('touchstart', startPress, { passive: true });
+      card.addEventListener('mouseup', clearPressTimer);
+      card.addEventListener('mouseleave', clearPressTimer);
+      card.addEventListener('touchend', clearPressTimer);
+      card.addEventListener('touchcancel', clearPressTimer);
+      card.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        if (isSelectionMode && widgetId) {
+          toggleWidgetSelection(widgetId);
+        }
+      });
+    });
+  };
+
   const updateCustomWidgetLibraryList = () => {
     const list = container.querySelector('#custom-widget-library-list');
     if (!list) return;
-    list.innerHTML = renderCustomWidgetLibraryItems();
+    list.innerHTML = renderCustomWidgetLibraryItems(icons);
+    bindCustomWidgetLibraryInteractions();
+    renderSelectionState();
   };
 
   const updatePreview = () => {
@@ -524,7 +672,7 @@ export function bindAppearanceEvents(container, { settings, eventBus, current })
       updateCustomWidgetLibraryList();
       updatePreview();
 
-      eventBus?.emit('desktop:custom-widgets-changed', { widgets: saved });
+      emitCustomWidgetsChanged(saved);
       Logger.info(`自定义组件已加入组件库: ${parsed.name}`);
     } catch (error) {
       Logger.error(error.message);
@@ -542,6 +690,31 @@ export function bindAppearanceEvents(container, { settings, eventBus, current })
       updatePreview();
     }
   });
+
+  container.querySelector('#custom-widget-select-toggle')?.addEventListener('click', () => {
+    isSelectionMode = true;
+    selectedWidgetIds.clear();
+    renderSelectionState();
+  });
+
+  container.querySelector('#custom-widget-select-cancel')?.addEventListener('click', () => {
+    isSelectionMode = false;
+    selectedWidgetIds.clear();
+    renderSelectionState();
+  });
+
+  container.querySelector('#custom-widget-bulk-delete')?.addEventListener('click', () => {
+    const ids = [...selectedWidgetIds];
+    if (!ids.length) return;
+    const confirmed = window.confirm(`确定要删除已选中的 ${ids.length} 个自定义组件吗？`);
+    if (!confirmed) return;
+    deleteCustomWidgets(ids);
+    isSelectionMode = false;
+    selectedWidgetIds.clear();
+    renderSelectionState();
+  });
+
+  updateCustomWidgetLibraryList();
 }
 
 export function getAppearanceCustomWidgetState() {
