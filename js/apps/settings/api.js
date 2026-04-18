@@ -6,7 +6,7 @@ import { Logger } from '../../utils/Logger.js';
  * 说明:
  * 1) 仅修改本文件，不影响其它设置页/应用页
  * 2) API 设置按主 API / 副 API 独立配置
- * 3) 图标统一使用 IconPark 风格 SVG
+ * 3) 图标统一使用 IconPark 风格 SVG，并在 ICONS 常量中集中标注，便于后续替换
  * 4) 支持模型拉取、连接测试、主 API 已保存配置快速切换
  */
 
@@ -18,48 +18,74 @@ const PROVIDER_META = {
     shortLabel: 'OpenAI',
     label: 'OpenAI 官方接口',
     defaultBaseUrl: 'https://api.openai.com/v1',
-    models: ['gpt-4o-mini', 'gpt-4.1-mini', 'gpt-4.1', 'o4-mini']
+    defaultModel: 'gpt-4o-mini',
+    presetModels: ['gpt-4o-mini', 'gpt-4.1-mini', 'gpt-4.1', 'o4-mini']
   },
   gemini: {
     id: 'gemini',
     shortLabel: 'Gemini',
     label: 'Gemini 官方接口',
     defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-    models: ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-pro']
+    defaultModel: 'gemini-2.0-flash',
+    presetModels: ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-pro']
   },
   claude: {
     id: 'claude',
     shortLabel: 'Claude',
     label: 'Claude 官方接口',
     defaultBaseUrl: 'https://api.anthropic.com/v1',
-    models: ['claude-3-5-haiku-latest', 'claude-3-7-sonnet-latest', 'claude-sonnet-4-0']
+    defaultModel: 'claude-3-5-haiku-latest',
+    presetModels: ['claude-3-5-haiku-latest', 'claude-3-7-sonnet-latest', 'claude-sonnet-4-0']
   },
   deepseek: {
     id: 'deepseek',
     shortLabel: 'DeepSeek',
     label: 'DeepSeek 官方接口',
     defaultBaseUrl: 'https://api.deepseek.com/v1',
-    models: ['deepseek-chat', 'deepseek-reasoner']
+    defaultModel: 'deepseek-chat',
+    presetModels: ['deepseek-chat', 'deepseek-reasoner']
   }
 };
 
-// IconPark SVG（统一图标风格）
+// IconPark SVG（统一图标风格 + 用途标注，方便后续修改）
 const ICONS = {
+  // IconPark: api-app / API 配置主标题
   api: `<svg viewBox="0 0 48 48" fill="none" width="18" height="18" xmlns="http://www.w3.org/2000/svg"><path d="M40 12L24 4L8 12V36L24 44L40 36V12Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M24 44V24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M40 12L24 24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M8 12L24 24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+  // IconPark: time / 主 API 标题
   main: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="18" stroke="currentColor" stroke-width="3"/><path d="M24 14V24L31 29" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  // IconPark: cycle / 副 API 标题
   secondary: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path d="M6 24C6 14.0589 14.0589 6 24 6C33.9411 6 42 14.0589 42 24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M42 24C42 33.9411 33.9411 42 24 42C14.0589 42 6 33.9411 6 24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="24" r="4" fill="currentColor"/></svg>`,
+  // IconPark: world / 全局参数与默认状态提示
   global: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path d="M24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44Z" stroke="currentColor" stroke-width="3"/><path d="M4 24H44" stroke="currentColor" stroke-width="3"/><path d="M24 4C24 4 32 11 32 24C32 37 24 44 24 44" stroke="currentColor" stroke-width="3"/><path d="M24 4C24 4 16 11 16 24C16 37 24 44 24 44" stroke="currentColor" stroke-width="3"/></svg>`,
+  // IconPark: save / 保存相关按钮
   save: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path d="M10 8H34L40 14V40H10V8Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M16 8V18H30V8" stroke="currentColor" stroke-width="3"/><path d="M16 30H32" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+  // IconPark: storage / 已保存配置相关
   storage: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><ellipse cx="24" cy="12" rx="14" ry="6" stroke="currentColor" stroke-width="3"/><path d="M10 12V24C10 27.3137 16.268 30 24 30C31.732 30 38 27.3137 38 24V12" stroke="currentColor" stroke-width="3"/><path d="M10 24V36C10 39.3137 16.268 42 24 42C31.732 42 38 39.3137 38 36V24" stroke="currentColor" stroke-width="3"/></svg>`,
+  // IconPark: right / 测试连接
   test: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path d="M6 24H42" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M28 12L42 24L28 36" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  // IconPark: download / 拉取模型
   fetch: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path d="M24 6V30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M14 20L24 30L34 20" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 38H40" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+  // IconPark: arrow-right / 应用已保存配置
   apply: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path d="M8 24H40" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M26 12L40 24L26 36" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  // IconPark: delete / 删除已保存配置
   delete: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path d="M10 12H38" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M18 12V8H30V12" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M14 12L16 40H32L34 12" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M20 20V32" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M28 20V32" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+  // IconPark: check / 成功结果
   ok: `<svg viewBox="0 0 48 48" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg"><path d="M10 25L20 34L38 14" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  // IconPark: close-one / 错误结果
   error: `<svg viewBox="0 0 48 48" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="18" stroke="currentColor" stroke-width="3"/><path d="M18 18L30 30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M30 18L18 30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+  // IconPark: close / 弹窗关闭
+  close: `<svg viewBox="0 0 48 48" fill="none" width="18" height="18" xmlns="http://www.w3.org/2000/svg"><path d="M14 14L34 34" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M34 14L14 34" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>`,
+  // IconPark: check-one / 服务商已选中状态
+  selected: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="18" stroke="currentColor" stroke-width="3"/><path d="M17 24L22 29L32 19" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  // IconPark: round / 服务商未选中状态
+  unselected: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="18" stroke="currentColor" stroke-width="3"/></svg>`,
+  // IconPark: openai-provider / OpenAI 服务商图标
   openai: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="16" stroke="currentColor" stroke-width="3"/><path d="M24 12L34 18V30L24 36L14 30V18L24 12Z" stroke="currentColor" stroke-width="3"/></svg>`,
+  // IconPark: gem / Gemini 服务商图标
   gemini: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path d="M24 6L28.5 19.5L42 24L28.5 28.5L24 42L19.5 28.5L6 24L19.5 19.5L24 6Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`,
+  // IconPark: square / Claude 服务商图标
   claude: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><rect x="8" y="8" width="32" height="32" rx="10" stroke="currentColor" stroke-width="3"/><path d="M18 24H30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+  // IconPark: clock / DeepSeek 服务商图标
   deepseek: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path d="M8 24C8 15.1634 15.1634 8 24 8C32.8366 8 40 15.1634 40 24C40 32.8366 32.8366 40 24 40" stroke="currentColor" stroke-width="3"/><path d="M24 16V24L30 28" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 };
 
@@ -123,8 +149,8 @@ function getDefaultProfileConfig(providerId = 'openai') {
     provider: safeProviderId,
     apiKey: '',
     baseUrl: meta.defaultBaseUrl,
-    model: meta.models[0],
-    availableModels: [...meta.models],
+    model: '',
+    availableModels: [],
     stream: true
   };
 }
@@ -150,9 +176,7 @@ function uniqueStrings(values) {
 }
 
 function mergeModelOptions(providerId, models, selectedModel) {
-  const defaults = PROVIDER_META[providerId]?.models || [];
-  const merged = uniqueStrings([...(models || []), ...defaults, selectedModel]);
-  return merged.length ? merged : [...defaults];
+  return uniqueStrings([...(models || []), selectedModel]);
 }
 
 function normalizeProfileConfig(profileInput, fallbackProvider = 'openai') {
@@ -178,7 +202,7 @@ function migrateLegacyProfile(source, profileKey, fallbackProvider) {
       apiKey: providerSource.apiKey,
       baseUrl: providerSource.baseUrl,
       model: providerSource.model,
-      availableModels: PROVIDER_META[selectedProvider].models,
+      availableModels: [],
       stream: providerSource.stream
     },
     selectedProvider
@@ -193,7 +217,7 @@ function normalizeSavedPrimaryConfigs(rawList) {
       const providerMeta = PROVIDER_META[profile.provider];
       const name =
         item?.name ||
-        `${providerMeta.shortLabel} · ${profile.model || providerMeta.models[0]} · ${index + 1}`;
+        `${providerMeta.shortLabel} · ${profile.model || providerMeta.defaultModel} · ${index + 1}`;
       return {
         id: item?.id || `saved-${Date.now()}-${index}`,
         name,
@@ -250,22 +274,16 @@ function renderProviderIcon(providerId) {
   return ICONS[providerId] || ICONS.api;
 }
 
-function renderProviderOptions(selectedProvider) {
-  return Object.keys(PROVIDER_META)
-    .map((id) => {
-      const selectedAttr = selectedProvider === id ? 'selected' : '';
-      return `<option value="${id}" ${selectedAttr}>${escapeHtml(PROVIDER_META[id].shortLabel)}</option>`;
-    })
-    .join('');
-}
-
 function renderModelOptions(profile) {
   const models = mergeModelOptions(profile.provider, profile.availableModels, profile.model);
+  if (!models.length) {
+    return '<option value="" selected>请先拉取模型</option>';
+  }
+
   return models
     .map((model) => {
       const selectedAttr = model === profile.model ? 'selected' : '';
-      const customSuffix = PROVIDER_META[profile.provider].models.includes(model) ? '' : '（自定义）';
-      return `<option value="${escapeHtml(model)}" ${selectedAttr}>${escapeHtml(model)}${customSuffix}</option>`;
+      return `<option value="${escapeHtml(model)}" ${selectedAttr}>${escapeHtml(model)}</option>`;
     })
     .join('');
 }
@@ -294,7 +312,7 @@ function renderSavedPrimaryConfigs(savedPrimaryConfigs) {
                 </div>
                 <div class="api-saved-item__meta">
                   <span>${escapeHtml(providerMeta.shortLabel)}</span>
-                  <span>${escapeHtml(item.model || '-')}</span>
+                  <span>${escapeHtml(item.model || '未设置模型')}</span>
                 </div>
               </div>
               <div class="api-saved-item__actions">
@@ -315,6 +333,70 @@ function renderSavedPrimaryConfigs(savedPrimaryConfigs) {
   `;
 }
 
+function renderProviderTrigger(profileKey, profile) {
+  const providerMeta = PROVIDER_META[profile.provider];
+  return `
+    <button
+      class="api-provider-trigger"
+      id="api-${profileKey}-provider-trigger"
+      type="button"
+      data-action="open-provider-modal"
+      data-profile="${profileKey}"
+      aria-haspopup="dialog"
+    >
+      <span class="api-provider-trigger__main">
+        <span class="api-provider-trigger__icon">${renderProviderIcon(profile.provider)}</span>
+        <span class="api-provider-trigger__text">${escapeHtml(providerMeta.shortLabel)}</span>
+      </span>
+      <span class="api-provider-trigger__meta">${escapeHtml(providerMeta.label)}</span>
+    </button>
+  `;
+}
+
+function renderProviderModalOptions(selectedProvider) {
+  return Object.keys(PROVIDER_META)
+    .map((id) => {
+      const provider = PROVIDER_META[id];
+      const isSelected = selectedProvider === id;
+      return `
+        <button
+          class="api-provider-option ${isSelected ? 'is-selected' : ''}"
+          type="button"
+          data-action="choose-provider"
+          data-provider="${id}"
+        >
+          <span class="api-provider-option__main">
+            <span class="api-provider-option__icon">${renderProviderIcon(id)}</span>
+            <span class="api-provider-option__label">${escapeHtml(provider.shortLabel)}</span>
+          </span>
+          <span class="api-provider-option__desc">${escapeHtml(provider.label)}</span>
+          <span class="api-provider-option__check">${isSelected ? ICONS.selected : ICONS.unselected}</span>
+        </button>
+      `;
+    })
+    .join('');
+}
+
+function renderProviderModal() {
+  return `
+    <div id="api-provider-modal" class="api-provider-modal hidden" aria-hidden="true" data-profile="">
+      <div class="api-provider-modal__mask" data-action="close-provider-modal"></div>
+      <div class="api-provider-modal__panel" role="dialog" aria-modal="true" aria-labelledby="api-provider-modal-title">
+        <div class="api-provider-modal__header">
+          <span id="api-provider-modal-title">选择 API 服务商接口</span>
+          <button type="button" class="api-provider-modal__close" data-action="close-provider-modal" aria-label="关闭服务商选择弹窗">
+            <span class="api-provider-modal__close-icon">${ICONS.close}</span>
+          </button>
+        </div>
+        <div class="api-provider-modal__body">
+          <p class="api-provider-modal__hint">切换服务商后，将自动替换 API 地址，并清空原有密钥与模型列表。</p>
+          <div id="api-provider-modal-options" class="api-provider-modal__options"></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderProfileSection(profileKey, title, icon, profile, { isPrimary = false } = {}) {
   const providerMeta = PROVIDER_META[profile.provider];
   return `
@@ -322,7 +404,6 @@ function renderProfileSection(profileKey, title, icon, profile, { isPrimary = fa
       <div class="api-section-head">
         <h3 class="api-section-title">
           ${icon}
-          <span class="api-module-mark">模块标注</span>
           <span>${title}</span>
         </h3>
         <span class="api-provider-badge">
@@ -332,10 +413,8 @@ function renderProfileSection(profileKey, title, icon, profile, { isPrimary = fa
       </div>
 
       <div class="api-field-group">
-        <label class="api-label" for="api-${profileKey}-provider">API 服务商接口</label>
-        <select id="api-${profileKey}-provider" class="api-select" data-profile-provider="${profileKey}">
-          ${renderProviderOptions(profile.provider)}
-        </select>
+        <label class="api-label" for="api-${profileKey}-provider-trigger">API 服务商接口</label>
+        ${renderProviderTrigger(profileKey, profile)}
       </div>
 
       <div class="api-field-group">
@@ -388,24 +467,20 @@ function renderProfileSection(profileKey, title, icon, profile, { isPrimary = fa
           <span class="api-btn__icon">${ICONS.save}</span>
           <span>保存${isPrimary ? '主' : '副'}API</span>
         </button>
-        <button class="ui-button api-btn api-btn--ghost" data-action="test-profile" data-test-type="connection" data-profile="${profileKey}" type="button">
+        <button class="ui-button api-btn api-btn--ghost" data-action="test-profile" data-profile="${profileKey}" type="button">
           <span class="api-btn__icon">${ICONS.test}</span>
           <span>测试连接</span>
-        </button>
-        <button class="ui-button api-btn api-btn--ghost" data-action="test-profile" data-test-type="model" data-profile="${profileKey}" type="button">
-          <span class="api-btn__icon">${ICONS.test}</span>
-          <span>测试模型</span>
         </button>
         ${
           isPrimary
             ? `
-              <button class="ui-button api-btn api-btn--ghost" data-action="save-primary-preset" type="button">
+              <button class="ui-button api-btn api-btn--ghost api-actions__full" data-action="save-primary-preset" type="button">
                 <span class="api-btn__icon">${ICONS.storage}</span>
                 <span>保存到已保存配置</span>
               </button>
             `
             : `
-              <div class="api-actions__placeholder"></div>
+              <div class="api-actions__placeholder api-actions__full"></div>
             `
         }
       </div>
@@ -452,20 +527,6 @@ export function renderApiSection({ current }) {
 
             #settings-api .api-section-title svg { color: currentColor; }
 
-            #settings-api .api-module-mark {
-              display: inline-flex;
-              align-items: center;
-              justify-content: center;
-              min-height: 22px;
-              padding: 0 8px;
-              border-radius: 999px;
-              background: rgba(215, 201, 184, 0.45);
-              color: var(--c-text-main, #4A342A);
-              font-size: 11px;
-              font-weight: 700;
-              letter-spacing: 0.3px;
-            }
-
             #settings-api .api-provider-badge {
               display: inline-flex;
               align-items: center;
@@ -481,7 +542,11 @@ export function renderApiSection({ current }) {
 
             #settings-api .api-provider-badge__icon,
             #settings-api .api-saved-item__icon,
-            #settings-api .api-empty-state__icon {
+            #settings-api .api-empty-state__icon,
+            #settings-api .api-provider-trigger__icon,
+            #settings-api .api-provider-option__icon,
+            #settings-api .api-provider-option__check,
+            #settings-api .api-provider-modal__close-icon {
               line-height: 0;
               display: inline-flex;
             }
@@ -518,7 +583,8 @@ export function renderApiSection({ current }) {
             }
 
             #settings-api .api-input,
-            #settings-api .api-select {
+            #settings-api .api-select,
+            #settings-api .api-provider-trigger {
               width: 100%;
               min-height: 38px;
               border: 1px solid rgba(125, 90, 68, 0.2);
@@ -532,8 +598,35 @@ export function renderApiSection({ current }) {
               font-family: var(--font-retro);
             }
 
+            #settings-api .api-provider-trigger {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 12px;
+              cursor: pointer;
+              text-align: left;
+            }
+
+            #settings-api .api-provider-trigger__main {
+              display: inline-flex;
+              align-items: center;
+              gap: 8px;
+              min-width: 0;
+            }
+
+            #settings-api .api-provider-trigger__text {
+              font-weight: 700;
+            }
+
+            #settings-api .api-provider-trigger__meta {
+              color: rgba(74, 52, 42, 0.62);
+              font-size: 11px;
+              text-align: right;
+            }
+
             #settings-api .api-input:focus,
-            #settings-api .api-select:focus {
+            #settings-api .api-select:focus,
+            #settings-api .api-provider-trigger:focus {
               border-color: var(--c-border, #7D5A44);
               box-shadow: 0 0 0 3px rgba(125, 90, 68, 0.12);
             }
@@ -602,6 +695,10 @@ export function renderApiSection({ current }) {
 
             #settings-api .api-actions--two-column {
               grid-template-columns: 1fr 1fr;
+            }
+
+            #settings-api .api-actions__full {
+              grid-column: 1 / -1;
             }
 
             #settings-api .api-actions__placeholder {
@@ -758,10 +855,124 @@ export function renderApiSection({ current }) {
               justify-content: flex-end;
             }
 
-            #settings-api .api-footer-actions {
+            /* API 服务商接口弹窗：视觉风格对齐桌面组件编辑弹窗 */
+            #settings-api .api-provider-modal {
+              position: fixed;
+              inset: 0;
+              z-index: 1200;
+            }
+
+            #settings-api .api-provider-modal.hidden {
+              display: none;
+            }
+
+            #settings-api .api-provider-modal__mask {
+              position: absolute;
+              inset: 0;
+              background: rgba(34, 24, 18, 0.22);
+              backdrop-filter: blur(4px);
+            }
+
+            #settings-api .api-provider-modal__panel {
+              position: relative;
+              width: min(420px, calc(100vw - 32px));
+              margin: 72px auto 0;
+              background: #fffdf8;
+              border: 1px solid rgba(125, 90, 68, 0.16);
+              border-radius: 24px;
+              box-shadow: 0 18px 40px rgba(84, 58, 44, 0.18);
+              overflow: hidden;
+            }
+
+            #settings-api .api-provider-modal__header {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 12px;
+              padding: 18px 18px 12px;
+              border-bottom: 1px solid rgba(125, 90, 68, 0.08);
+              color: var(--c-text-main, #4A342A);
+              font-size: 16px;
+              font-weight: 700;
+            }
+
+            #settings-api .api-provider-modal__close {
+              border: 0;
+              width: 34px;
+              height: 34px;
+              border-radius: 999px;
+              background: rgba(215, 201, 184, 0.28);
+              color: var(--c-text-main, #4A342A);
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              cursor: pointer;
+            }
+
+            #settings-api .api-provider-modal__close:active {
+              background: rgba(215, 201, 184, 0.46);
+            }
+
+            #settings-api .api-provider-modal__body {
+              display: flex;
+              flex-direction: column;
+              gap: 12px;
+              padding: 16px 18px 18px;
+            }
+
+            #settings-api .api-provider-modal__hint {
+              margin: 0;
+              font-size: 12px;
+              line-height: 1.6;
+              color: rgba(74, 52, 42, 0.72);
+            }
+
+            #settings-api .api-provider-modal__options {
               display: grid;
-              grid-template-columns: 1fr;
+              gap: 10px;
+            }
+
+            #settings-api .api-provider-option {
+              width: 100%;
+              display: grid;
+              grid-template-columns: minmax(0, 1fr) auto;
+              gap: 8px 12px;
+              align-items: center;
+              padding: 14px 14px;
+              border-radius: 18px;
+              border: 1px solid rgba(125, 90, 68, 0.14);
+              background: rgba(245, 241, 234, 0.86);
+              color: var(--c-text-main, #4A342A);
+              text-align: left;
+              cursor: pointer;
+            }
+
+            #settings-api .api-provider-option.is-selected {
+              border-color: rgba(74, 52, 42, 0.26);
+              background: rgba(215, 201, 184, 0.34);
+            }
+
+            #settings-api .api-provider-option__main {
+              display: inline-flex;
+              align-items: center;
               gap: 8px;
+              min-width: 0;
+              font-size: 13px;
+              font-weight: 700;
+            }
+
+            #settings-api .api-provider-option__desc {
+              grid-column: 1 / 2;
+              font-size: 11px;
+              color: rgba(74, 52, 42, 0.68);
+            }
+
+            #settings-api .api-provider-option__check {
+              grid-column: 2 / 3;
+              grid-row: 1 / span 2;
+              color: var(--c-text-main, #4A342A);
+              justify-self: end;
+              align-self: center;
             }
 
             @media (max-width: 420px) {
@@ -771,6 +982,10 @@ export function renderApiSection({ current }) {
 
               #settings-api .api-actions--two-column {
                 grid-template-columns: 1fr;
+              }
+
+              #settings-api .api-actions__full {
+                grid-column: auto;
               }
 
               #settings-api .api-saved-item {
@@ -785,21 +1000,31 @@ export function renderApiSection({ current }) {
               #settings-api .api-saved-item__actions .api-btn {
                 width: 100%;
               }
+
+              #settings-api .api-provider-trigger {
+                align-items: flex-start;
+                flex-direction: column;
+              }
+
+              #settings-api .api-provider-trigger__meta {
+                text-align: left;
+              }
+
+              #settings-api .api-provider-modal__panel {
+                width: calc(100vw - 24px);
+                margin-top: 48px;
+              }
             }
           </style>
 
-          <!-- 模块标注：主API设置 -->
           ${renderProfileSection('primary', '主API设置', ICONS.main, api.primary, { isPrimary: true })}
 
-          <!-- 模块标注：副API设置 -->
           ${renderProfileSection('secondary', '副API设置', ICONS.secondary, api.secondary)}
 
-          <!-- 模块标注：全局模型参数 -->
           <section class="ui-card api-section-card">
             <div class="api-section-head">
               <h3 class="api-section-title">
                 ${ICONS.global}
-                <span class="api-module-mark">模块标注</span>
                 <span>全局模型参数</span>
               </h3>
               <label class="ios-switch">
@@ -835,12 +1060,10 @@ export function renderApiSection({ current }) {
             </div>
           </section>
 
-          <!-- 模块标注：已保存的API配置 -->
           <section class="ui-card api-section-card">
             <div class="api-section-head">
               <h3 class="api-section-title">
                 ${ICONS.storage}
-                <span class="api-module-mark">模块标注</span>
                 <span>已保存的API配置</span>
               </h3>
             </div>
@@ -849,33 +1072,16 @@ export function renderApiSection({ current }) {
             </div>
           </section>
 
-          <!-- 模块标注：保存操作 -->
-          <section class="ui-card api-section-card">
-            <div class="api-section-head">
-              <h3 class="api-section-title">
-                ${ICONS.save}
-                <span class="api-module-mark">模块标注</span>
-                <span>保存操作</span>
-              </h3>
-            </div>
-            <div class="api-footer-actions">
-              <button class="ui-button api-btn" id="save-api-all" type="button">
-                <span class="api-btn__icon">${ICONS.save}</span>
-                <span>保存全部 API 设置</span>
-              </button>
-              <p class="ui-muted" style="margin:0;font-size:12px;">
-                模型拉取与测试请求将从前端直接调用所选 API。若出现 CORS / 鉴权限制，会在模块结果中显示错误详情。
-              </p>
-            </div>
-          </section>
+          ${renderProviderModal()}
         </div>
       </div>
   `;
 }
 
 function getProfileConfigFromForm(container, profileKey, fallbackProfile) {
+  const trigger = container.querySelector(`#api-${profileKey}-provider-trigger`);
   const provider = normalizeProviderId(
-    container.querySelector(`#api-${profileKey}-provider`)?.value,
+    trigger?.dataset?.provider,
     fallbackProfile?.provider || 'openai'
   );
   const baseUrl = container.querySelector(`#api-${profileKey}-url`)?.value?.trim() || '';
@@ -883,14 +1089,16 @@ function getProfileConfigFromForm(container, profileKey, fallbackProfile) {
   const model = container.querySelector(`#api-${profileKey}-model`)?.value?.trim() || '';
   const availableModels = Array.from(
     container.querySelectorAll(`#api-${profileKey}-model option`)
-  ).map((option) => option.value);
+  )
+    .map((option) => option.value)
+    .filter(Boolean);
 
   return normalizeProfileConfig(
     {
       provider,
       apiKey,
       baseUrl: baseUrl || PROVIDER_META[provider].defaultBaseUrl,
-      model: model || PROVIDER_META[provider].models[0],
+      model,
       availableModels,
       stream: !!container.querySelector(`#api-${profileKey}-stream`)?.checked
     },
@@ -1099,13 +1307,17 @@ async function fetchModelsByProvider(providerId, baseUrl, apiKey) {
   }
 }
 
-async function testProviderRequest(profileConfig, globalConfig, testType) {
+async function testProviderRequest(profileConfig, globalConfig) {
   const providerId = normalizeProviderId(profileConfig.provider, 'openai');
   const effectiveTemperature = globalConfig.temperature;
-  const effectiveMaxTokens = testType === 'connection' ? 16 : globalConfig.maxTokens;
+  const effectiveMaxTokens = 16;
 
   if (!profileConfig.apiKey) {
     throw new Error('API Key 不能为空');
+  }
+
+  if (!profileConfig.model) {
+    throw new Error('请先拉取并选择模型');
   }
 
   switch (providerId) {
@@ -1151,25 +1363,44 @@ function setModelSelectOptions(container, profileKey, providerId, models, select
   if (!select) return;
 
   const merged = mergeModelOptions(providerId, models, selectedModel);
-  const nextSelected = merged.includes(selectedModel) ? selectedModel : merged[0];
+  const nextSelected = merged.includes(selectedModel) ? selectedModel : (merged[0] || '');
+  if (!merged.length) {
+    select.innerHTML = '<option value="" selected>请先拉取模型</option>';
+    select.value = '';
+    return;
+  }
+
   select.innerHTML = merged
     .map((model) => {
       const selectedAttr = model === nextSelected ? 'selected' : '';
-      const customSuffix = PROVIDER_META[providerId].models.includes(model) ? '' : '（自定义）';
-      return `<option value="${escapeHtml(model)}" ${selectedAttr}>${escapeHtml(model)}${customSuffix}</option>`;
+      return `<option value="${escapeHtml(model)}" ${selectedAttr}>${escapeHtml(model)}</option>`;
     })
     .join('');
 }
 
+function updateProviderTrigger(container, profileKey, providerId) {
+  const trigger = container.querySelector(`#api-${profileKey}-provider-trigger`);
+  if (!trigger) return;
+  const providerMeta = PROVIDER_META[providerId];
+  trigger.dataset.provider = providerId;
+  trigger.innerHTML = `
+    <span class="api-provider-trigger__main">
+      <span class="api-provider-trigger__icon">${renderProviderIcon(providerId)}</span>
+      <span class="api-provider-trigger__text">${escapeHtml(providerMeta.shortLabel)}</span>
+    </span>
+    <span class="api-provider-trigger__meta">${escapeHtml(providerMeta.label)}</span>
+  `;
+}
+
 function fillProfileForm(container, profileKey, profileConfig) {
   const normalized = normalizeProfileConfig(profileConfig, profileConfig?.provider || 'openai');
-  const providerSelect = container.querySelector(`#api-${profileKey}-provider`);
   const urlInput = container.querySelector(`#api-${profileKey}-url`);
   const keyInput = container.querySelector(`#api-${profileKey}-key`);
   const streamInput = container.querySelector(`#api-${profileKey}-stream`);
   const badge = container.querySelector(`[data-profile-section="${profileKey}"] .api-provider-badge`);
 
-  if (providerSelect) providerSelect.value = normalized.provider;
+  updateProviderTrigger(container, profileKey, normalized.provider);
+
   if (urlInput) {
     urlInput.value = normalized.baseUrl;
     urlInput.placeholder = PROVIDER_META[normalized.provider].defaultBaseUrl;
@@ -1193,6 +1424,18 @@ function fillProfileForm(container, profileKey, profileConfig) {
   }
 }
 
+function switchProviderProfile(container, profileKey, nextProvider) {
+  const providerId = normalizeProviderId(nextProvider, 'openai');
+  const nextProfile = getDefaultProfileConfig(providerId);
+  fillProfileForm(container, profileKey, nextProfile);
+  setResultByProfile(
+    container,
+    profileKey,
+    'success',
+    `已切换到 ${PROVIDER_META[providerId].shortLabel} 接口，地址已自动替换，密钥与模型已清空`
+  );
+}
+
 function renderSavedPrimaryConfigsInto(container, apiState) {
   const host = container.querySelector('#api-saved-primary-configs');
   if (!host) return;
@@ -1204,7 +1447,7 @@ function buildSavedPrimaryPreset(profileConfig, existingCount) {
   const providerMeta = PROVIDER_META[normalized.provider];
   return {
     id: `saved-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    name: `${providerMeta.shortLabel} · ${normalized.model || providerMeta.models[0]} · ${existingCount + 1}`,
+    name: `${providerMeta.shortLabel} · ${normalized.model || '未设置模型'} · ${existingCount + 1}`,
     provider: normalized.provider,
     apiKey: normalized.apiKey,
     baseUrl: normalized.baseUrl,
@@ -1212,6 +1455,29 @@ function buildSavedPrimaryPreset(profileConfig, existingCount) {
     availableModels: normalized.availableModels,
     stream: normalized.stream
   };
+}
+
+function openProviderModal(container, profileKey) {
+  const modal = container.querySelector('#api-provider-modal');
+  const optionsHost = container.querySelector('#api-provider-modal-options');
+  if (!modal || !optionsHost || !profileKey) return;
+
+  const trigger = container.querySelector(`#api-${profileKey}-provider-trigger`);
+  const selectedProvider = normalizeProviderId(trigger?.dataset?.provider, 'openai');
+  modal.dataset.profile = profileKey;
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+  optionsHost.innerHTML = renderProviderModalOptions(selectedProvider);
+}
+
+function closeProviderModal(container) {
+  const modal = container.querySelector('#api-provider-modal');
+  const optionsHost = container.querySelector('#api-provider-modal-options');
+  if (!modal || !optionsHost) return;
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+  modal.dataset.profile = '';
+  optionsHost.innerHTML = '';
 }
 
 export function bindApiEvents(container, { settings }) {
@@ -1252,55 +1518,13 @@ export function bindApiEvents(container, { settings }) {
   };
 
   ['primary', 'secondary'].forEach((profileKey) => {
-    const providerSelect = container.querySelector(`#api-${profileKey}-provider`);
+    const trigger = container.querySelector(`#api-${profileKey}-provider-trigger`);
     const urlInput = container.querySelector(`#api-${profileKey}-url`);
-
-    if (providerSelect) {
-      providerSelect.addEventListener('change', () => {
-        const nextProvider = normalizeProviderId(providerSelect.value, 'openai');
-        const previousProvider = urlInput?.dataset?.provider || nextProvider;
-        const previousDefaultUrl = PROVIDER_META[previousProvider]?.defaultBaseUrl || '';
-        const currentUrl = urlInput?.value?.trim() || '';
-
-        if (urlInput) {
-          if (!currentUrl || currentUrl === previousDefaultUrl) {
-            urlInput.value = PROVIDER_META[nextProvider].defaultBaseUrl;
-          }
-          urlInput.placeholder = PROVIDER_META[nextProvider].defaultBaseUrl;
-          urlInput.dataset.provider = nextProvider;
-        }
-
-        setModelSelectOptions(
-          container,
-          profileKey,
-          nextProvider,
-          PROVIDER_META[nextProvider].models,
-          PROVIDER_META[nextProvider].models[0]
-        );
-        fillProfileForm(
-          container,
-          profileKey,
-          getProfileConfigFromForm(container, profileKey, getDefaultProfileConfig(nextProvider))
-        );
-        setResultByProfile(container, profileKey, 'success', `已切换到 ${PROVIDER_META[nextProvider].shortLabel} 接口`);
-      });
+    if (trigger) {
+      trigger.dataset.provider = normalizeProviderId(trigger.dataset.provider, 'openai');
     }
-
     if (urlInput) {
-      urlInput.dataset.provider = providerSelect?.value || 'openai';
-    }
-  });
-
-  container.querySelector('#save-api-all')?.addEventListener('click', async () => {
-    try {
-      const nextApi = await saveAllApiSettings('API 全量设置已保存');
-      setResultByProfile(container, 'primary', 'success', '主 API 设置已保存');
-      setResultByProfile(container, 'secondary', 'success', '副 API 设置已保存');
-      renderSavedPrimaryConfigsInto(container, nextApi);
-    } catch (error) {
-      Logger.error(`保存 API 设置失败: ${error?.message || '未知错误'}`);
-      setResultByProfile(container, 'primary', 'error', `保存失败：${error?.message || '未知错误'}`);
-      setResultByProfile(container, 'secondary', 'error', `保存失败：${error?.message || '未知错误'}`);
+      urlInput.dataset.provider = trigger?.dataset?.provider || 'openai';
     }
   });
 
@@ -1388,7 +1612,6 @@ export function bindApiEvents(container, { settings }) {
   container.querySelectorAll('[data-action="test-profile"]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const profileKey = btn.getAttribute('data-profile');
-      const testType = btn.getAttribute('data-test-type') || 'connection';
       if (!profileKey) return;
 
       const fallback = currentApiCache || normalizeApiSettings({});
@@ -1396,20 +1619,11 @@ export function bindApiEvents(container, { settings }) {
       const profileConfig = snapshot[profileKey];
       const startAt = performance.now();
 
-      const buttonGroup = container.querySelectorAll(
-        `[data-action="test-profile"][data-profile="${profileKey}"]`
-      );
-      buttonGroup.forEach((b) => b.setAttribute('disabled', 'disabled'));
-
-      setResultByProfile(
-        container,
-        profileKey,
-        'loading',
-        testType === 'connection' ? '正在测试连接...' : '正在测试模型...'
-      );
+      btn.setAttribute('disabled', 'disabled');
+      setResultByProfile(container, profileKey, 'loading', '正在测试连接...');
 
       try {
-        const text = await testProviderRequest(profileConfig, snapshot.global, testType);
+        const text = await testProviderRequest(profileConfig, snapshot.global);
         const cost = Math.max(1, Math.round(performance.now() - startAt));
         const preview = String(text || '').slice(0, 120);
         setResultByProfile(container, profileKey, 'success', `成功（${cost}ms）：${preview}`);
@@ -1422,7 +1636,7 @@ export function bindApiEvents(container, { settings }) {
           `失败（${cost}ms）：${error?.message || '未知错误'}`
         );
       } finally {
-        buttonGroup.forEach((b) => b.removeAttribute('disabled'));
+        btn.removeAttribute('disabled');
       }
     });
   });
@@ -1466,10 +1680,39 @@ export function bindApiEvents(container, { settings }) {
   });
 
   container.addEventListener('click', async (event) => {
-    const target = event.target.closest('[data-action="apply-saved-primary"], [data-action="delete-saved-primary"]');
+    const target = event.target.closest([
+      '[data-action="apply-saved-primary"]',
+      '[data-action="delete-saved-primary"]',
+      '[data-action="open-provider-modal"]',
+      '[data-action="close-provider-modal"]',
+      '[data-action="choose-provider"]'
+    ].join(', '));
     if (!target) return;
 
     const action = target.getAttribute('data-action');
+
+    if (action === 'open-provider-modal') {
+      const profileKey = target.getAttribute('data-profile');
+      if (!profileKey) return;
+      openProviderModal(container, profileKey);
+      return;
+    }
+
+    if (action === 'close-provider-modal') {
+      closeProviderModal(container);
+      return;
+    }
+
+    if (action === 'choose-provider') {
+      const modal = container.querySelector('#api-provider-modal');
+      const profileKey = modal?.dataset?.profile;
+      const providerId = target.getAttribute('data-provider');
+      if (!profileKey || !providerId) return;
+      switchProviderProfile(container, profileKey, providerId);
+      closeProviderModal(container);
+      return;
+    }
+
     const savedId = target.getAttribute('data-saved-id');
     if (!savedId) return;
 
