@@ -18,11 +18,20 @@ const DEFAULT_CUSTOM_WIDGET_TEMPLATE = `{
 const DEFAULT_ICON_ADJUSTMENTS = {
   iconSize: 56,
   iconRadius: 18,
-  iconShadowStyle: 'outer',
+  iconShadowStyle: 'none',
   iconShadowSize: 18,
   iconBorderWidth: 0,
   iconBorderColor: '#d7c9b8'
 };
+
+const ICON_SHADOW_OPTIONS = [
+  { value: 'none', label: '无阴影' },
+  { value: 'outer', label: '外投影' },
+  { value: 'inner', label: '内阴影' },
+  { value: 'long', label: '长阴影' },
+  { value: 'multi', label: '多重阴影' },
+  { value: 'neumorphism', label: '新拟态' }
+];
 
 function getSavedCustomWidgets() {
   try {
@@ -77,7 +86,9 @@ function escapeHtml(value) {
   return String(value || '')
     .replace(/&/g, `${amp}amp;`)
     .replace(/</g, `${amp}lt;`)
-    .replace(/>/g, `${amp}gt;`);
+    .replace(/>/g, `${amp}gt;`)
+    .replace(/"/g, `${amp}quot;`)
+    .replace(/'/g, `${amp}#39;`);
 }
 
 function parseCustomWidgetCode(source) {
@@ -339,30 +350,40 @@ function renderManagedImageField({
   `;
 }
 
-function renderIconManagedImageField({ app, value = '' }) {
-  const baseId = `setting-icon-image-${app.id}`;
+function renderIconQuickTile({ app, value = '' }) {
   const hasValue = !!String(value || '').trim();
 
   return `
-    <div class="appearance-resource-card appearance-resource-card--icon">
-      <div class="appearance-resource-card__head">
-        <div>
-          <h4>${app.name}</h4>
-          <p>为该图标单独设置图片，支持本地上传与 URL 链接。</p>
-        </div>
-      </div>
-      <div class="appearance-resource-card__preview ${hasValue ? 'has-image' : ''}" id="${baseId}-preview" style="${hasValue ? `background-image:url('${escapeHtml(value)}');` : ''}">
-        ${hasValue ? '' : '<span>暂无图片</span>'}
-      </div>
-      <div class="appearance-resource-card__actions">
-        <label class="ui-button" for="${baseId}-file">上传本地图片</label>
-        <input id="${baseId}-file" type="file" accept="image/*" style="display:none;" />
-        <button class="ui-button" type="button" data-resource-target="${baseId}">使用 URL 链接</button>
-        <button class="ui-button danger" type="button" id="${baseId}-remove">删除</button>
-      </div>
-      <input id="${baseId}" type="url" value="${escapeHtml(value)}" placeholder="https://example.com/${app.id}.jpg" />
-    </div>
+    <button
+      class="appearance-icon-grid__item ${hasValue ? 'has-image' : ''}"
+      type="button"
+      data-icon-editor-trigger="${app.id}"
+      aria-label="编辑 ${app.name} 图标"
+    >
+      <span class="appearance-icon-grid__preview">
+        ${hasValue
+          ? `<img class="appearance-icon-grid__img" src="${escapeHtml(value)}" alt="${escapeHtml(app.name)}">`
+          : `<span class="appearance-icon-grid__glyph">${app.icon || ''}</span>`}
+      </span>
+      <span class="appearance-icon-grid__label">${escapeHtml(app.name)}</span>
+    </button>
   `;
+}
+
+function renderShadowStyleOptions(icons, selectedValue) {
+  return ICON_SHADOW_OPTIONS.map((option) => `
+    <button
+      type="button"
+      class="appearance-shadow-option ${selectedValue === option.value ? 'is-selected' : ''}"
+      data-shadow-style="${option.value}"
+      aria-pressed="${selectedValue === option.value ? 'true' : 'false'}"
+    >
+      <span class="appearance-shadow-option__state">
+        ${selectedValue === option.value ? icons.selected : icons.unselected}
+      </span>
+      <span class="appearance-shadow-option__label">${option.label}</span>
+    </button>
+  `).join('');
 }
 
 function renderSliderField({ id, label, value, min, max, step = 1 }) {
@@ -473,27 +494,44 @@ export function renderAppearanceSections({ current, icons, apps = [] }) {
       <!-- 图标设置子页面 -->
       <div id="settings-appearance-icon" class="settings-detail">
         <div class="settings-detail__body">
-          <!-- [模块标注] 自定义图标设置模块：按应用逐个更换图标图片，便于后续继续单独维护每个图标 -->
+          <!-- [模块标注] 快捷更换图标图片模块：按应用图标网格逐个打开编辑弹窗，便于后续继续维护单图标图片入口 -->
           <section class="ui-card">
-            <h3>自定义图标</h3>
-            <p class="ui-muted" style="margin-bottom: 10px;">现在支持为每个应用图标单独设置图片，而不是一张图覆盖所有图标。</p>
-            <div class="appearance-settings-stack">
-              ${apps.map((app) => renderIconManagedImageField({
+            <h3>快捷更换图标图片</h3>
+            <p class="ui-muted" style="margin-bottom: 10px;">点击任意图标，即可单独为该应用上传本地图片或填写 URL 链接；不会再用同一张图覆盖所有图标。</p>
+            <div class="appearance-icon-grid">
+              ${apps.map((app) => renderIconQuickTile({
                 app,
                 value: iconImages[app.id] || ''
               })).join('')}
             </div>
+            <div aria-hidden="true" style="display:none;">
+              ${apps.map((app) => `<input id="setting-icon-image-${app.id}" type="hidden" value="${escapeHtml(iconImages[app.id] || '')}">`).join('')}
+            </div>
             <div class="appearance-inline-actions">
               <button class="ui-button primary" id="save-custom-icon-settings">${icons.saveWidget}<span>保存设置</span></button>
-              <button class="ui-button" id="reset-custom-icon-settings" type="button">${icons.closeSmall}<span>恢复默认</span></button>
+              <button class="ui-button" id="reset-custom-icon-settings" type="button">${icons.closeSmall}<span>重置所有图标图片</span></button>
             </div>
           </section>
 
-          <!-- [模块标注] 图标调整模块：统一控制所有应用图标的大小、圆角、阴影、边框等外观参数；滑杆便于后续微调 -->
+          <!-- [模块标注] 图标美化模块：统一控制图标大小、圆角、阴影与边框，滑杆与阴影选项样式可在此区域独立微调 -->
           <section class="ui-card">
-            <h3>图标调整</h3>
+            <h3>图标美化</h3>
             <p class="ui-muted" style="margin-bottom: 10px;">统一调整桌面与 Dock 图标的尺寸、圆角、阴影和边框样式。</p>
             <div class="appearance-form-grid">
+              ${renderSliderField({
+                id: 'setting-icon-radius',
+                label: '圆角大小',
+                value: iconAdjustments.iconRadius,
+                min: 0,
+                max: 32
+              })}
+              ${renderSliderField({
+                id: 'setting-icon-shadow-size',
+                label: '阴影强度',
+                value: iconAdjustments.iconShadowSize,
+                min: 0,
+                max: 40
+              })}
               ${renderSliderField({
                 id: 'setting-icon-size',
                 label: '图标大小',
@@ -502,37 +540,19 @@ export function renderAppearanceSections({ current, icons, apps = [] }) {
                 max: 96
               })}
               ${renderSliderField({
-                id: 'setting-icon-radius',
-                label: '圆角大小',
-                value: iconAdjustments.iconRadius,
-                min: 0,
-                max: 32
-              })}
-              <label class="appearance-form-field">
-                <span>阴影样式</span>
-                <select id="setting-icon-shadow-style">
-                  <option value="none" ${iconAdjustments.iconShadowStyle === 'none' ? 'selected' : ''}>无阴影</option>
-                  <option value="outer" ${iconAdjustments.iconShadowStyle === 'outer' ? 'selected' : ''}>外投影</option>
-                  <option value="inner" ${iconAdjustments.iconShadowStyle === 'inner' ? 'selected' : ''}>内阴影</option>
-                  <option value="long" ${iconAdjustments.iconShadowStyle === 'long' ? 'selected' : ''}>长阴影</option>
-                  <option value="multi" ${iconAdjustments.iconShadowStyle === 'multi' ? 'selected' : ''}>多重阴影</option>
-                  <option value="neumorphism" ${iconAdjustments.iconShadowStyle === 'neumorphism' ? 'selected' : ''}>新拟态阴影</option>
-                </select>
-              </label>
-              ${renderSliderField({
-                id: 'setting-icon-shadow-size',
-                label: '阴影大小',
-                value: iconAdjustments.iconShadowSize,
-                min: 0,
-                max: 40
-              })}
-              ${renderSliderField({
                 id: 'setting-icon-border-width',
                 label: '边框粗细',
                 value: iconAdjustments.iconBorderWidth,
                 min: 0,
                 max: 8
               })}
+              <div class="appearance-form-field">
+                <span>阴影样式</span>
+                <input id="setting-icon-shadow-style" type="hidden" value="${iconAdjustments.iconShadowStyle}">
+                <div class="appearance-shadow-options" role="radiogroup" aria-label="阴影样式">
+                  ${renderShadowStyleOptions(icons, iconAdjustments.iconShadowStyle)}
+                </div>
+              </div>
               <label class="appearance-form-field">
                 <span>边框颜色</span>
                 <input id="setting-icon-border-color" type="color" value="${iconAdjustments.iconBorderColor}">
@@ -763,9 +783,62 @@ function showAppearanceConfirm(container, icons, message, onConfirm) {
   mask?.addEventListener('click', close);
 }
 
+function ensureIconResourceModal(container, icons) {
+  let modal = container.querySelector('#appearance-icon-resource-modal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'appearance-icon-resource-modal';
+  modal.className = 'managed-resource-modal hidden';
+  modal.setAttribute('aria-hidden', 'true');
+  modal.innerHTML = `
+    <div class="managed-resource-modal__mask"></div>
+    <div class="managed-resource-modal__panel" role="dialog" aria-modal="true" aria-labelledby="appearance-icon-resource-title">
+      <div class="managed-resource-modal__header">
+        <span id="appearance-icon-resource-title">编辑图标</span>
+        <button type="button" class="managed-resource-modal__close" id="appearance-icon-resource-close" aria-label="关闭图标编辑弹窗">
+          ${icons.closeSmall}
+        </button>
+      </div>
+      <div class="managed-resource-modal__body">
+        <div class="appearance-icon-editor">
+          <div class="appearance-icon-editor__hero">
+            <div class="appearance-icon-editor__preview" id="appearance-icon-editor-preview"></div>
+            <div class="appearance-icon-editor__meta">
+              <strong id="appearance-icon-editor-name">应用图标</strong>
+              <p id="appearance-icon-editor-hint">支持本地上传图片，也支持填写网络图片链接。</p>
+            </div>
+          </div>
+          <input id="appearance-icon-editor-file" type="file" accept="image/*" style="display:none;" />
+          <div class="short-action-row">
+            <button class="ui-button" type="button" id="appearance-icon-editor-upload">${icons.uploadLocal}<span>上传本地图片</span></button>
+            <button class="ui-button" type="button" id="appearance-icon-editor-focus-url">${icons.link}<span>使用 URL 链接</span></button>
+            <button class="ui-button danger" type="button" id="appearance-icon-editor-delete">${icons.delete}<span>删除</span></button>
+          </div>
+          <label class="appearance-form-field">
+            <span>图片链接</span>
+            <input id="appearance-icon-editor-url" type="url" placeholder="https://example.com/image.jpg" />
+          </label>
+          <div class="appearance-inline-actions">
+            <button class="ui-button" type="button" id="appearance-icon-editor-cancel">${icons.closeSmall}<span>取消</span></button>
+            <button class="ui-button primary" type="button" id="appearance-icon-editor-save">${icons.saveWidget}<span>应用到该图标</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  container.appendChild(modal);
+  return modal;
+}
+
 export function bindAppearanceEvents(container, { settings, eventBus, current, icons, apps = [] }) {
   let isSelectionMode = false;
   let selectedWidgetIds = new Set();
+  let activeIconEditorAppId = '';
+
+  const appMap = new Map((apps || []).map((app) => [app.id, app]));
+  const iconEditorModal = ensureIconResourceModal(container, icons);
 
   const getWidgetCards = () => Array.from(container.querySelectorAll('[data-widget-library-id]'));
 
@@ -779,6 +852,90 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
       hiddenIds: getHiddenWidgetIds(),
       removedIds: Array.isArray(removedIds) ? removedIds : []
     });
+  };
+
+  const getIconImageInput = (appId) => container.querySelector(`#setting-icon-image-${appId}`);
+
+  const getIconTileValue = (appId) => String(getIconImageInput(appId)?.value || '').trim();
+
+  const renderIconTileVisual = (app, value) => {
+    if (!app) return '';
+    return value
+      ? `<img class="appearance-icon-grid__img" src="${escapeHtml(value)}" alt="${escapeHtml(app.name)}">`
+      : `<span class="appearance-icon-grid__glyph">${app.icon || ''}</span>`;
+  };
+
+  const renderIconEditorVisual = (app, value) => {
+    if (!app) return '';
+    return value
+      ? `<img class="appearance-icon-editor__img" src="${escapeHtml(value)}" alt="${escapeHtml(app.name)}">`
+      : `<span class="appearance-icon-editor__glyph">${app.icon || ''}</span>`;
+  };
+
+  const updateIconTilePreview = (appId) => {
+    const app = appMap.get(appId);
+    const tile = container.querySelector(`[data-icon-editor-trigger="${appId}"]`);
+    const preview = tile?.querySelector('.appearance-icon-grid__preview');
+    if (!app || !tile || !preview) return;
+
+    const value = getIconTileValue(appId);
+    tile.classList.toggle('has-image', !!value);
+    preview.innerHTML = renderIconTileVisual(app, value);
+  };
+
+  const updateAllIconTilePreviews = () => {
+    apps.forEach((app) => updateIconTilePreview(app.id));
+  };
+
+  const syncShadowStyleOptions = () => {
+    const hiddenInput = container.querySelector('#setting-icon-shadow-style');
+    const value = String(hiddenInput?.value || DEFAULT_ICON_ADJUSTMENTS.iconShadowStyle);
+
+    container.querySelectorAll('[data-shadow-style]').forEach((button) => {
+      const selected = button.getAttribute('data-shadow-style') === value;
+      button.classList.toggle('is-selected', selected);
+      button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      const state = button.querySelector('.appearance-shadow-option__state');
+      if (state) {
+        state.innerHTML = selected ? icons.selected : icons.unselected;
+      }
+    });
+  };
+
+  const closeIconEditorModal = () => {
+    activeIconEditorAppId = '';
+    iconEditorModal.classList.add('hidden');
+    iconEditorModal.setAttribute('aria-hidden', 'true');
+    const fileInput = iconEditorModal.querySelector('#appearance-icon-editor-file');
+    if (fileInput) fileInput.value = '';
+  };
+
+  const syncIconEditorModal = (appId, nextValue) => {
+    const app = appMap.get(appId);
+    if (!app) return;
+
+    const preview = iconEditorModal.querySelector('#appearance-icon-editor-preview');
+    const nameEl = iconEditorModal.querySelector('#appearance-icon-editor-name');
+    const urlInput = iconEditorModal.querySelector('#appearance-icon-editor-url');
+    const titleEl = iconEditorModal.querySelector('#appearance-icon-resource-title');
+
+    if (preview) preview.innerHTML = renderIconEditorVisual(app, nextValue);
+    if (nameEl) nameEl.textContent = app.name;
+    if (titleEl) titleEl.textContent = `编辑 ${app.name} 图标`;
+    if (urlInput && urlInput.value !== nextValue) {
+      urlInput.value = nextValue;
+    }
+  };
+
+  const openIconEditorModal = (appId) => {
+    const app = appMap.get(appId);
+    if (!app) return;
+
+    activeIconEditorAppId = appId;
+    const currentValue = getIconTileValue(appId);
+    syncIconEditorModal(appId, currentValue);
+    iconEditorModal.classList.remove('hidden');
+    iconEditorModal.setAttribute('aria-hidden', 'false');
   };
 
   const updateBulkDeleteButtonState = () => {
@@ -970,10 +1127,7 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
   };
 
   const collectIconImages = () => {
-    const entries = apps.map((app) => {
-      const input = container.querySelector(`#setting-icon-image-${app.id}`);
-      return [app.id, String(input?.value || '').trim()];
-    });
+    const entries = apps.map((app) => [app.id, getIconTileValue(app.id)]);
     return normalizeIconImages(Object.fromEntries(entries));
   };
 
@@ -1044,6 +1198,7 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
       desktopWallpaper,
       lockscreenWallpaper
     };
+
     eventBus?.emit('settings:appearance-changed', {
       wallpaper: desktopWallpaper,
       desktopWallpaper,
@@ -1069,20 +1224,19 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
       iconImage: '',
       iconImages
     };
+
     eventBus?.emit('settings:appearance-changed', { iconImage: '', iconImages });
-    Logger.info('自定义图标设置已保存');
+    Logger.info('图标图片设置已保存');
   };
 
   const onResetCustomIconSettings = async () => {
     apps.forEach((app) => {
-      const baseId = `setting-icon-image-${app.id}`;
-      const input = container.querySelector(`#${baseId}`);
-      const fileInput = container.querySelector(`#${baseId}-file`);
+      const input = getIconImageInput(app.id);
       if (input) input.value = '';
-      if (fileInput) fileInput.value = '';
-      updateManagedImagePreview(container, baseId, `${baseId}-preview`);
       localStorage.removeItem(`miniphone_app_icon_${app.id}`);
     });
+
+    updateAllIconTilePreviews();
 
     await settings.update({
       appearance: {
@@ -1097,8 +1251,9 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
       iconImage: '',
       iconImages: {}
     };
+
     eventBus?.emit('settings:appearance-changed', { iconImage: '', iconImages: {} });
-    Logger.info('自定义图标已恢复默认');
+    Logger.info('所有自定义图标图片已恢复默认');
   };
 
   const onSaveIconSettings = async () => {
@@ -1139,7 +1294,7 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
       iconBorderWidth,
       iconBorderColor
     });
-    Logger.info('图标设置已保存');
+    Logger.info('图标样式设置已保存');
   };
 
   const onResetIconAdjustments = async () => {
@@ -1169,6 +1324,8 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
     const borderColor = container.querySelector('#setting-icon-border-color');
     if (borderColor) borderColor.value = defaults.iconBorderColor;
 
+    syncShadowStyleOptions();
+
     await settings.update({
       appearance: {
         ...(current.appearance || {}),
@@ -1182,7 +1339,7 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
     };
 
     eventBus?.emit('settings:appearance-changed', { ...defaults });
-    Logger.info('图标调整已恢复默认');
+    Logger.info('图标美化已恢复默认');
   };
 
   const onSaveCustomWidget = () => {
@@ -1223,20 +1380,77 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
     removeId: 'remove-lockscreen-wallpaper'
   });
 
-  apps.forEach((app) => {
-    const baseId = `setting-icon-image-${app.id}`;
-    bindManagedImageField(container, {
-      inputId: baseId,
-      fileId: `${baseId}-file`,
-      previewId: `${baseId}-preview`,
-      removeId: `${baseId}-remove`
-    });
-  });
-
   syncRangeValue('setting-icon-size');
   syncRangeValue('setting-icon-radius');
   syncRangeValue('setting-icon-shadow-size');
   syncRangeValue('setting-icon-border-width');
+  syncShadowStyleOptions();
+  updateAllIconTilePreviews();
+
+  container.querySelectorAll('[data-icon-editor-trigger]').forEach((trigger) => {
+    trigger.addEventListener('click', () => {
+      const appId = trigger.getAttribute('data-icon-editor-trigger');
+      if (appId) openIconEditorModal(appId);
+    });
+  });
+
+  iconEditorModal.querySelector('#appearance-icon-editor-upload')?.addEventListener('click', () => {
+    iconEditorModal.querySelector('#appearance-icon-editor-file')?.click();
+  });
+
+  iconEditorModal.querySelector('#appearance-icon-editor-focus-url')?.addEventListener('click', () => {
+    iconEditorModal.querySelector('#appearance-icon-editor-url')?.focus();
+  });
+
+  iconEditorModal.querySelector('#appearance-icon-editor-delete')?.addEventListener('click', () => {
+    if (!activeIconEditorAppId) return;
+    const urlInput = iconEditorModal.querySelector('#appearance-icon-editor-url');
+    if (urlInput) urlInput.value = '';
+    syncIconEditorModal(activeIconEditorAppId, '');
+  });
+
+  iconEditorModal.querySelector('#appearance-icon-editor-file')?.addEventListener('change', (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !activeIconEditorAppId) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const urlInput = iconEditorModal.querySelector('#appearance-icon-editor-url');
+      if (urlInput) urlInput.value = result;
+      syncIconEditorModal(activeIconEditorAppId, result);
+      event.target.value = '';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  iconEditorModal.querySelector('#appearance-icon-editor-url')?.addEventListener('input', (event) => {
+    if (!activeIconEditorAppId) return;
+    syncIconEditorModal(activeIconEditorAppId, String(event.target.value || '').trim());
+  });
+
+  iconEditorModal.querySelector('#appearance-icon-editor-save')?.addEventListener('click', () => {
+    if (!activeIconEditorAppId) return;
+    const input = getIconImageInput(activeIconEditorAppId);
+    const urlInput = iconEditorModal.querySelector('#appearance-icon-editor-url');
+    const nextValue = String(urlInput?.value || '').trim();
+    if (input) input.value = nextValue;
+    updateIconTilePreview(activeIconEditorAppId);
+    closeIconEditorModal();
+  });
+
+  iconEditorModal.querySelector('#appearance-icon-editor-cancel')?.addEventListener('click', closeIconEditorModal);
+  iconEditorModal.querySelector('#appearance-icon-resource-close')?.addEventListener('click', closeIconEditorModal);
+  iconEditorModal.querySelector('.managed-resource-modal__mask')?.addEventListener('click', closeIconEditorModal);
+
+  container.querySelectorAll('[data-shadow-style]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const hiddenInput = container.querySelector('#setting-icon-shadow-style');
+      if (!hiddenInput) return;
+      hiddenInput.value = button.getAttribute('data-shadow-style') || DEFAULT_ICON_ADJUSTMENTS.iconShadowStyle;
+      syncShadowStyleOptions();
+    });
+  });
 
   container.querySelector('#save-ui-settings')?.addEventListener('click', onSaveUiSettings);
   container.querySelector('#save-wallpaper-settings')?.addEventListener('click', onSaveWallpaperSettings);

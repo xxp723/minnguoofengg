@@ -36,7 +36,7 @@ export class Theme {
       iconSize = 56,
       iconImage = '',
       iconRadius = 18,
-      iconShadowStyle = 'outer',
+      iconShadowStyle = 'none',
       iconShadowSize = 18,
       iconBorderWidth = 0,
       iconBorderColor = '#d7c9b8'
@@ -97,7 +97,7 @@ export class Theme {
     }
 
     if (document.body) {
-      document.body.dataset.iconShadowStyle = iconShadowStyle || 'outer';
+      document.body.dataset.iconShadowStyle = iconShadowStyle || 'none';
       document.body.classList.toggle('has-global-icon-image', !!iconImage);
     }
   }

@@ -24,6 +24,54 @@ export class Desktop {
     this.eventBus.on('desktop:changed', ({ config }) => {
       this.render(config);
     });
+
+    this.eventBus.on('settings:changed', () => {
+      this.refreshCustomIconImages();
+    });
+  }
+
+  refreshCustomIconImages() {
+    const apps = this.appManager.registry.getAll();
+    const appMap = new Map(apps.map((app) => [app.id, app]));
+
+    this.container.querySelectorAll('[data-app-id]').forEach((el) => {
+      const appId = el.getAttribute('data-app-id');
+      const app = appMap.get(appId);
+      if (!app) return;
+      const btn = el.querySelector('.app-icon-btn');
+      const img = el.querySelector('.app-custom-img');
+      const glyph = el.querySelector('.app-icon-glyph');
+      if (glyph && !glyph.innerHTML.trim()) glyph.innerHTML = app.icon || '';
+      const customImg = localStorage.getItem(`miniphone_app_icon_${appId}`);
+      if (img && customImg) {
+        img.src = customImg;
+        img.style.display = 'block';
+        btn?.classList.add('has-img');
+      } else if (img) {
+        img.src = '';
+        img.style.display = 'none';
+        btn?.classList.remove('has-img');
+      }
+    });
+
+    document.querySelectorAll('#dock-container [data-app-id]').forEach((el) => {
+      const appId = el.getAttribute('data-app-id');
+      const img = el.querySelector('.app-custom-img');
+      const btn = el.querySelector('.app-icon-btn');
+      const glyph = el.querySelector('.app-icon-glyph');
+      const app = appMap.get(appId);
+      if (glyph && app && !glyph.innerHTML.trim()) glyph.innerHTML = app.icon || '';
+      const customImg = localStorage.getItem(`miniphone_app_icon_${appId}`);
+      if (img && customImg) {
+        img.src = customImg;
+        img.style.display = 'block';
+        btn?.classList.add('has-img');
+      } else if (img) {
+        img.src = '';
+        img.style.display = 'none';
+        btn?.classList.remove('has-img');
+      }
+    });
   }
 
   render(config) {
@@ -145,46 +193,7 @@ export class Desktop {
       const apps = this.appManager.registry.getAll();
       const appMap = new Map(apps.map((app) => [app.id, app]));
 
-      // 恢复自定义图标
-      this.container.querySelectorAll('[data-app-id]').forEach((el) => {
-        const appId = el.getAttribute('data-app-id');
-        const app = appMap.get(appId);
-        if (!app) return;
-        const btn = el.querySelector('.app-icon-btn');
-        const img = el.querySelector('.app-custom-img');
-        const glyph = el.querySelector('.app-icon-glyph');
-        if (glyph && !glyph.innerHTML.trim()) glyph.innerHTML = app.icon || '';
-        const customImg = localStorage.getItem(`miniphone_app_icon_${appId}`);
-        if (img && customImg) {
-          img.src = customImg;
-          img.style.display = 'block';
-          btn?.classList.add('has-img');
-        } else if (img) {
-          img.src = '';
-          img.style.display = 'none';
-          btn?.classList.remove('has-img');
-        }
-      });
-
-      // Dock 图标自定义
-      document.querySelectorAll('#dock-container [data-app-id]').forEach((el) => {
-        const appId = el.getAttribute('data-app-id');
-        const img = el.querySelector('.app-custom-img');
-        const btn = el.querySelector('.app-icon-btn');
-        const glyph = el.querySelector('.app-icon-glyph');
-        const app = appMap.get(appId);
-        if (glyph && app && !glyph.innerHTML.trim()) glyph.innerHTML = app.icon || '';
-        const customImg = localStorage.getItem(`miniphone_app_icon_${appId}`);
-        if (img && customImg) {
-          img.src = customImg;
-          img.style.display = 'block';
-          btn?.classList.add('has-img');
-        } else if (img) {
-          img.src = '';
-          img.style.display = 'none';
-          btn?.classList.remove('has-img');
-        }
-      });
+      this.refreshCustomIconImages();
 
       // [模块标注] 桌面应用名称显示修复模块：桌面应用显示名称，DOCK 栏应用隐藏名称
       this.container.querySelectorAll('.app-icon[data-app-id]').forEach((el) => {
