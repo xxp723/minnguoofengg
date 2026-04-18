@@ -3,8 +3,13 @@ export function renderLogsSection() {
       <!-- 日志详情页 -->
       <div id="settings-logs" class="settings-detail">
         <div class="settings-detail__body">
+          <style>
+            #settings-logs .logs-card-title {
+              text-align: left;
+            }
+          </style>
           <section class="ui-card">
-            <h3>系统日志</h3>
+            <h3 class="logs-card-title">查看日志</h3>
             <p class="ui-muted" style="margin-bottom: 10px;">查看系统运行时的所有日志内容</p>
             <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
               <button class="ui-button" id="view-all-logs">查看全部日志</button>

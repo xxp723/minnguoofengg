@@ -158,7 +158,7 @@ export async function mount(container, context) {
           </div>
           <div class="settings-card settings-card--logs" data-page="logs">
             <div class="settings-card__icon">${ICONS.logs}</div>
-            <h3 class="settings-card__title">日志</h3>
+            <h3 class="settings-card__title">查看日志</h3>
           </div>
         </div>
       </div>
@@ -185,7 +185,7 @@ export async function mount(container, context) {
       'appearance-widget-custom': '自定义',
       api: 'API设置',
       data: '数据设置',
-      logs: '日志'
+      logs: '查看日志'
     };
 
     // 确定返回目标

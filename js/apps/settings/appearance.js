@@ -412,6 +412,20 @@ export function renderAppearanceSections({ current, icons }) {
       <!-- [模块标注] 自定义页：组件代码编辑器与保存按钮图标统一使用 IconPark 风格 SVG -->
       <div id="settings-appearance-widget-custom" class="settings-detail">
         <div class="settings-detail__body">
+          <style>
+            #settings-appearance-widget-custom .custom-widget-toggle .toggle-switch .toggle-slider {
+              background: rgba(125, 125, 130, 0.38);
+              box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+            }
+
+            #settings-appearance-widget-custom .custom-widget-toggle .toggle-switch .toggle-slider::before {
+              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+            }
+
+            #settings-appearance-widget-custom .custom-widget-toggle .toggle-switch input:checked + .toggle-slider {
+              background: var(--c-text-main, #4A342A);
+            }
+          </style>
           <section class="ui-card">
             <h3>自定义组件代码样式</h3>
             <p class="ui-muted" style="margin-bottom: 10px;">支持导入 / 导出本地组件代码文件。请使用 JSON 模板定义组件信息，并在 css 中只编写组件内部样式，避免污染全局样式。已导入的自定义组件在桌面上单击后，也会使用统一弹窗风格进行编辑。</p>

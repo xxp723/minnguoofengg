@@ -931,7 +931,12 @@ body.is-edit-mode #dock-container.is-edit-mode .app-icon .edit-delete-btn {
 }
 
 .app-window--widget-custom .app-window__title {
-  padding: 0 128px 0 92px;
+  left: 0;
+  right: 0;
+  width: auto;
+  padding: 0;
+  transform: none;
+  justify-content: center;
 }
 
 .app-window--widget-custom .app-window__actions {
@@ -1569,8 +1574,8 @@ body.is-edit-mode .grid-lines {
 }
 
 .settings-card--logs .settings-card__title {
-  width: 100%;
-  text-align: center;
+  width: auto;
+  text-align: left;
 }
 
 /* 设置详情页 */

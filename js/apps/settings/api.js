@@ -69,15 +69,19 @@ const ICONS = {
   apply: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path d="M8 24H40" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M26 12L40 24L26 36" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   // IconPark: delete / 删除已保存配置
   delete: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path d="M10 12H38" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M18 12V8H30V12" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M14 12L16 40H32L34 12" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M20 20V32" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M28 20V32" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+  // IconPark: list-view / 模型选择触发按钮
+  model: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path d="M10 12H38" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M10 24H38" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M10 36H38" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+  // IconPark: down / 下拉指示
+  chevronDown: `<svg viewBox="0 0 48 48" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg"><path d="M36 18L24 30L12 18" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   // IconPark: check / 成功结果
   ok: `<svg viewBox="0 0 48 48" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg"><path d="M10 25L20 34L38 14" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   // IconPark: close-one / 错误结果
   error: `<svg viewBox="0 0 48 48" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="18" stroke="currentColor" stroke-width="3"/><path d="M18 18L30 30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M30 18L18 30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
   // IconPark: close / 弹窗关闭
   close: `<svg viewBox="0 0 48 48" fill="none" width="18" height="18" xmlns="http://www.w3.org/2000/svg"><path d="M14 14L34 34" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M34 14L14 34" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>`,
-  // IconPark: check-one / 服务商已选中状态
+  // IconPark: check-one / 服务商/模型已选中状态
   selected: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="18" stroke="currentColor" stroke-width="3"/><path d="M17 24L22 29L32 19" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-  // IconPark: round / 服务商未选中状态
+  // IconPark: round / 服务商/模型未选中状态
   unselected: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="18" stroke="currentColor" stroke-width="3"/></svg>`,
   // IconPark: openai-provider / OpenAI 服务商图标
   openai: `<svg viewBox="0 0 48 48" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="16" stroke="currentColor" stroke-width="3"/><path d="M24 12L34 18V30L24 36L14 30V18L24 12Z" stroke="currentColor" stroke-width="3"/></svg>`,
@@ -353,6 +357,31 @@ function renderProviderTrigger(profileKey, profile) {
   `;
 }
 
+function renderModelTrigger(profileKey, profile) {
+  const models = mergeModelOptions(profile.provider, profile.availableModels, profile.model);
+  const selectedModel = profile.model || '';
+  const hasModels = models.length > 0;
+  return `
+    <button
+      class="api-model-trigger ${hasModels ? '' : 'is-empty'}"
+      id="api-${profileKey}-model-trigger"
+      type="button"
+      data-action="open-model-modal"
+      data-profile="${profileKey}"
+      aria-haspopup="dialog"
+    >
+      <span class="api-model-trigger__main">
+        <span class="api-model-trigger__icon">${ICONS.model}</span>
+        <span class="api-model-trigger__text">${escapeHtml(selectedModel || '请先拉取模型')}</span>
+      </span>
+      <span class="api-model-trigger__side">
+        <span class="api-model-trigger__meta">${hasModels ? `共 ${models.length} 个` : '暂无模型'}</span>
+        <span class="api-model-trigger__arrow">${ICONS.chevronDown}</span>
+      </span>
+    </button>
+  `;
+}
+
 function renderProviderModalOptions(selectedProvider) {
   return Object.keys(PROVIDER_META)
     .map((id) => {
@@ -377,6 +406,41 @@ function renderProviderModalOptions(selectedProvider) {
     .join('');
 }
 
+function renderModelModalOptions(profile) {
+  const models = mergeModelOptions(profile.provider, profile.availableModels, profile.model);
+
+  if (!models.length) {
+    return `
+      <div class="api-model-empty-state">
+        <span class="api-model-empty-state__icon">${ICONS.model}</span>
+        <span>当前没有可选模型，请先点击“拉取模型”</span>
+      </div>
+    `;
+  }
+
+  return models
+    .map((model) => {
+      const isSelected = model === profile.model;
+      const providerMeta = PROVIDER_META[profile.provider] || PROVIDER_META.openai;
+      return `
+        <button
+          class="api-model-option ${isSelected ? 'is-selected' : ''}"
+          type="button"
+          data-action="choose-model"
+          data-model="${escapeHtml(model)}"
+        >
+          <span class="api-model-option__main">
+            <span class="api-model-option__icon">${ICONS.model}</span>
+            <span class="api-model-option__label">${escapeHtml(model)}</span>
+          </span>
+          <span class="api-model-option__desc">${escapeHtml(providerMeta.shortLabel)} 模型</span>
+          <span class="api-model-option__check">${isSelected ? ICONS.selected : ICONS.unselected}</span>
+        </button>
+      `;
+    })
+    .join('');
+}
+
 function renderProviderModal() {
   return `
     <div id="api-provider-modal" class="api-provider-modal hidden" aria-hidden="true" data-profile="">
@@ -391,6 +455,26 @@ function renderProviderModal() {
         <div class="api-provider-modal__body">
           <p class="api-provider-modal__hint">切换服务商后，将自动替换 API 地址，并清空原有密钥与模型列表。</p>
           <div id="api-provider-modal-options" class="api-provider-modal__options"></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderModelModal() {
+  return `
+    <div id="api-model-modal" class="api-model-modal hidden" aria-hidden="true" data-profile="">
+      <div class="api-model-modal__mask" data-action="close-model-modal"></div>
+      <div class="api-model-modal__panel" role="dialog" aria-modal="true" aria-labelledby="api-model-modal-title">
+        <div class="api-model-modal__header">
+          <span id="api-model-modal-title">选择模型</span>
+          <button type="button" class="api-model-modal__close" data-action="close-model-modal" aria-label="关闭模型选择弹窗">
+            <span class="api-model-modal__close-icon">${ICONS.close}</span>
+          </button>
+        </div>
+        <div class="api-model-modal__body">
+          <p class="api-model-modal__hint">模型选择弹窗已与“API 服务商接口”窗口风格保持一致，统一主界面视觉。</p>
+          <div id="api-model-modal-options" class="api-model-modal__options"></div>
         </div>
       </div>
     </div>
@@ -442,11 +526,14 @@ function renderProfileSection(profileKey, title, icon, profile, { isPrimary = fa
       </div>
 
       <div class="api-field-group">
-        <label class="api-label" for="api-${profileKey}-model">模型选择</label>
+        <label class="api-label" for="api-${profileKey}-model-trigger">模型选择</label>
         <div class="api-inline-actions">
-          <select id="api-${profileKey}-model" class="api-select">
-            ${renderModelOptions(profile)}
-          </select>
+          <div class="api-model-picker">
+            <select id="api-${profileKey}-model" class="api-select api-select--hidden" aria-hidden="true" tabindex="-1">
+              ${renderModelOptions(profile)}
+            </select>
+            ${renderModelTrigger(profileKey, profile)}
+          </div>
           <button class="ui-button api-btn api-btn--ghost api-btn--compact" type="button" data-action="fetch-models" data-profile="${profileKey}">
             <span class="api-btn__icon">${ICONS.fetch}</span>
             <span>拉取模型</span>
@@ -546,7 +633,13 @@ export function renderApiSection({ current }) {
             #settings-api .api-provider-trigger__icon,
             #settings-api .api-provider-option__icon,
             #settings-api .api-provider-option__check,
-            #settings-api .api-provider-modal__close-icon {
+            #settings-api .api-provider-modal__close-icon,
+            #settings-api .api-model-trigger__icon,
+            #settings-api .api-model-trigger__arrow,
+            #settings-api .api-model-option__icon,
+            #settings-api .api-model-option__check,
+            #settings-api .api-model-empty-state__icon,
+            #settings-api .api-model-modal__close-icon {
               line-height: 0;
               display: inline-flex;
             }
@@ -584,7 +677,8 @@ export function renderApiSection({ current }) {
 
             #settings-api .api-input,
             #settings-api .api-select,
-            #settings-api .api-provider-trigger {
+            #settings-api .api-provider-trigger,
+            #settings-api .api-model-trigger {
               width: 100%;
               min-height: 38px;
               border: 1px solid rgba(125, 90, 68, 0.2);
@@ -624,9 +718,64 @@ export function renderApiSection({ current }) {
               text-align: right;
             }
 
+            #settings-api .api-model-picker {
+              position: relative;
+              min-width: 0;
+            }
+
+            #settings-api .api-select--hidden {
+              position: absolute;
+              inset: 0;
+              opacity: 0;
+              pointer-events: none;
+            }
+
+            #settings-api .api-model-trigger {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 12px;
+              cursor: pointer;
+              text-align: left;
+            }
+
+            #settings-api .api-model-trigger__main {
+              display: inline-flex;
+              align-items: center;
+              gap: 8px;
+              min-width: 0;
+              flex: 1 1 auto;
+            }
+
+            #settings-api .api-model-trigger__text {
+              min-width: 0;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              font-weight: 700;
+            }
+
+            #settings-api .api-model-trigger__side {
+              display: inline-flex;
+              align-items: center;
+              gap: 8px;
+              flex: 0 0 auto;
+            }
+
+            #settings-api .api-model-trigger__meta {
+              font-size: 11px;
+              color: rgba(74, 52, 42, 0.62);
+            }
+
+            #settings-api .api-model-trigger.is-empty .api-model-trigger__text,
+            #settings-api .api-model-trigger.is-empty .api-model-trigger__meta {
+              color: rgba(74, 52, 42, 0.56);
+            }
+
             #settings-api .api-input:focus,
             #settings-api .api-select:focus,
-            #settings-api .api-provider-trigger:focus {
+            #settings-api .api-provider-trigger:focus,
+            #settings-api .api-model-trigger:focus {
               border-color: var(--c-border, #7D5A44);
               box-shadow: 0 0 0 3px rgba(125, 90, 68, 0.12);
             }
@@ -855,25 +1004,28 @@ export function renderApiSection({ current }) {
               justify-content: flex-end;
             }
 
-            /* API 服务商接口弹窗：视觉风格对齐桌面组件编辑弹窗 */
-            #settings-api .api-provider-modal {
+            #settings-api .api-provider-modal,
+            #settings-api .api-model-modal {
               position: fixed;
               inset: 0;
               z-index: 1200;
             }
 
-            #settings-api .api-provider-modal.hidden {
+            #settings-api .api-provider-modal.hidden,
+            #settings-api .api-model-modal.hidden {
               display: none;
             }
 
-            #settings-api .api-provider-modal__mask {
+            #settings-api .api-provider-modal__mask,
+            #settings-api .api-model-modal__mask {
               position: absolute;
               inset: 0;
               background: rgba(34, 24, 18, 0.22);
               backdrop-filter: blur(4px);
             }
 
-            #settings-api .api-provider-modal__panel {
+            #settings-api .api-provider-modal__panel,
+            #settings-api .api-model-modal__panel {
               position: relative;
               width: min(420px, calc(100vw - 32px));
               margin: 72px auto 0;
@@ -884,7 +1036,8 @@ export function renderApiSection({ current }) {
               overflow: hidden;
             }
 
-            #settings-api .api-provider-modal__header {
+            #settings-api .api-provider-modal__header,
+            #settings-api .api-model-modal__header {
               display: flex;
               align-items: center;
               justify-content: space-between;
@@ -896,7 +1049,8 @@ export function renderApiSection({ current }) {
               font-weight: 700;
             }
 
-            #settings-api .api-provider-modal__close {
+            #settings-api .api-provider-modal__close,
+            #settings-api .api-model-modal__close {
               border: 0;
               width: 34px;
               height: 34px;
@@ -909,30 +1063,35 @@ export function renderApiSection({ current }) {
               cursor: pointer;
             }
 
-            #settings-api .api-provider-modal__close:active {
+            #settings-api .api-provider-modal__close:active,
+            #settings-api .api-model-modal__close:active {
               background: rgba(215, 201, 184, 0.46);
             }
 
-            #settings-api .api-provider-modal__body {
+            #settings-api .api-provider-modal__body,
+            #settings-api .api-model-modal__body {
               display: flex;
               flex-direction: column;
               gap: 12px;
               padding: 16px 18px 18px;
             }
 
-            #settings-api .api-provider-modal__hint {
+            #settings-api .api-provider-modal__hint,
+            #settings-api .api-model-modal__hint {
               margin: 0;
               font-size: 12px;
               line-height: 1.6;
               color: rgba(74, 52, 42, 0.72);
             }
 
-            #settings-api .api-provider-modal__options {
+            #settings-api .api-provider-modal__options,
+            #settings-api .api-model-modal__options {
               display: grid;
               gap: 10px;
             }
 
-            #settings-api .api-provider-option {
+            #settings-api .api-provider-option,
+            #settings-api .api-model-option {
               width: 100%;
               display: grid;
               grid-template-columns: minmax(0, 1fr) auto;
@@ -947,12 +1106,14 @@ export function renderApiSection({ current }) {
               cursor: pointer;
             }
 
-            #settings-api .api-provider-option.is-selected {
+            #settings-api .api-provider-option.is-selected,
+            #settings-api .api-model-option.is-selected {
               border-color: rgba(74, 52, 42, 0.26);
               background: rgba(215, 201, 184, 0.34);
             }
 
-            #settings-api .api-provider-option__main {
+            #settings-api .api-provider-option__main,
+            #settings-api .api-model-option__main {
               display: inline-flex;
               align-items: center;
               gap: 8px;
@@ -961,18 +1122,42 @@ export function renderApiSection({ current }) {
               font-weight: 700;
             }
 
-            #settings-api .api-provider-option__desc {
+            #settings-api .api-provider-option__label,
+            #settings-api .api-model-option__label {
+              min-width: 0;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+
+            #settings-api .api-provider-option__desc,
+            #settings-api .api-model-option__desc {
               grid-column: 1 / 2;
               font-size: 11px;
               color: rgba(74, 52, 42, 0.68);
             }
 
-            #settings-api .api-provider-option__check {
+            #settings-api .api-provider-option__check,
+            #settings-api .api-model-option__check {
               grid-column: 2 / 3;
               grid-row: 1 / span 2;
               color: var(--c-text-main, #4A342A);
               justify-self: end;
               align-self: center;
+            }
+
+            #settings-api .api-model-empty-state {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              min-height: 42px;
+              padding: 12px 14px;
+              border-radius: 18px;
+              border: 1px solid rgba(125, 90, 68, 0.14);
+              background: rgba(245, 241, 234, 0.86);
+              color: rgba(74, 52, 42, 0.72);
+              font-size: 12px;
+              line-height: 1.6;
             }
 
             @media (max-width: 420px) {
@@ -1001,7 +1186,8 @@ export function renderApiSection({ current }) {
                 width: 100%;
               }
 
-              #settings-api .api-provider-trigger {
+              #settings-api .api-provider-trigger,
+              #settings-api .api-model-trigger {
                 align-items: flex-start;
                 flex-direction: column;
               }
@@ -1010,7 +1196,13 @@ export function renderApiSection({ current }) {
                 text-align: left;
               }
 
-              #settings-api .api-provider-modal__panel {
+              #settings-api .api-model-trigger__side {
+                width: 100%;
+                justify-content: space-between;
+              }
+
+              #settings-api .api-provider-modal__panel,
+              #settings-api .api-model-modal__panel {
                 width: calc(100vw - 24px);
                 margin-top: 48px;
               }
@@ -1073,6 +1265,7 @@ export function renderApiSection({ current }) {
           </section>
 
           ${renderProviderModal()}
+          ${renderModelModal()}
         </div>
       </div>
   `;
@@ -1358,6 +1551,33 @@ async function testProviderRequest(profileConfig, globalConfig) {
   }
 }
 
+function updateModelTrigger(container, profileKey) {
+  const trigger = container.querySelector(`#api-${profileKey}-model-trigger`);
+  const select = container.querySelector(`#api-${profileKey}-model`);
+  const providerTrigger = container.querySelector(`#api-${profileKey}-provider-trigger`);
+  if (!trigger || !select) return;
+
+  const providerId = normalizeProviderId(providerTrigger?.dataset?.provider, 'openai');
+  const models = Array.from(select.options)
+    .map((option) => option.value)
+    .filter(Boolean);
+  const selectedModel = select.value || '';
+  const hasModels = models.length > 0;
+
+  trigger.classList.toggle('is-empty', !hasModels);
+  trigger.innerHTML = `
+    <span class="api-model-trigger__main">
+      <span class="api-model-trigger__icon">${ICONS.model}</span>
+      <span class="api-model-trigger__text">${escapeHtml(selectedModel || '请先拉取模型')}</span>
+    </span>
+    <span class="api-model-trigger__side">
+      <span class="api-model-trigger__meta">${hasModels ? `共 ${models.length} 个` : '暂无模型'}</span>
+      <span class="api-model-trigger__arrow">${ICONS.chevronDown}</span>
+    </span>
+  `;
+  trigger.dataset.provider = providerId;
+}
+
 function setModelSelectOptions(container, profileKey, providerId, models, selectedModel) {
   const select = container.querySelector(`#api-${profileKey}-model`);
   if (!select) return;
@@ -1367,6 +1587,7 @@ function setModelSelectOptions(container, profileKey, providerId, models, select
   if (!merged.length) {
     select.innerHTML = '<option value="" selected>请先拉取模型</option>';
     select.value = '';
+    updateModelTrigger(container, profileKey);
     return;
   }
 
@@ -1376,6 +1597,8 @@ function setModelSelectOptions(container, profileKey, providerId, models, select
       return `<option value="${escapeHtml(model)}" ${selectedAttr}>${escapeHtml(model)}</option>`;
     })
     .join('');
+  select.value = nextSelected;
+  updateModelTrigger(container, profileKey);
 }
 
 function updateProviderTrigger(container, profileKey, providerId) {
@@ -1480,6 +1703,37 @@ function closeProviderModal(container) {
   optionsHost.innerHTML = '';
 }
 
+function openModelModal(container, profileKey) {
+  const modal = container.querySelector('#api-model-modal');
+  const optionsHost = container.querySelector('#api-model-modal-options');
+  const select = container.querySelector(`#api-${profileKey}-model`);
+  const providerTrigger = container.querySelector(`#api-${profileKey}-provider-trigger`);
+  if (!modal || !optionsHost || !select || !profileKey) return;
+
+  const profile = {
+    provider: normalizeProviderId(providerTrigger?.dataset?.provider, 'openai'),
+    model: select.value || '',
+    availableModels: Array.from(select.options)
+      .map((option) => option.value)
+      .filter(Boolean)
+  };
+
+  modal.dataset.profile = profileKey;
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+  optionsHost.innerHTML = renderModelModalOptions(profile);
+}
+
+function closeModelModal(container) {
+  const modal = container.querySelector('#api-model-modal');
+  const optionsHost = container.querySelector('#api-model-modal-options');
+  if (!modal || !optionsHost) return;
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+  modal.dataset.profile = '';
+  optionsHost.innerHTML = '';
+}
+
 export function bindApiEvents(container, { settings }) {
   let currentApiCache = null;
 
@@ -1526,6 +1780,7 @@ export function bindApiEvents(container, { settings }) {
     if (urlInput) {
       urlInput.dataset.provider = trigger?.dataset?.provider || 'openai';
     }
+    updateModelTrigger(container, profileKey);
   });
 
   container.querySelectorAll('[data-action="save-profile"]').forEach((btn) => {
@@ -1588,6 +1843,11 @@ export function bindApiEvents(container, { settings }) {
             },
             profileConfig.provider
           );
+        }
+
+        const modelModal = container.querySelector('#api-model-modal');
+        if (modelModal?.dataset?.profile === profileKey && !modelModal.classList.contains('hidden')) {
+          openModelModal(container, profileKey);
         }
 
         setResultByProfile(
@@ -1685,7 +1945,10 @@ export function bindApiEvents(container, { settings }) {
       '[data-action="delete-saved-primary"]',
       '[data-action="open-provider-modal"]',
       '[data-action="close-provider-modal"]',
-      '[data-action="choose-provider"]'
+      '[data-action="choose-provider"]',
+      '[data-action="open-model-modal"]',
+      '[data-action="close-model-modal"]',
+      '[data-action="choose-model"]'
     ].join(', '));
     if (!target) return;
 
@@ -1710,6 +1973,31 @@ export function bindApiEvents(container, { settings }) {
       if (!profileKey || !providerId) return;
       switchProviderProfile(container, profileKey, providerId);
       closeProviderModal(container);
+      return;
+    }
+
+    if (action === 'open-model-modal') {
+      const profileKey = target.getAttribute('data-profile');
+      if (!profileKey) return;
+      openModelModal(container, profileKey);
+      return;
+    }
+
+    if (action === 'close-model-modal') {
+      closeModelModal(container);
+      return;
+    }
+
+    if (action === 'choose-model') {
+      const modal = container.querySelector('#api-model-modal');
+      const profileKey = modal?.dataset?.profile;
+      const model = target.getAttribute('data-model');
+      const select = profileKey ? container.querySelector(`#api-${profileKey}-model`) : null;
+      if (!profileKey || !model || !select) return;
+      select.value = model;
+      updateModelTrigger(container, profileKey);
+      setResultByProfile(container, profileKey, 'success', `已选择模型：${model}`);
+      closeModelModal(container);
       return;
     }
 
