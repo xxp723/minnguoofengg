@@ -11,6 +11,7 @@ import {
   bindAppearanceEvents,
   getAppearanceCustomWidgetState
 } from './appearance.js';
+import { Registry } from '../../core/logic/Registry.js';
 import { renderApiSection, bindApiEvents } from './api.js';
 import { renderDataSection, bindDataEvents } from './data.js';
 import { renderLogsSection, bindLogsEvents } from './logs.js';
@@ -55,6 +56,9 @@ const ICONS = {
 export async function mount(container, context) {
   const { settings, eventBus, windowManager, appId } = context;
   const current = await settings.getAll();
+  const registry = new Registry();
+  await registry.initDefaults();
+  const apps = registry.getAll();
   const importInputId = `settings-custom-widget-import-${appId}`;
 
   // 当前页面状态
@@ -163,7 +167,7 @@ export async function mount(container, context) {
         </div>
       </div>
 
-      ${renderAppearanceSections({ current, icons: ICONS })}
+      ${renderAppearanceSections({ current, icons: ICONS, apps })}
       ${renderApiSection({ current })}
       ${renderDataSection()}
       ${renderLogsSection()}
@@ -233,7 +237,7 @@ export async function mount(container, context) {
   });
 
   // 绑定拆分后的模块事件
-  bindAppearanceEvents(container, { settings, eventBus, current, icons: ICONS });
+  bindAppearanceEvents(container, { settings, eventBus, current, icons: ICONS, apps });
   bindApiEvents(container, { settings });
   bindDataEvents(container, { settings });
   bindLogsEvents(container);

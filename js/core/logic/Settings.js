@@ -34,6 +34,7 @@ export class Settings {
         themeColor: '#4f46e5',
         iconSize: 56,
         iconImage: '',
+        iconImages: {},
         iconRadius: 18,
         iconShadowStyle: 'outer',
         iconShadowSize: 18,

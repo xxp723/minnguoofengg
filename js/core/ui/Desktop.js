@@ -44,9 +44,10 @@ export class Desktop {
             if (!app) return '';
             const customImg = localStorage.getItem(`miniphone_app_icon_${app.id}`);
             const imgStyle = customImg ? '' : 'display:none;';
+            const btnClass = customImg ? 'app-icon-btn has-img' : 'app-icon-btn';
             return `
               <div class="app-icon" draggable="true" data-app-id="${app.id}" title="${app.name}">
-                <button class="app-icon-btn" type="button" data-open-app="${app.id}" aria-label="打开${app.name}">
+                <button class="${btnClass}" type="button" data-open-app="${app.id}" aria-label="打开${app.name}">
                   <span class="app-icon-glyph">${app.icon || ''}</span>
                   <img class="app-custom-img" src="${customImg || ''}" style="${imgStyle}" alt="${app.name}" />
                 </button>
@@ -158,6 +159,10 @@ export class Desktop {
           img.src = customImg;
           img.style.display = 'block';
           btn?.classList.add('has-img');
+        } else if (img) {
+          img.src = '';
+          img.style.display = 'none';
+          btn?.classList.remove('has-img');
         }
       });
 
@@ -174,6 +179,10 @@ export class Desktop {
           img.src = customImg;
           img.style.display = 'block';
           btn?.classList.add('has-img');
+        } else if (img) {
+          img.src = '';
+          img.style.display = 'none';
+          btn?.classList.remove('has-img');
         }
       });
 

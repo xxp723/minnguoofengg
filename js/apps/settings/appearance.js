@@ -15,6 +15,15 @@ const DEFAULT_CUSTOM_WIDGET_TEMPLATE = `{
   "html": "<div class='widget-card'><div class='widget-title'>旅途拍立得</div><div class='widget-photo'>✦</div><div class='widget-desc'>把你的灵感、行程或纪念文字放在这里。</div></div>"
 }`;
 
+const DEFAULT_ICON_ADJUSTMENTS = {
+  iconSize: 56,
+  iconRadius: 18,
+  iconShadowStyle: 'outer',
+  iconShadowSize: 18,
+  iconBorderWidth: 0,
+  iconBorderColor: '#d7c9b8'
+};
+
 function getSavedCustomWidgets() {
   try {
     const parsed = JSON.parse(localStorage.getItem(CUSTOM_WIDGET_STORAGE_KEY) || '[]');
@@ -47,6 +56,20 @@ function saveDraft(code) {
 
 function getDraft() {
   return localStorage.getItem(CUSTOM_WIDGET_DRAFT_KEY) || DEFAULT_CUSTOM_WIDGET_TEMPLATE;
+}
+
+function getDefaultIconAdjustmentState(overrides = {}) {
+  return {
+    ...DEFAULT_ICON_ADJUSTMENTS,
+    ...overrides
+  };
+}
+
+function normalizeIconImages(iconImages) {
+  if (!iconImages || typeof iconImages !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(iconImages).filter(([, value]) => String(value || '').trim())
+  );
 }
 
 function escapeHtml(value) {
@@ -316,9 +339,49 @@ function renderManagedImageField({
   `;
 }
 
-export function renderAppearanceSections({ current, icons }) {
+function renderIconManagedImageField({ app, value = '' }) {
+  const baseId = `setting-icon-image-${app.id}`;
+  const hasValue = !!String(value || '').trim();
+
+  return `
+    <div class="appearance-resource-card appearance-resource-card--icon">
+      <div class="appearance-resource-card__head">
+        <div>
+          <h4>${app.name}</h4>
+          <p>为该图标单独设置图片，支持本地上传与 URL 链接。</p>
+        </div>
+      </div>
+      <div class="appearance-resource-card__preview ${hasValue ? 'has-image' : ''}" id="${baseId}-preview" style="${hasValue ? `background-image:url('${escapeHtml(value)}');` : ''}">
+        ${hasValue ? '' : '<span>暂无图片</span>'}
+      </div>
+      <div class="appearance-resource-card__actions">
+        <label class="ui-button" for="${baseId}-file">上传本地图片</label>
+        <input id="${baseId}-file" type="file" accept="image/*" style="display:none;" />
+        <button class="ui-button" type="button" data-resource-target="${baseId}">使用 URL 链接</button>
+        <button class="ui-button danger" type="button" id="${baseId}-remove">删除</button>
+      </div>
+      <input id="${baseId}" type="url" value="${escapeHtml(value)}" placeholder="https://example.com/${app.id}.jpg" />
+    </div>
+  `;
+}
+
+function renderSliderField({ id, label, value, min, max, step = 1 }) {
+  return `
+    <label class="appearance-form-field appearance-form-field--slider">
+      <span>${label}</span>
+      <div class="appearance-slider-wrap">
+        <input id="${id}" type="range" min="${min}" max="${max}" step="${step}" value="${value}">
+        <strong data-range-value="${id}">${value}</strong>
+      </div>
+    </label>
+  `;
+}
+
+export function renderAppearanceSections({ current, icons, apps = [] }) {
   const customDraft = getDraft();
   const appearance = current.appearance || {};
+  const iconImages = normalizeIconImages(appearance.iconImages);
+  const iconAdjustments = getDefaultIconAdjustmentState(appearance);
 
   return `
       <!-- 外观设置详情页（改为卡片式分类） -->
@@ -410,64 +473,76 @@ export function renderAppearanceSections({ current, icons }) {
       <!-- 图标设置子页面 -->
       <div id="settings-appearance-icon" class="settings-detail">
         <div class="settings-detail__body">
-          <!-- [模块标注] 自定义图标设置模块：统一更换桌面所有应用图标图片，并提供保存与恢复默认 -->
+          <!-- [模块标注] 自定义图标设置模块：按应用逐个更换图标图片，便于后续继续单独维护每个图标 -->
           <section class="ui-card">
             <h3>自定义图标</h3>
-            <p class="ui-muted" style="margin-bottom: 10px;">对桌面上的所有应用图标统一更换为同一张自定义图片。</p>
-            ${renderManagedImageField({
-              title: '统一图标图片',
-              inputId: 'setting-icon-image',
-              fileId: 'setting-icon-image-file',
-              previewId: 'setting-icon-image-preview',
-              removeId: 'remove-icon-image',
-              value: appearance.iconImage || '',
-              hint: '保存后会统一覆盖桌面与 Dock 的所有应用图标。'
-            })}
+            <p class="ui-muted" style="margin-bottom: 10px;">现在支持为每个应用图标单独设置图片，而不是一张图覆盖所有图标。</p>
+            <div class="appearance-settings-stack">
+              ${apps.map((app) => renderIconManagedImageField({
+                app,
+                value: iconImages[app.id] || ''
+              })).join('')}
+            </div>
             <div class="appearance-inline-actions">
               <button class="ui-button primary" id="save-custom-icon-settings">${icons.saveWidget}<span>保存设置</span></button>
               <button class="ui-button" id="reset-custom-icon-settings" type="button">${icons.closeSmall}<span>恢复默认</span></button>
             </div>
           </section>
 
-          <!-- [模块标注] 图标调整模块：统一控制所有应用图标的大小、圆角、阴影、边框等外观参数 -->
+          <!-- [模块标注] 图标调整模块：统一控制所有应用图标的大小、圆角、阴影、边框等外观参数；滑杆便于后续微调 -->
           <section class="ui-card">
             <h3>图标调整</h3>
             <p class="ui-muted" style="margin-bottom: 10px;">统一调整桌面与 Dock 图标的尺寸、圆角、阴影和边框样式。</p>
             <div class="appearance-form-grid">
-              <label class="appearance-form-field">
-                <span>图标大小</span>
-                <input id="setting-icon-size" type="number" min="40" max="96" value="${appearance.iconSize || 56}">
-              </label>
-              <label class="appearance-form-field">
-                <span>圆角大小</span>
-                <input id="setting-icon-radius" type="number" min="0" max="32" value="${appearance.iconRadius ?? 18}">
-              </label>
+              ${renderSliderField({
+                id: 'setting-icon-size',
+                label: '图标大小',
+                value: iconAdjustments.iconSize,
+                min: 40,
+                max: 96
+              })}
+              ${renderSliderField({
+                id: 'setting-icon-radius',
+                label: '圆角大小',
+                value: iconAdjustments.iconRadius,
+                min: 0,
+                max: 32
+              })}
               <label class="appearance-form-field">
                 <span>阴影样式</span>
                 <select id="setting-icon-shadow-style">
-                  <option value="outer" ${(appearance.iconShadowStyle || 'outer') === 'outer' ? 'selected' : ''}>外投影</option>
-                  <option value="inner" ${appearance.iconShadowStyle === 'inner' ? 'selected' : ''}>内阴影</option>
-                  <option value="long" ${appearance.iconShadowStyle === 'long' ? 'selected' : ''}>长阴影</option>
-                  <option value="multi" ${appearance.iconShadowStyle === 'multi' ? 'selected' : ''}>多重阴影</option>
-                  <option value="neumorphism" ${appearance.iconShadowStyle === 'neumorphism' ? 'selected' : ''}>新拟态阴影</option>
+                  <option value="none" ${iconAdjustments.iconShadowStyle === 'none' ? 'selected' : ''}>无阴影</option>
+                  <option value="outer" ${iconAdjustments.iconShadowStyle === 'outer' ? 'selected' : ''}>外投影</option>
+                  <option value="inner" ${iconAdjustments.iconShadowStyle === 'inner' ? 'selected' : ''}>内阴影</option>
+                  <option value="long" ${iconAdjustments.iconShadowStyle === 'long' ? 'selected' : ''}>长阴影</option>
+                  <option value="multi" ${iconAdjustments.iconShadowStyle === 'multi' ? 'selected' : ''}>多重阴影</option>
+                  <option value="neumorphism" ${iconAdjustments.iconShadowStyle === 'neumorphism' ? 'selected' : ''}>新拟态阴影</option>
                 </select>
               </label>
-              <label class="appearance-form-field">
-                <span>阴影大小</span>
-                <input id="setting-icon-shadow-size" type="number" min="0" max="40" value="${appearance.iconShadowSize ?? 18}">
-              </label>
-              <label class="appearance-form-field">
-                <span>边框粗细</span>
-                <input id="setting-icon-border-width" type="number" min="0" max="8" value="${appearance.iconBorderWidth ?? 0}">
-              </label>
+              ${renderSliderField({
+                id: 'setting-icon-shadow-size',
+                label: '阴影大小',
+                value: iconAdjustments.iconShadowSize,
+                min: 0,
+                max: 40
+              })}
+              ${renderSliderField({
+                id: 'setting-icon-border-width',
+                label: '边框粗细',
+                value: iconAdjustments.iconBorderWidth,
+                min: 0,
+                max: 8
+              })}
               <label class="appearance-form-field">
                 <span>边框颜色</span>
-                <input id="setting-icon-border-color" type="color" value="${appearance.iconBorderColor || '#d7c9b8'}">
+                <input id="setting-icon-border-color" type="color" value="${iconAdjustments.iconBorderColor}">
               </label>
             </div>
+            <div class="appearance-inline-actions">
+              <button class="ui-button primary" id="save-icon-settings">${icons.saveWidget}<span>保存图标设置</span></button>
+              <button class="ui-button" id="reset-icon-adjustments" type="button">${icons.closeSmall}<span>恢复默认</span></button>
+            </div>
           </section>
-
-          <button class="ui-button primary" id="save-icon-settings" style="width: 100%; margin-top: 10px;">保存图标设置</button>
         </div>
       </div>
 
@@ -688,7 +763,7 @@ function showAppearanceConfirm(container, icons, message, onConfirm) {
   mask?.addEventListener('click', close);
 }
 
-export function bindAppearanceEvents(container, { settings, eventBus, current, icons }) {
+export function bindAppearanceEvents(container, { settings, eventBus, current, icons, apps = [] }) {
   let isSelectionMode = false;
   let selectedWidgetIds = new Set();
 
@@ -876,6 +951,44 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
     }
   };
 
+  const syncRangeValue = (id) => {
+    const input = container.querySelector(`#${id}`);
+    const valueEl = container.querySelector(`[data-range-value="${id}"]`);
+    if (!input || !valueEl) return;
+
+    const update = () => {
+      const min = Number(input.min || 0);
+      const max = Number(input.max || 100);
+      const value = Number(input.value || min);
+      const progress = max <= min ? 0 : ((value - min) / (max - min)) * 100;
+      valueEl.textContent = input.value;
+      input.style.setProperty('--range-progress', `${progress}%`);
+    };
+
+    update();
+    input.addEventListener('input', update);
+  };
+
+  const collectIconImages = () => {
+    const entries = apps.map((app) => {
+      const input = container.querySelector(`#setting-icon-image-${app.id}`);
+      return [app.id, String(input?.value || '').trim()];
+    });
+    return normalizeIconImages(Object.fromEntries(entries));
+  };
+
+  const syncIconImagesToLocalStorage = (iconImages) => {
+    apps.forEach((app) => {
+      const value = String(iconImages[app.id] || '').trim();
+      const storageKey = `miniphone_app_icon_${app.id}`;
+      if (value) {
+        localStorage.setItem(storageKey, value);
+      } else {
+        localStorage.removeItem(storageKey);
+      }
+    });
+  };
+
   const onSaveUiSettings = async () => {
     const statusBarChecked = container.querySelector('#setting-status-bar')?.checked;
     const fullscreenChecked = container.querySelector('#setting-fullscreen')?.checked;
@@ -940,50 +1053,61 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
   };
 
   const onSaveCustomIconSettings = async () => {
-    const iconImage = String(container.querySelector('#setting-icon-image')?.value || '').trim();
+    const iconImages = collectIconImages();
+    syncIconImagesToLocalStorage(iconImages);
 
     await settings.update({
       appearance: {
         ...(current.appearance || {}),
-        iconImage
+        iconImage: '',
+        iconImages
       }
     });
 
     current.appearance = {
       ...(current.appearance || {}),
-      iconImage
+      iconImage: '',
+      iconImages
     };
-    eventBus?.emit('settings:appearance-changed', { iconImage });
+    eventBus?.emit('settings:appearance-changed', { iconImage: '', iconImages });
     Logger.info('自定义图标设置已保存');
   };
 
   const onResetCustomIconSettings = async () => {
-    const input = container.querySelector('#setting-icon-image');
-    if (input) input.value = '';
-    updateManagedImagePreview(container, 'setting-icon-image', 'setting-icon-image-preview');
+    apps.forEach((app) => {
+      const baseId = `setting-icon-image-${app.id}`;
+      const input = container.querySelector(`#${baseId}`);
+      const fileInput = container.querySelector(`#${baseId}-file`);
+      if (input) input.value = '';
+      if (fileInput) fileInput.value = '';
+      updateManagedImagePreview(container, baseId, `${baseId}-preview`);
+      localStorage.removeItem(`miniphone_app_icon_${app.id}`);
+    });
 
     await settings.update({
       appearance: {
         ...(current.appearance || {}),
-        iconImage: ''
+        iconImage: '',
+        iconImages: {}
       }
     });
 
     current.appearance = {
       ...(current.appearance || {}),
-      iconImage: ''
+      iconImage: '',
+      iconImages: {}
     };
-    eventBus?.emit('settings:appearance-changed', { iconImage: '' });
+    eventBus?.emit('settings:appearance-changed', { iconImage: '', iconImages: {} });
     Logger.info('自定义图标已恢复默认');
   };
 
   const onSaveIconSettings = async () => {
-    const iconSize = Number(container.querySelector('#setting-icon-size')?.value || 56);
-    const iconRadius = Number(container.querySelector('#setting-icon-radius')?.value || 18);
-    const iconShadowStyle = String(container.querySelector('#setting-icon-shadow-style')?.value || 'outer');
-    const iconShadowSize = Number(container.querySelector('#setting-icon-shadow-size')?.value || 18);
-    const iconBorderWidth = Number(container.querySelector('#setting-icon-border-width')?.value || 0);
-    const iconBorderColor = String(container.querySelector('#setting-icon-border-color')?.value || '#d7c9b8');
+    const iconSize = Number(container.querySelector('#setting-icon-size')?.value || DEFAULT_ICON_ADJUSTMENTS.iconSize);
+    const iconRadius = Number(container.querySelector('#setting-icon-radius')?.value || DEFAULT_ICON_ADJUSTMENTS.iconRadius);
+    const iconShadowStyle = String(container.querySelector('#setting-icon-shadow-style')?.value || DEFAULT_ICON_ADJUSTMENTS.iconShadowStyle);
+    const iconShadowSize = Number(container.querySelector('#setting-icon-shadow-size')?.value || DEFAULT_ICON_ADJUSTMENTS.iconShadowSize);
+    const iconBorderWidth = Number(container.querySelector('#setting-icon-border-width')?.value || DEFAULT_ICON_ADJUSTMENTS.iconBorderWidth);
+    const iconBorderColor = String(container.querySelector('#setting-icon-border-color')?.value || DEFAULT_ICON_ADJUSTMENTS.iconBorderColor);
 
     await settings.update({
       appearance: {
@@ -1016,6 +1140,49 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
       iconBorderColor
     });
     Logger.info('图标设置已保存');
+  };
+
+  const onResetIconAdjustments = async () => {
+    const defaults = getDefaultIconAdjustmentState();
+
+    const setField = (id, value) => {
+      const input = container.querySelector(`#${id}`);
+      if (!input) return;
+      input.value = value;
+      const min = Number(input.min || 0);
+      const max = Number(input.max || 100);
+      const numericValue = Number(value || min);
+      const progress = max <= min ? 0 : ((numericValue - min) / (max - min)) * 100;
+      input.style.setProperty('--range-progress', `${progress}%`);
+      const valueEl = container.querySelector(`[data-range-value="${id}"]`);
+      if (valueEl) valueEl.textContent = String(value);
+    };
+
+    setField('setting-icon-size', defaults.iconSize);
+    setField('setting-icon-radius', defaults.iconRadius);
+    setField('setting-icon-shadow-size', defaults.iconShadowSize);
+    setField('setting-icon-border-width', defaults.iconBorderWidth);
+
+    const shadowStyle = container.querySelector('#setting-icon-shadow-style');
+    if (shadowStyle) shadowStyle.value = defaults.iconShadowStyle;
+
+    const borderColor = container.querySelector('#setting-icon-border-color');
+    if (borderColor) borderColor.value = defaults.iconBorderColor;
+
+    await settings.update({
+      appearance: {
+        ...(current.appearance || {}),
+        ...defaults
+      }
+    });
+
+    current.appearance = {
+      ...(current.appearance || {}),
+      ...defaults
+    };
+
+    eventBus?.emit('settings:appearance-changed', { ...defaults });
+    Logger.info('图标调整已恢复默认');
   };
 
   const onSaveCustomWidget = () => {
@@ -1055,18 +1222,28 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
     previewId: 'setting-lockscreen-wallpaper-preview',
     removeId: 'remove-lockscreen-wallpaper'
   });
-  bindManagedImageField(container, {
-    inputId: 'setting-icon-image',
-    fileId: 'setting-icon-image-file',
-    previewId: 'setting-icon-image-preview',
-    removeId: 'remove-icon-image'
+
+  apps.forEach((app) => {
+    const baseId = `setting-icon-image-${app.id}`;
+    bindManagedImageField(container, {
+      inputId: baseId,
+      fileId: `${baseId}-file`,
+      previewId: `${baseId}-preview`,
+      removeId: `${baseId}-remove`
+    });
   });
+
+  syncRangeValue('setting-icon-size');
+  syncRangeValue('setting-icon-radius');
+  syncRangeValue('setting-icon-shadow-size');
+  syncRangeValue('setting-icon-border-width');
 
   container.querySelector('#save-ui-settings')?.addEventListener('click', onSaveUiSettings);
   container.querySelector('#save-wallpaper-settings')?.addEventListener('click', onSaveWallpaperSettings);
   container.querySelector('#save-custom-icon-settings')?.addEventListener('click', onSaveCustomIconSettings);
   container.querySelector('#reset-custom-icon-settings')?.addEventListener('click', onResetCustomIconSettings);
   container.querySelector('#save-icon-settings')?.addEventListener('click', onSaveIconSettings);
+  container.querySelector('#reset-icon-adjustments')?.addEventListener('click', onResetIconAdjustments);
   container.querySelector('#custom-widget-save')?.addEventListener('click', onSaveCustomWidget);
   container.querySelector('#custom-widget-preview-toggle')?.addEventListener('change', updatePreview);
   container.querySelector('#custom-widget-code')?.addEventListener('input', (event) => {
