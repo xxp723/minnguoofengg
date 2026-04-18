@@ -621,6 +621,127 @@
       let currentUploadTarget = null;
       let currentModalMode = null;
 
+      // [模块标注] 图片资源主题弹窗模块：替换头像/戏票上传时的浏览器原生 confirm/prompt，为主题风格弹窗（与桌面编辑窗口一致）
+      let inlineResourceModalRefs = null;
+      let inlineResourceModalResolver = null;
+
+      const ensureInlineManagedResourceModal = () => {
+        if (inlineResourceModalRefs) return inlineResourceModalRefs;
+
+        const modal = document.createElement('div');
+        modal.id = 'inline-managed-resource-modal';
+        modal.className = 'managed-resource-modal hidden';
+        modal.setAttribute('aria-hidden', 'true');
+        modal.innerHTML = `
+          <div class="managed-resource-modal__mask"></div>
+          <div class="managed-resource-modal__panel" role="dialog" aria-modal="true" aria-labelledby="inline-managed-resource-title">
+            <div class="managed-resource-modal__header">
+              <span id="inline-managed-resource-title">选择图片资源</span>
+              <button type="button" class="managed-resource-modal__close" id="inline-managed-resource-cancel" aria-label="关闭图片资源弹窗">
+                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path d="M14 14L34 34" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M34 14L14 34" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+            <div class="managed-resource-modal__body">
+              <p class="managed-resource-modal__hint" id="inline-managed-resource-hint">可从本地导入，也可直接粘贴图片 URL。</p>
+              <button type="button" class="modal-btn" id="inline-managed-resource-local">从本地导入图片</button>
+              <div class="modal-field">
+                <label for="inline-managed-resource-url">图片 URL</label>
+                <input id="inline-managed-resource-url" type="url" placeholder="https://example.com/image.jpg" />
+              </div>
+              <button type="button" class="modal-btn primary" id="inline-managed-resource-confirm">使用 URL 图片</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+
+        const refs = {
+          modal,
+          mask: modal.querySelector('.managed-resource-modal__mask'),
+          title: modal.querySelector('#inline-managed-resource-title'),
+          hint: modal.querySelector('#inline-managed-resource-hint'),
+          urlInput: modal.querySelector('#inline-managed-resource-url'),
+          localBtn: modal.querySelector('#inline-managed-resource-local'),
+          cancelBtn: modal.querySelector('#inline-managed-resource-cancel'),
+          confirmBtn: modal.querySelector('#inline-managed-resource-confirm')
+        };
+
+        const close = (result = null) => {
+          refs.modal.classList.add('hidden');
+          refs.modal.setAttribute('aria-hidden', 'true');
+          if (inlineResourceModalResolver) {
+            const resolver = inlineResourceModalResolver;
+            inlineResourceModalResolver = null;
+            resolver(result);
+          }
+        };
+
+        refs.mask?.addEventListener('click', () => close(null));
+        refs.cancelBtn?.addEventListener('click', () => close(null));
+        refs.localBtn?.addEventListener('click', () => close({ type: 'local' }));
+        refs.confirmBtn?.addEventListener('click', () => {
+          const url = refs.urlInput?.value?.trim();
+          if (!url) {
+            refs.urlInput?.focus();
+            return;
+          }
+          close({ type: 'url', url });
+        });
+
+        inlineResourceModalRefs = refs;
+        return refs;
+      };
+
+      const openInlineManagedResourcePicker = (target) => {
+        const refs = ensureInlineManagedResourceModal();
+        const labelMap = {
+          avatar: '头像图片',
+          ticket2: '戏票图片',
+          ticket: '戏票图片',
+          news: '图片'
+        };
+        const label = labelMap[target] || '图片资源';
+
+        refs.title.textContent = `选择${label}`;
+        refs.hint.textContent = `你可以从本地导入${label}，也可以输入${label} URL。`;
+        refs.urlInput.value = '';
+        refs.urlInput.placeholder = 'https://example.com/image.jpg';
+
+        refs.modal.classList.remove('hidden');
+        refs.modal.setAttribute('aria-hidden', 'false');
+        setTimeout(() => refs.urlInput?.focus(), 0);
+
+        return new Promise((resolve) => {
+          inlineResourceModalResolver = resolve;
+        });
+      };
+
+      const syncModalImagePreview = (target, src = '') => {
+        if (target === 'avatar') {
+          if (src) {
+            modalAvatarPreview.src = src;
+            modalAvatarPreview.style.display = 'block';
+            modalAvatarPlaceholder.style.display = 'none';
+          } else {
+            modalAvatarPreview.removeAttribute('src');
+            modalAvatarPreview.style.display = 'none';
+            modalAvatarPlaceholder.style.display = 'block';
+          }
+          return;
+        }
+
+        if (target === 'ticket2' || target === 'ticket') {
+          if (src) {
+            modalTicket2Preview.src = src;
+            modalTicket2Preview.style.display = 'block';
+            modalTicket2Placeholder.style.display = 'none';
+          } else {
+            modalTicket2Preview.removeAttribute('src');
+            modalTicket2Preview.style.display = 'none';
+            modalTicket2Placeholder.style.display = 'block';
+          }
+        }
+      };
+
       const showSection = (mode) => {
         modalSections.forEach(sec => sec.classList.remove('is-active'));
         const target = document.querySelector(`.modal-section[data-modal-section="${mode}"]`);
@@ -702,30 +823,19 @@
         currentModalMode = null;
       };
 
-      const handleUploadClick = (target) => {
-        const option = confirm('点击确定使用本地上传，点击取消使用网络URL');
-        if (option) {
+      const handleUploadClick = async (target) => {
+        const choice = await openInlineManagedResourcePicker(target);
+        if (!choice) return;
+
+        if (choice.type === 'local') {
           currentUploadTarget = target;
           fileInput?.click();
-        } else {
-          const url = prompt('请输入网络图片URL:');
-          if (url && url.trim() !== '') {
-            applyImage(target, url.trim());
-            if (target === 'avatar') {
-              modalAvatarPreview.src = url.trim();
-              modalAvatarPreview.style.display = 'block';
-              modalAvatarPlaceholder.style.display = 'none';
-            }if (target === 'news') {
-              modalNewsPreview.src = url.trim();
-              modalNewsPreview.style.display = 'block';
-              modalNewsPlaceholder.style.display = 'none';
-            }
-            if (target === 'ticket2') {
-              modalTicket2Preview.src = url.trim();
-              modalTicket2Preview.style.display = 'block';
-              modalTicket2Placeholder.style.display = 'none';
-            }
-          }
+          return;
+        }
+
+        if (choice.type === 'url' && choice.url) {
+          applyImage(target, choice.url);
+          syncModalImagePreview(target, choice.url);
         }
       };
 
@@ -822,26 +932,29 @@
       // 文件选择
       fileInput?.addEventListener('change', (e) => {
         const file = e.target.files?.[0];
-        if (file && currentUploadTarget) {
-          const reader = new FileReader();
-          reader.onload = (evt) => {
-            applyImage(currentUploadTarget, evt.target.result);
-            if (currentUploadTarget === 'avatar') {
-              modalAvatarPreview.src = evt.target.result;
-              modalAvatarPreview.style.display = 'block';
-              modalAvatarPlaceholder.style.display = 'none';
-            } else if (currentUploadTarget === 'news') {
-              modalNewsPreview.src = evt.target.result;
-              modalNewsPreview.style.display = 'block';
-              modalNewsPlaceholder.style.display = 'none';
-            } else if (currentUploadTarget === 'ticket2') {
-              modalTicket2Preview.src = evt.target.result;
-              modalTicket2Preview.style.display = 'block';
-              modalTicket2Placeholder.style.display = 'none';
-            }fileInput.value = '';
-          };
-          reader.readAsDataURL(file);
+        if (!file || !currentUploadTarget) {
+          currentUploadTarget = null;
+          if (fileInput) fileInput.value = '';
+          return;
         }
+
+        const target = currentUploadTarget;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const src = String(evt?.target?.result || '');
+          if (!src) {
+            currentUploadTarget = null;
+            if (fileInput) fileInput.value = '';
+            return;
+          }
+
+          applyImage(target, src);
+          syncModalImagePreview(target, src);
+
+          currentUploadTarget = null;
+          if (fileInput) fileInput.value = '';
+        };
+        reader.readAsDataURL(file);
       });
 
       // 如果未加载主JS，给应用按钮一个提示

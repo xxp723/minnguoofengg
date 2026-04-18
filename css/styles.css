@@ -2125,7 +2125,9 @@ body.fullscreen-mode .app-window {
 
 /* [模块标注] 短按钮右对齐布局模块：统一确认/取消这类短按钮的动作区右对齐，不影响全宽主按钮 */
 .custom-widget-actions,
-.short-action-row {
+.short-action-row,
+/* [模块标注] 设置弹窗短按钮右对齐子模块：覆盖 appearance-inline-actions 默认左对齐行为 */
+.appearance-inline-actions {
   display: flex;
   gap: 10px;
   margin-top: 14px;
