@@ -350,14 +350,113 @@ export class Desktop {
         }
       };
 
+      const ensureManagedResourceModal = () => {
+        const existed = document.getElementById('desktop-managed-resource-modal');
+        if (existed) {
+          return {
+            modal: existed,
+            mask: existed.querySelector('.managed-resource-modal__mask'),
+            closeBtn: existed.querySelector('#desktop-managed-resource-modal-close'),
+            localBtn: existed.querySelector('#desktop-managed-resource-modal-local'),
+            confirmBtn: existed.querySelector('#desktop-managed-resource-modal-confirm'),
+            titleEl: existed.querySelector('#desktop-managed-resource-modal-title'),
+            hintEl: existed.querySelector('#desktop-managed-resource-modal-hint'),
+            inputEl: existed.querySelector('#desktop-managed-resource-modal-url')
+          };
+        }
+
+        const modalEl = document.createElement('div');
+        modalEl.id = 'desktop-managed-resource-modal';
+        modalEl.className = 'managed-resource-modal hidden';
+        modalEl.setAttribute('aria-hidden', 'true');
+        modalEl.innerHTML = `
+          <div class="managed-resource-modal__mask"></div>
+          <div class="managed-resource-modal__panel" role="dialog" aria-modal="true" aria-labelledby="desktop-managed-resource-modal-title">
+            <div class="managed-resource-modal__header">
+              <span id="desktop-managed-resource-modal-title">选择图片资源</span>
+              <button type="button" class="managed-resource-modal__close" id="desktop-managed-resource-modal-close" aria-label="关闭图片资源弹窗">
+                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path d="M14 14L34 34" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M34 14L14 34" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+            <div class="managed-resource-modal__body">
+              <p class="managed-resource-modal__hint" id="desktop-managed-resource-modal-hint">可从本地导入，也可直接粘贴图片 URL。</p>
+              <button type="button" class="modal-btn" id="desktop-managed-resource-modal-local">从本地导入图片</button>
+              <div class="modal-field">
+                <label for="desktop-managed-resource-modal-url">图片 URL</label>
+                <input id="desktop-managed-resource-modal-url" type="url" placeholder="https://example.com/image.jpg" />
+              </div>
+              <button type="button" class="modal-btn primary" id="desktop-managed-resource-modal-confirm">使用 URL 图片</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modalEl);
+
+        return {
+          modal: modalEl,
+          mask: modalEl.querySelector('.managed-resource-modal__mask'),
+          closeBtn: modalEl.querySelector('#desktop-managed-resource-modal-close'),
+          localBtn: modalEl.querySelector('#desktop-managed-resource-modal-local'),
+          confirmBtn: modalEl.querySelector('#desktop-managed-resource-modal-confirm'),
+          titleEl: modalEl.querySelector('#desktop-managed-resource-modal-title'),
+          hintEl: modalEl.querySelector('#desktop-managed-resource-modal-hint'),
+          inputEl: modalEl.querySelector('#desktop-managed-resource-modal-url')
+        };
+      };
+
+      const openManagedResourceModal = ({ title, hint, placeholder, onLocalPick, onUrlConfirm }) => {
+        const modalRefs = ensureManagedResourceModal();
+        if (!modalRefs?.modal) return;
+
+        modalRefs.titleEl.textContent = title || '选择图片资源';
+        modalRefs.hintEl.textContent = hint || '可从本地导入，也可直接粘贴图片 URL。';
+        modalRefs.inputEl.value = '';
+        modalRefs.inputEl.placeholder = placeholder || 'https://example.com/image.jpg';
+
+        const close = () => {
+          modalRefs.modal.classList.add('hidden');
+          modalRefs.modal.setAttribute('aria-hidden', 'true');
+          modalRefs.mask?.removeEventListener('click', close);
+          modalRefs.closeBtn?.removeEventListener('click', close);
+          modalRefs.localBtn?.removeEventListener('click', handleLocal);
+          modalRefs.confirmBtn?.removeEventListener('click', handleConfirm);
+        };
+
+        const handleLocal = async () => {
+          const ok = await onLocalPick?.();
+          if (ok) close();
+        };
+
+        const handleConfirm = async () => {
+          const url = modalRefs.inputEl?.value?.trim();
+          if (!url) {
+            modalRefs.inputEl?.focus();
+            return;
+          }
+          const ok = await onUrlConfirm?.(url);
+          if (ok) close();
+        };
+
+        modalRefs.mask?.addEventListener('click', close);
+        modalRefs.closeBtn?.addEventListener('click', close);
+        modalRefs.localBtn?.addEventListener('click', handleLocal);
+        modalRefs.confirmBtn?.addEventListener('click', handleConfirm);
+
+        modalRefs.modal.classList.remove('hidden');
+        modalRefs.modal.setAttribute('aria-hidden', 'false');
+        modalRefs.inputEl?.focus();
+      };
+
       const handleUploadClick = (target) => {
-        const option = confirm("点击确定使用本地上传，点击取消使用网络URL");
-        if (option) {
-          currentUploadTarget = target;
-          fileInput?.click();
-        } else {
-          const url = prompt("请输入网络图片URL:");
-          if (url && url.trim() !== "") {
+        openManagedResourceModal({
+          title: '选择图片资源',
+          hint: '你可以从本地导入图片，也可以输入网络图片 URL。',
+          placeholder: 'https://example.com/image.jpg',
+          onLocalPick: async () => {
+            currentUploadTarget = target;
+            fileInput?.click();
+            return true;
+          },
+          onUrlConfirm: async (url) => {
             this.applyImageToTarget(target, url.trim());
             if (target === 'avatar') {
               modalAvatarPreview.src = url.trim();
@@ -379,8 +478,9 @@ export class Desktop {
               modalP2TicketPreview.style.display = 'block';
               modalP2TicketPlaceholder.style.display = 'none';
             }
+            return true;
           }
-        }
+        });
       };
 
       if (avatarTrigger) avatarTrigger.addEventListener('click', () => openModal('avatar'));

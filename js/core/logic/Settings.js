@@ -29,8 +29,16 @@ export class Settings {
     return {
       appearance: {
         wallpaper: '',
+        desktopWallpaper: '',
+        lockscreenWallpaper: '',
         themeColor: '#4f46e5',
-        iconSize: 56
+        iconSize: 56,
+        iconImage: '',
+        iconRadius: 18,
+        iconShadowStyle: 'outer',
+        iconShadowSize: 18,
+        iconBorderWidth: 0,
+        iconBorderColor: '#d7c9b8'
       },
       api: {
         textToImage: { baseUrl: '', apiKey: '' },

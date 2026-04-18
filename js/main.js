@@ -41,7 +41,7 @@ class MiniPhoneApp {
     this.registry = new Registry();
 
     /** @type {Settings} */
-    this.settings = new Settings(this.db);
+    this.settings = new Settings(this.db, this.eventBus);
 
     /** @type {DesktopConfig} */
     this.desktopConfig = new DesktopConfig(this.db, this.eventBus, this.registry);
@@ -80,6 +80,10 @@ class MiniPhoneApp {
 
     /** @type {DragDrop} */
     this.dragDrop = new DragDrop(document.getElementById('desktop-container'), this.eventBus);
+
+    this.eventBus.on('settings:changed', ({ settings }) => {
+      this.theme.apply(settings?.appearance || {});
+    });
     
     /** @type {DesktopEditMode} */
     this.desktopEditMode = new DesktopEditMode(

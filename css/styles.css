@@ -26,6 +26,17 @@
 
   --status-bar-height: 28px;
   --dock-height: 90px;
+  --icon-size: 58px;
+  --app-icon-radius: 18px;
+  --app-icon-shadow: none;
+  --app-icon-border-width: 0px;
+  --app-icon-border-color: #D7C9B8;
+  --app-icon-custom-image: none;
+  --desktop-wallpaper: none;
+  --lockscreen-wallpaper: none;
+  --ui-switch-off: rgba(125, 125, 130, 0.38);
+  --ui-switch-on: #4A342A;
+  --ui-switch-thumb: #fff;
 }
 
 /* =========================
@@ -42,7 +53,10 @@ html, body {
   padding: 0;
   width: 100%;
   height: 100%;
-  background: #111;
+  background: var(--c-bg-wallpaper);
+  background-image: var(--desktop-wallpaper);
+  background-size: cover;
+  background-position: center;
   font-family: var(--font-retro);
   color: var(--c-text-main);
   overflow: hidden;
@@ -73,7 +87,8 @@ body.hide-status-bar #top-status-bar {
   width: 100%;
   height: 100%;
   position: relative;
-  background: var(--c-bg-wallpaper); /* 默认壁纸，后续可被 JS 覆盖 */
+  background-color: var(--c-bg-wallpaper); /* 默认壁纸，后续可被 JS 覆盖 */
+  background-image: var(--desktop-wallpaper);
   background-size: cover;
   background-position: center;
 }
@@ -171,19 +186,34 @@ body.hide-status-bar #top-status-bar {
 }
 
 .app-icon-btn {
-  width: 58px;
-  height: 58px;
-  border: none;
-  border-radius: 18px;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  border: var(--app-icon-border-width) solid var(--app-icon-border-color);
+  border-radius: var(--app-icon-radius);
   background: var(--c-milktea);
-  box-shadow: none;
+  box-shadow: var(--app-icon-shadow);
   display: flex;
   justify-content: center;
   align-items: center;
   transition: transform 0.15s ease, opacity 0.15s ease;
   overflow: hidden;
-  padding: 6px;
+  padding: clamp(4px, calc(var(--icon-size) * 0.11), 8px);
   position: relative;
+}
+
+.app-icon-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: var(--app-icon-custom-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  z-index: 1;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
 }
 .app-icon-btn:active {
   transform: scale(0.92);
@@ -209,9 +239,18 @@ body.hide-status-bar #top-status-bar {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 12px;
+  border-radius: inherit;
   position: relative;
   z-index: 1;
+}
+
+body.has-global-icon-image .app-icon-btn::after {
+  opacity: 1;
+}
+
+body.has-global-icon-image .app-icon-btn .app-icon-glyph,
+body.has-global-icon-image .app-icon-btn .app-custom-img {
+  opacity: 0;
 }
 
 .app-icon-btn.has-img .app-icon-glyph {
@@ -252,10 +291,10 @@ body.hide-status-bar #top-status-bar {
 }
 
 .dock-container .app-icon-btn {
-  width: 48px;
-  height: 48px;
-  border-radius: 16px;
-  padding: 4px;
+  width: clamp(40px, calc(var(--icon-size) * 0.84), 80px);
+  height: clamp(40px, calc(var(--icon-size) * 0.84), 80px);
+  border-radius: calc(var(--app-icon-radius) * 0.9);
+  padding: clamp(4px, calc(var(--icon-size) * 0.08), 6px);
 }
 
 
@@ -1744,6 +1783,14 @@ body.is-edit-mode .grid-lines {
 /* =========================
    全屏显示模式
    ========================= */
+body.fullscreen-mode,
+body.fullscreen-mode .phone-frame,
+body.fullscreen-mode .screen {
+  background-image: var(--desktop-wallpaper);
+  background-size: cover;
+  background-position: center;
+}
+
 body.fullscreen-mode .phone-frame {
   width: 100vw;
   height: 100dvh;
@@ -1761,7 +1808,8 @@ body.fullscreen-mode .app-window {
 /* =========================
    iOS风格滑动开关 (Toggle Switch)
    ========================= */
-.toggle-switch {
+.toggle-switch,
+.widget-music-switch {
   position: relative;
   display: inline-block;
   width: 50px;
@@ -1769,42 +1817,46 @@ body.fullscreen-mode .app-window {
   flex-shrink: 0;
 }
 
-.toggle-switch input {
+.toggle-switch input,
+.widget-music-switch-input {
   opacity: 0;
   width: 0;
   height: 0;
   position: absolute;
 }
 
-.toggle-switch .toggle-slider {
+.toggle-switch .toggle-slider,
+.widget-music-switch-slider {
   position: absolute;
   cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
+  inset: 0;
+  background-color: var(--ui-switch-off);
   border-radius: 28px;
   transition: background-color 0.3s ease;
+  box-shadow: inset 0 0 0 1px rgba(74, 52, 42, 0.08);
 }
 
-.toggle-switch .toggle-slider::before {
+.toggle-switch .toggle-slider::before,
+.widget-music-switch-slider::before {
   content: '';
   position: absolute;
   height: 22px;
   width: 22px;
   left: 3px;
   bottom: 3px;
-  background-color: #fff;
+  background-color: var(--ui-switch-thumb);
   border-radius: 50%;
-  transition: transform 0.3s ease;box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 
-.toggle-switch input:checked + .toggle-slider {
-  background-color: #1a1a1a;
+.toggle-switch input:checked + .toggle-slider,
+.widget-music-switch-input:checked + .widget-music-switch-slider {
+  background-color: var(--ui-switch-on);
 }
 
-.toggle-switch input:checked + .toggle-slider::before {
+.toggle-switch input:checked + .toggle-slider::before,
+.widget-music-switch-input:checked + .widget-music-switch-slider::before {
   transform: translateX(22px);
 }
 
@@ -2097,11 +2149,11 @@ body.fullscreen-mode .app-window {
   border: 1px solid rgba(125, 90, 68, 0.12);
 }
 
-/* [模块标注] 音乐组件样式模块：统一新版 4×1 横向音乐卡片的封面、歌曲名与进度区域，便于后续单独调整 */
+/* [模块标注] 音乐组件样式模块：统一新版 2×2 音乐卡片的封面、歌曲名、滑动开关与进度区域，便于后续单独调整 */
 .widget-surface--music {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
   padding: 12px;
   background:
     radial-gradient(circle at top left, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 34%),
@@ -2109,18 +2161,17 @@ body.fullscreen-mode .app-window {
 }
 
 .widget-music-cover {
-  flex: 0 0 78px;
-  width: 78px;
-  min-width: 78px;
+  width: 100%;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
 }
 
 .widget-music-cover__frame {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1;
+  min-height: 104px;
   border-radius: 22px;
   overflow: hidden;
   display: grid;
@@ -2168,14 +2219,21 @@ body.fullscreen-mode .app-window {
 }
 
 .widget-music-body {
-  flex: 1;
   min-width: 0;
-  justify-content: center;
+  gap: 10px;
+}
+
+.widget-music-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
 }
 
 .widget-music-name {
-  font-size: 15px;
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.35;
   color: #4A342A;

@@ -53,8 +53,8 @@ export class DesktopEditMode {
       { id: 'news', name: '报纸', icon: '📰', selector: '.p1-news-widget', colSpan: 2, rowSpan: 2, source: 'system' },
       { id: 'ticket1', name: '船票', icon: '🎫', selector: '.p1-ticket-widget', colSpan: 4, rowSpan: 2, source: 'system' },
       { id: 'ticket2', name: '戏票', icon: '🎟', selector: '.p2-ticket-widget', colSpan: 4, rowSpan: 2, source: 'system' },
-      // [模块标注] 音乐组件库元数据模块：统一维护新版音乐组件占位尺寸（4×1）与组件库入口
-      { id: 'music', name: '音乐', icon: '♫', selector: '.widget-music-card', colSpan: 4, rowSpan: 1, source: 'builtin' },
+      // [模块标注] 音乐组件库元数据模块：统一维护新版音乐组件占位尺寸（2×2）与组件库入口
+      { id: 'music', name: '音乐', icon: '♫', selector: '.widget-music-card', colSpan: 2, rowSpan: 2, source: 'builtin' },
       { id: 'calendar', name: '日历', icon: '📅', selector: '.widget-calendar-card', colSpan: 2, rowSpan: 2, source: 'builtin' },
       { id: 'polaroid', name: '拍立得', icon: '▣', selector: '.widget-polaroid-card', colSpan: 2, rowSpan: 2, source: 'builtin' },
       { id: 'profile', name: '个人名片', icon: '◉', selector: '.widget-profile-card', colSpan: 2, rowSpan: 2, source: 'builtin' },
@@ -129,12 +129,12 @@ export class DesktopEditMode {
 
     if (this.btnReset) {
       this.btnReset.addEventListener('click', () => {
-        if (confirm('确定要恢复默认布局吗？所有自定义位置将被重置。')) {
+        this.showManagedConfirmModal('确定要恢复默认布局吗？所有自定义位置将被重置。', () => {
           // 重置仅作用于当前编辑态；只有点“完成”才会真正保存
           this.initDefaultLayout();
           this.applyLayoutToDOM();
           this.showToast('已恢复默认布局');
-        }
+        });
       });
     }
 
@@ -359,6 +359,7 @@ export class DesktopEditMode {
     }
 
     this.initManagedResourceModal();
+    this.initManagedConfirmModal();
   }
 
   // [模块标注] 图片资源主题弹窗模块：统一本地图片 / URL 图片选择弹窗，风格对齐桌面组件编辑窗口，便于后续单独调整
@@ -452,6 +453,76 @@ export class DesktopEditMode {
     this.resourceModalUrlInput?.focus();
   }
 
+  initManagedConfirmModal() {
+    if (document.getElementById('managed-confirm-modal')) {
+      this.confirmModal = document.getElementById('managed-confirm-modal');
+      this.confirmModalMask = this.confirmModal?.querySelector('.managed-resource-modal__mask') || null;
+      this.confirmModalMessage = document.getElementById('managed-confirm-modal-message');
+      this.confirmModalCancel = document.getElementById('managed-confirm-modal-cancel');
+      this.confirmModalClose = document.getElementById('managed-confirm-modal-close');
+      this.confirmModalPrimary = document.getElementById('managed-confirm-modal-primary');
+      return;
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'managed-confirm-modal';
+    modal.className = 'managed-resource-modal hidden';
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+      <div class="managed-resource-modal__mask"></div>
+      <div class="managed-resource-modal__panel" role="dialog" aria-modal="true" aria-labelledby="managed-confirm-modal-title">
+        <div class="managed-resource-modal__header">
+          <span id="managed-confirm-modal-title">确认操作</span>
+          <button type="button" class="managed-resource-modal__close" id="managed-confirm-modal-close" aria-label="关闭确认弹窗">
+            ${this.getEditModeIconSvg('delete').replace('#ff3b30', 'currentColor')}
+          </button>
+        </div>
+        <div class="managed-resource-modal__body">
+          <p class="managed-resource-modal__hint" id="managed-confirm-modal-message">确认继续此操作？</p>
+          <div class="custom-widget-actions" style="margin-top:0;">
+            <button type="button" class="modal-btn" id="managed-confirm-modal-cancel">取消</button>
+            <button type="button" class="modal-btn primary" id="managed-confirm-modal-primary">确认</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    this.confirmModal = modal;
+    this.confirmModalMask = modal.querySelector('.managed-resource-modal__mask');
+    this.confirmModalMessage = modal.querySelector('#managed-confirm-modal-message');
+    this.confirmModalCancel = modal.querySelector('#managed-confirm-modal-cancel');
+    this.confirmModalClose = modal.querySelector('#managed-confirm-modal-close');
+    this.confirmModalPrimary = modal.querySelector('#managed-confirm-modal-primary');
+  }
+
+  showManagedConfirmModal(message, onConfirm) {
+    if (!this.confirmModal) return;
+    this.confirmModalMessage.textContent = message || '确认继续此操作？';
+
+    const close = () => {
+      this.confirmModal.classList.add('hidden');
+      this.confirmModal.setAttribute('aria-hidden', 'true');
+      this.confirmModalMask?.removeEventListener('click', close);
+      this.confirmModalCancel?.removeEventListener('click', close);
+      this.confirmModalClose?.removeEventListener('click', close);
+      this.confirmModalPrimary?.removeEventListener('click', handleConfirm);
+    };
+
+    const handleConfirm = () => {
+      close();
+      onConfirm?.();
+    };
+
+    this.confirmModalMask?.addEventListener('click', close);
+    this.confirmModalCancel?.addEventListener('click', close);
+    this.confirmModalClose?.addEventListener('click', close);
+    this.confirmModalPrimary?.addEventListener('click', handleConfirm);
+
+    this.confirmModal.classList.remove('hidden');
+    this.confirmModal.setAttribute('aria-hidden', 'false');
+  }
+
   async chooseImageResourceForManagedModal(label) {
     return await new Promise((resolve) => {
       this.showManagedResourceModal({
@@ -516,18 +587,25 @@ export class DesktopEditMode {
   }
 
   async chooseResourceForManagedModal(label, accept, urlHint) {
-    const useLocal = window.confirm(`点击“确定”从本地导入${label}，点击“取消”输入${urlHint || 'URL 链接'}`);
-    if (useLocal) {
-      return await this.pickLocalResource(accept);
-    }
-
-    const url = window.prompt(`请输入${label}的URL链接：`);
-    if (!url || !url.trim()) return null;
-    const cleanUrl = url.trim();
-    return {
-      src: cleanUrl,
-      name: cleanUrl.split('/').pop() || label
-    };
+    return await new Promise((resolve) => {
+      this.showManagedResourceModal({
+        title: `选择${label}`,
+        hint: `你可以从本地导入${label}，也可以输入${urlHint || 'URL 链接'}。`,
+        placeholder: 'https://example.com/resource',
+        onLocalPick: async () => {
+          const file = await this.pickLocalResource(accept);
+          resolve(file || null);
+          return true;
+        },
+        onUrlConfirm: async (url) => {
+          resolve({
+            src: url,
+            name: url.split('/').pop() || label
+          });
+          return true;
+        }
+      });
+    });
   }
 
   bindManagedModalAction(elementId, handler) {
@@ -1744,15 +1822,15 @@ export class DesktopEditMode {
   }
 
   getBuiltinWidgetDefaultState(id) {
-    // [模块标注] 音乐组件默认数据模块：统一维护新 4×1 音乐卡片的默认标题、播放名称与音频状态
+    // [模块标注] 音乐组件默认数据模块：统一维护新 2×2 音乐卡片的封面、歌曲名、滑动开关与进度状态
     if (id === 'music') {
       return {
         title: '旧梦留声机',
-        subtitle: '与当前主题一致的横向播放器',
         coverSrc: '',
         audioSrc: '',
         audioName: '',
-        progress: 0
+        progress: 0,
+        enabled: true
       };
     }
 
@@ -1834,20 +1912,27 @@ export class DesktopEditMode {
     const month = now.getMonth() + 1;
     const date = now.getDate();
 
-    // [模块标注] 音乐组件新样式渲染模块：新版音乐组件固定为 4×1，仅保留封面、歌曲名与进度区域
+    // [模块标注] 音乐组件新样式渲染模块：新版音乐组件固定为 2×2，仅保留封面、歌曲名、滑动开关与进度区域
     if (id === 'music') {
       const musicName = this.escapeHtml(state.audioName || state.title || '未导入音频');
+      const enabled = state.enabled !== false;
       return `
         <div class="widget-surface widget-surface--music">
           <div class="widget-music-cover">
-            <div class="widget-music-cover__frame" role="button" aria-label="播放或暂停音乐">
+            <div class="widget-music-cover__frame">
               ${state.coverSrc
                 ? `<img class="widget-music-cover-img" src="${this.escapeHtml(state.coverSrc)}" alt="${musicName}" />`
                 : `<span class="widget-music-cover-placeholder">${this.getWidgetIconSvg('music-record')}</span>`}
             </div>
           </div>
           <div class="widget-music-body">
-            <div class="widget-music-name">${musicName}</div>
+            <div class="widget-music-head">
+              <div class="widget-music-name">${musicName}</div>
+              <label class="widget-music-switch" aria-label="音乐开关">
+                <input class="widget-music-switch-input" type="checkbox" ${enabled ? 'checked' : ''}>
+                <span class="widget-music-switch-slider"></span>
+              </label>
+            </div>
             <div class="widget-progress widget-progress--music"><span style="width:${Number(state.progress) || 0}%;"></span></div>
             <audio class="widget-music-audio" preload="metadata" src="${this.escapeHtml(state.audioSrc || '')}"></audio>
           </div>
@@ -1974,10 +2059,9 @@ export class DesktopEditMode {
         const widgetId = el.getAttribute('data-builtin-widget-id');
         if (!widgetId) return;
 
-        if (widgetId === 'music' && event.target.closest('.widget-music-cover__frame')) {
+        if (widgetId === 'music' && event.target.closest('.widget-music-switch')) {
           event.preventDefault();
           event.stopPropagation();
-          this.toggleMusicPlayback(el);
           return;
         }
 
@@ -1988,6 +2072,14 @@ export class DesktopEditMode {
     }
 
     if (id === 'music') {
+      const toggleInput = el.querySelector('.widget-music-switch-input');
+      if (toggleInput && toggleInput.dataset.bound !== 'true') {
+        toggleInput.dataset.bound = 'true';
+        toggleInput.addEventListener('change', () => {
+          this.toggleMusicPlayback(el, !!toggleInput.checked);
+        });
+      }
+
       this.bindMusicAudioProgress(el);
     }
   }
@@ -2044,26 +2136,34 @@ export class DesktopEditMode {
   }
 
   async pickResourceFromLocalOrUrl(label, accept, urlHint) {
-    const useLocal = confirm(`点击“确定”从本地导入${label}，点击“取消”输入${urlHint || 'URL 链接'}`);
-    if (useLocal) {
-      return await this.pickLocalResource(accept);
-    }
-
-    const url = prompt(`请输入${label}的URL链接：`);
-    if (!url || !url.trim()) return null;
-
-    const cleanUrl = url.trim();
-    return {
-      src: cleanUrl,
-      name: cleanUrl.split('/').pop() || label
-    };
+    return await new Promise((resolve) => {
+      this.showManagedResourceModal({
+        title: `选择${label}`,
+        hint: `你可以从本地导入${label}，也可以输入${urlHint || 'URL 链接'}。`,
+        placeholder: 'https://example.com/resource',
+        onLocalPick: async () => {
+          const file = await this.pickLocalResource(accept);
+          resolve(file || null);
+          return true;
+        },
+        onUrlConfirm: async (url) => {
+          resolve({
+            src: url,
+            name: url.split('/').pop() || label
+          });
+          return true;
+        }
+      });
+    });
   }
 
-  toggleMusicPlayback(el) {
+  toggleMusicPlayback(el, forcePlay = null) {
     const audio = el?.querySelector('.widget-music-audio');
+    const toggleInput = el?.querySelector('.widget-music-switch-input');
     if (!audio) return;
 
     if (!audio.getAttribute('src')) {
+      if (toggleInput) toggleInput.checked = false;
       this.showToast('请先导入 mp3 / wav 音频');
       return;
     }
@@ -2072,12 +2172,18 @@ export class DesktopEditMode {
       if (node !== audio) node.pause();
     });
 
-    if (audio.paused) {
-      audio.play().catch(() => {
+    const shouldPlay = typeof forcePlay === 'boolean' ? forcePlay : audio.paused;
+
+    if (shouldPlay) {
+      audio.play().then(() => {
+        if (toggleInput) toggleInput.checked = true;
+      }).catch(() => {
+        if (toggleInput) toggleInput.checked = false;
         this.showToast('音频播放失败');
       });
     } else {
       audio.pause();
+      if (toggleInput) toggleInput.checked = false;
     }
   }
 

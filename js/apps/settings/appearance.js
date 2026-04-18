@@ -146,10 +146,10 @@ function getBaseLibraryWidgets(icons) {
       id: 'music',
       name: '音乐',
       source: 'builtin',
-      width: 4,
-      height: 1,
+      width: 2,
+      height: 2,
       iconSvg: icons.musicWidget,
-      description: '新版横向音乐组件，统一为 4×1，仅保留封面、歌曲名称与进度显示区域。'
+      description: '新版 2×2 音乐组件，仅保留封面、歌曲名、滑动开关与进度显示区域。'
     },
     {
       id: 'calendar',
@@ -283,8 +283,42 @@ function renderWidgetLibraryItems(icons) {
   `).join('');
 }
 
+function renderManagedImageField({
+  title,
+  inputId,
+  fileId,
+  previewId,
+  removeId,
+  value = '',
+  hint
+}) {
+  const hasValue = !!String(value || '').trim();
+
+  return `
+    <div class="appearance-resource-card">
+      <div class="appearance-resource-card__head">
+        <div>
+          <h4>${title}</h4>
+          <p>${hint || '支持上传本地图片或粘贴 URL 链接。'}</p>
+        </div>
+      </div>
+      <div class="appearance-resource-card__preview ${hasValue ? 'has-image' : ''}" id="${previewId}" style="${hasValue ? `background-image:url('${escapeHtml(value)}');` : ''}">
+        ${hasValue ? '' : '<span>暂无图片</span>'}
+      </div>
+      <div class="appearance-resource-card__actions">
+        <label class="ui-button" for="${fileId}">上传本地图片</label>
+        <input id="${fileId}" type="file" accept="image/*" style="display:none;" />
+        <button class="ui-button" type="button" data-resource-target="${inputId}">使用 URL 链接</button>
+        <button class="ui-button danger" type="button" id="${removeId}">删除</button>
+      </div>
+      <input id="${inputId}" type="url" value="${escapeHtml(value)}" placeholder="https://example.com/image.jpg" />
+    </div>
+  `;
+}
+
 export function renderAppearanceSections({ current, icons }) {
   const customDraft = getDraft();
+  const appearance = current.appearance || {};
 
   return `
       <!-- 外观设置详情页（改为卡片式分类） -->
@@ -314,12 +348,13 @@ export function renderAppearanceSections({ current, icons }) {
       <!-- 界面设置子页面 -->
       <div id="settings-appearance-ui" class="settings-detail">
         <div class="settings-detail__body">
+          <!-- [模块标注] 界面设置开关模块：界面设置中的滑动开关统一复用组件库的暖棕色系开关颜色 -->
           <section class="ui-card">
             <h3>顶部状态栏显示</h3>
             <p class="ui-muted" style="margin-bottom: 10px;">控制顶部状态栏是否显示</p>
             <label style="display:flex;align-items:center;justify-content:space-between;font-size:13px;">
               <span>显示顶部状态栏</span>
-              <label class="toggle-switch">
+              <label class="toggle-switch toggle-switch--theme">
                 <input id="setting-status-bar" type="checkbox" ${localStorage.getItem('miniphone_status_bar_hidden') === '1' ? '' : 'checked'}>
                 <span class="toggle-slider"></span>
               </label>
@@ -330,7 +365,7 @@ export function renderAppearanceSections({ current, icons }) {
             <p class="ui-muted" style="margin-bottom: 10px;">去除小手机外框限制，以全屏模式显示</p>
             <label style="display:flex;align-items:center;justify-content:space-between;font-size:13px;">
               <span>启用全屏显示模式</span>
-              <label class="toggle-switch">
+              <label class="toggle-switch toggle-switch--theme">
                 <input id="setting-fullscreen" type="checkbox" ${localStorage.getItem('miniphone_fullscreen') === '1' ? 'checked' : ''}>
                 <span class="toggle-slider"></span>
               </label>
@@ -343,25 +378,95 @@ export function renderAppearanceSections({ current, icons }) {
       <!-- 壁纸设置子页面 -->
       <div id="settings-appearance-wallpaper" class="settings-detail">
         <div class="settings-detail__body">
+          <!-- [模块标注] 壁纸设置模块：桌面壁纸 / 锁屏壁纸分别独立配置、上传、URL 与删除 -->
           <section class="ui-card">
             <h3>壁纸设置</h3>
-            <p class="ui-muted" style="margin-bottom: 10px;">自定义桌面壁纸（功能开发中）</p>
-            <div style="text-align:center;color:#B2967D;padding:30px 0;font-size:13px;">暂未开放，敬请期待</div>
+            <p class="ui-muted" style="margin-bottom: 10px;">桌面壁纸和锁屏壁纸均支持本地上传、URL 链接与删除。全屏模式下状态栏区域也会一并应用对应壁纸。</p>
+            <div class="appearance-settings-stack">
+              ${renderManagedImageField({
+                title: '桌面壁纸',
+                inputId: 'setting-desktop-wallpaper',
+                fileId: 'setting-desktop-wallpaper-file',
+                previewId: 'setting-desktop-wallpaper-preview',
+                removeId: 'remove-desktop-wallpaper',
+                value: appearance.desktopWallpaper || appearance.wallpaper || '',
+                hint: '应用到桌面、状态栏与全屏模式下的主界面背景。'
+              })}
+              ${renderManagedImageField({
+                title: '锁屏壁纸',
+                inputId: 'setting-lockscreen-wallpaper',
+                fileId: 'setting-lockscreen-wallpaper-file',
+                previewId: 'setting-lockscreen-wallpaper-preview',
+                removeId: 'remove-lockscreen-wallpaper',
+                value: appearance.lockscreenWallpaper || '',
+                hint: '预留给锁屏全屏背景；未设置时自动沿用桌面壁纸。'
+              })}
+            </div>
           </section>
+          <button class="ui-button primary" id="save-wallpaper-settings" style="width: 100%; margin-top: 10px;">保存壁纸设置</button>
         </div>
       </div>
 
       <!-- 图标设置子页面 -->
       <div id="settings-appearance-icon" class="settings-detail">
         <div class="settings-detail__body">
+          <!-- [模块标注] 自定义图标设置模块：统一更换桌面所有应用图标图片，并提供保存与恢复默认 -->
           <section class="ui-card">
-            <h3>图标大小</h3>
-            <p class="ui-muted" style="margin-bottom: 10px;">调整桌面图标尺寸</p>
-            <label style="display:flex;align-items:center;gap:10px;font-size:13px;">
-              <span style="min-width:70px;">图标大小:</span>
-              <input id="setting-icon-size" type="number" min="40" max="96" value="${current.appearance?.iconSize || 56}" style="flex:1;">
-            </label>
+            <h3>自定义图标</h3>
+            <p class="ui-muted" style="margin-bottom: 10px;">对桌面上的所有应用图标统一更换为同一张自定义图片。</p>
+            ${renderManagedImageField({
+              title: '统一图标图片',
+              inputId: 'setting-icon-image',
+              fileId: 'setting-icon-image-file',
+              previewId: 'setting-icon-image-preview',
+              removeId: 'remove-icon-image',
+              value: appearance.iconImage || '',
+              hint: '保存后会统一覆盖桌面与 Dock 的所有应用图标。'
+            })}
+            <div class="appearance-inline-actions">
+              <button class="ui-button primary" id="save-custom-icon-settings">${icons.saveWidget}<span>保存设置</span></button>
+              <button class="ui-button" id="reset-custom-icon-settings" type="button">${icons.closeSmall}<span>恢复默认</span></button>
+            </div>
           </section>
+
+          <!-- [模块标注] 图标调整模块：统一控制所有应用图标的大小、圆角、阴影、边框等外观参数 -->
+          <section class="ui-card">
+            <h3>图标调整</h3>
+            <p class="ui-muted" style="margin-bottom: 10px;">统一调整桌面与 Dock 图标的尺寸、圆角、阴影和边框样式。</p>
+            <div class="appearance-form-grid">
+              <label class="appearance-form-field">
+                <span>图标大小</span>
+                <input id="setting-icon-size" type="number" min="40" max="96" value="${appearance.iconSize || 56}">
+              </label>
+              <label class="appearance-form-field">
+                <span>圆角大小</span>
+                <input id="setting-icon-radius" type="number" min="0" max="32" value="${appearance.iconRadius ?? 18}">
+              </label>
+              <label class="appearance-form-field">
+                <span>阴影样式</span>
+                <select id="setting-icon-shadow-style">
+                  <option value="outer" ${(appearance.iconShadowStyle || 'outer') === 'outer' ? 'selected' : ''}>外投影</option>
+                  <option value="inner" ${appearance.iconShadowStyle === 'inner' ? 'selected' : ''}>内阴影</option>
+                  <option value="long" ${appearance.iconShadowStyle === 'long' ? 'selected' : ''}>长阴影</option>
+                  <option value="multi" ${appearance.iconShadowStyle === 'multi' ? 'selected' : ''}>多重阴影</option>
+                  <option value="neumorphism" ${appearance.iconShadowStyle === 'neumorphism' ? 'selected' : ''}>新拟态阴影</option>
+                </select>
+              </label>
+              <label class="appearance-form-field">
+                <span>阴影大小</span>
+                <input id="setting-icon-shadow-size" type="number" min="0" max="40" value="${appearance.iconShadowSize ?? 18}">
+              </label>
+              <label class="appearance-form-field">
+                <span>边框粗细</span>
+                <input id="setting-icon-border-width" type="number" min="0" max="8" value="${appearance.iconBorderWidth ?? 0}">
+              </label>
+              <label class="appearance-form-field">
+                <span>边框颜色</span>
+                <input id="setting-icon-border-color" type="color" value="${appearance.iconBorderColor || '#d7c9b8'}">
+              </label>
+            </div>
+          </section>
+
           <button class="ui-button primary" id="save-icon-settings" style="width: 100%; margin-top: 10px;">保存图标设置</button>
         </div>
       </div>
@@ -423,7 +528,7 @@ export function renderAppearanceSections({ current, icons }) {
             }
 
             #settings-appearance-widget-custom .custom-widget-toggle .toggle-switch input:checked + .toggle-slider {
-              background: var(--c-text-main, #4A342A);
+              background: var(--ui-switch-on, #B59375);
             }
           </style>
           <section class="ui-card">
@@ -447,7 +552,7 @@ export function renderAppearanceSections({ current, icons }) {
               </div>
               <label class="custom-widget-toggle">
                 <span>预览</span>
-                <label class="toggle-switch">
+                <label class="toggle-switch toggle-switch--theme">
                   <input id="custom-widget-preview-toggle" type="checkbox">
                   <span class="toggle-slider"></span>
                 </label>
@@ -472,6 +577,115 @@ export function renderAppearanceSections({ current, icons }) {
         </div>
       </div>
   `;
+}
+
+function updateManagedImagePreview(container, inputId, previewId) {
+  const input = container.querySelector(`#${inputId}`);
+  const preview = container.querySelector(`#${previewId}`);
+  if (!input || !preview) return;
+  const value = String(input.value || '').trim();
+
+  preview.classList.toggle('has-image', !!value);
+  preview.style.backgroundImage = value ? `url("${value}")` : '';
+  preview.innerHTML = value ? '' : '<span>暂无图片</span>';
+}
+
+function bindManagedImageField(container, { inputId, fileId, previewId, removeId }) {
+  const input = container.querySelector(`#${inputId}`);
+  const fileInput = container.querySelector(`#${fileId}`);
+  const removeBtn = container.querySelector(`#${removeId}`);
+  const urlBtn = container.querySelector(`[data-resource-target="${inputId}"]`);
+
+  updateManagedImagePreview(container, inputId, previewId);
+
+  input?.addEventListener('input', () => {
+    updateManagedImagePreview(container, inputId, previewId);
+  });
+
+  fileInput?.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      input.value = String(reader.result || '');
+      updateManagedImagePreview(container, inputId, previewId);
+      fileInput.value = '';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  urlBtn?.addEventListener('click', () => {
+    input?.focus();
+  });
+
+  removeBtn?.addEventListener('click', () => {
+    if (input) input.value = '';
+    if (fileInput) fileInput.value = '';
+    updateManagedImagePreview(container, inputId, previewId);
+  });
+}
+
+function ensureAppearanceConfirmModal(container, icons) {
+  let modal = container.querySelector('#appearance-confirm-modal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'appearance-confirm-modal';
+  modal.className = 'managed-resource-modal hidden';
+  modal.setAttribute('aria-hidden', 'true');
+  modal.innerHTML = `
+    <div class="managed-resource-modal__mask"></div>
+    <div class="managed-resource-modal__panel" role="dialog" aria-modal="true" aria-labelledby="appearance-confirm-title">
+      <div class="managed-resource-modal__header">
+        <span id="appearance-confirm-title">确认操作</span>
+        <button type="button" class="managed-resource-modal__close" id="appearance-confirm-cancel" aria-label="关闭确认弹窗">
+          ${icons.closeSmall}
+        </button>
+      </div>
+      <div class="managed-resource-modal__body">
+        <p class="managed-resource-modal__hint" id="appearance-confirm-message">确认继续此操作？</p>
+        <div class="appearance-inline-actions">
+          <button type="button" class="ui-button" id="appearance-confirm-secondary">取消</button>
+          <button type="button" class="ui-button danger" id="appearance-confirm-primary">确认</button>
+        </div>
+      </div>
+    </div>
+  `;
+  container.appendChild(modal);
+  return modal;
+}
+
+function showAppearanceConfirm(container, icons, message, onConfirm) {
+  const modal = ensureAppearanceConfirmModal(container, icons);
+  const messageEl = modal.querySelector('#appearance-confirm-message');
+  const primaryBtn = modal.querySelector('#appearance-confirm-primary');
+  const cancelBtn = modal.querySelector('#appearance-confirm-cancel');
+  const secondaryBtn = modal.querySelector('#appearance-confirm-secondary');
+  const mask = modal.querySelector('.managed-resource-modal__mask');
+
+  const close = () => {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    primaryBtn?.removeEventListener('click', handleConfirm);
+    cancelBtn?.removeEventListener('click', close);
+    secondaryBtn?.removeEventListener('click', close);
+    mask?.removeEventListener('click', close);
+  };
+
+  const handleConfirm = () => {
+    close();
+    onConfirm?.();
+  };
+
+  messageEl.textContent = message || '确认继续此操作？';
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+
+  primaryBtn?.addEventListener('click', handleConfirm);
+  cancelBtn?.addEventListener('click', close);
+  secondaryBtn?.addEventListener('click', close);
+  mask?.addEventListener('click', close);
 }
 
 export function bindAppearanceEvents(container, { settings, eventBus, current, icons }) {
@@ -601,10 +815,12 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
           const libraryMap = getLibraryWidgetMap(icons, { includeHidden: true });
           const hit = libraryMap.get(widgetId);
           if (!hit) return;
-          const confirmed = window.confirm(`确定要删除组件“${hit.name}”吗？此操作会把该组件从组件库和桌面中移除。`);
-          if (confirmed) {
-            deleteWidgetLibraryItems([widgetId]);
-          }
+          showAppearanceConfirm(
+            container,
+            icons,
+            `确定要删除组件“${hit.name}”吗？此操作会把该组件从组件库和桌面中移除。`,
+            () => deleteWidgetLibraryItems([widgetId])
+          );
         }, 550);
       };
 
@@ -683,17 +899,122 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
     Logger.info('界面设置已保存');
   };
 
-  const onSaveIconSettings = async () => {
-    const iconSize = Number(container.querySelector('#setting-icon-size')?.value || 56);
+  const onSaveWallpaperSettings = async () => {
+    const desktopWallpaper = String(container.querySelector('#setting-desktop-wallpaper')?.value || '').trim();
+    const lockscreenWallpaper = String(container.querySelector('#setting-lockscreen-wallpaper')?.value || '').trim();
+
+    // [模块标注] 壁纸兼容存储模块：同步写入静态预览脚本兼容 key，确保全屏与状态栏区域读取到最新桌面 / 锁屏壁纸
+    if (desktopWallpaper) {
+      localStorage.setItem('miniphone_wallpaper', desktopWallpaper);
+    } else {
+      localStorage.removeItem('miniphone_wallpaper');
+    }
+
+    if (lockscreenWallpaper) {
+      localStorage.setItem('miniphone_lockscreen_wallpaper', lockscreenWallpaper);
+    } else {
+      localStorage.removeItem('miniphone_lockscreen_wallpaper');
+    }
 
     await settings.update({
       appearance: {
         ...(current.appearance || {}),
-        iconSize
+        wallpaper: desktopWallpaper,
+        desktopWallpaper,
+        lockscreenWallpaper
       }
     });
 
-    eventBus?.emit('settings:appearance-changed', { iconSize });
+    current.appearance = {
+      ...(current.appearance || {}),
+      wallpaper: desktopWallpaper,
+      desktopWallpaper,
+      lockscreenWallpaper
+    };
+    eventBus?.emit('settings:appearance-changed', {
+      wallpaper: desktopWallpaper,
+      desktopWallpaper,
+      lockscreenWallpaper
+    });
+    Logger.info('壁纸设置已保存');
+  };
+
+  const onSaveCustomIconSettings = async () => {
+    const iconImage = String(container.querySelector('#setting-icon-image')?.value || '').trim();
+
+    await settings.update({
+      appearance: {
+        ...(current.appearance || {}),
+        iconImage
+      }
+    });
+
+    current.appearance = {
+      ...(current.appearance || {}),
+      iconImage
+    };
+    eventBus?.emit('settings:appearance-changed', { iconImage });
+    Logger.info('自定义图标设置已保存');
+  };
+
+  const onResetCustomIconSettings = async () => {
+    const input = container.querySelector('#setting-icon-image');
+    if (input) input.value = '';
+    updateManagedImagePreview(container, 'setting-icon-image', 'setting-icon-image-preview');
+
+    await settings.update({
+      appearance: {
+        ...(current.appearance || {}),
+        iconImage: ''
+      }
+    });
+
+    current.appearance = {
+      ...(current.appearance || {}),
+      iconImage: ''
+    };
+    eventBus?.emit('settings:appearance-changed', { iconImage: '' });
+    Logger.info('自定义图标已恢复默认');
+  };
+
+  const onSaveIconSettings = async () => {
+    const iconSize = Number(container.querySelector('#setting-icon-size')?.value || 56);
+    const iconRadius = Number(container.querySelector('#setting-icon-radius')?.value || 18);
+    const iconShadowStyle = String(container.querySelector('#setting-icon-shadow-style')?.value || 'outer');
+    const iconShadowSize = Number(container.querySelector('#setting-icon-shadow-size')?.value || 18);
+    const iconBorderWidth = Number(container.querySelector('#setting-icon-border-width')?.value || 0);
+    const iconBorderColor = String(container.querySelector('#setting-icon-border-color')?.value || '#d7c9b8');
+
+    await settings.update({
+      appearance: {
+        ...(current.appearance || {}),
+        iconSize,
+        iconRadius,
+        iconShadowStyle,
+        iconShadowSize,
+        iconBorderWidth,
+        iconBorderColor
+      }
+    });
+
+    current.appearance = {
+      ...(current.appearance || {}),
+      iconSize,
+      iconRadius,
+      iconShadowStyle,
+      iconShadowSize,
+      iconBorderWidth,
+      iconBorderColor
+    };
+
+    eventBus?.emit('settings:appearance-changed', {
+      iconSize,
+      iconRadius,
+      iconShadowStyle,
+      iconShadowSize,
+      iconBorderWidth,
+      iconBorderColor
+    });
     Logger.info('图标设置已保存');
   };
 
@@ -722,7 +1043,29 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
     }
   };
 
+  bindManagedImageField(container, {
+    inputId: 'setting-desktop-wallpaper',
+    fileId: 'setting-desktop-wallpaper-file',
+    previewId: 'setting-desktop-wallpaper-preview',
+    removeId: 'remove-desktop-wallpaper'
+  });
+  bindManagedImageField(container, {
+    inputId: 'setting-lockscreen-wallpaper',
+    fileId: 'setting-lockscreen-wallpaper-file',
+    previewId: 'setting-lockscreen-wallpaper-preview',
+    removeId: 'remove-lockscreen-wallpaper'
+  });
+  bindManagedImageField(container, {
+    inputId: 'setting-icon-image',
+    fileId: 'setting-icon-image-file',
+    previewId: 'setting-icon-image-preview',
+    removeId: 'remove-icon-image'
+  });
+
   container.querySelector('#save-ui-settings')?.addEventListener('click', onSaveUiSettings);
+  container.querySelector('#save-wallpaper-settings')?.addEventListener('click', onSaveWallpaperSettings);
+  container.querySelector('#save-custom-icon-settings')?.addEventListener('click', onSaveCustomIconSettings);
+  container.querySelector('#reset-custom-icon-settings')?.addEventListener('click', onResetCustomIconSettings);
   container.querySelector('#save-icon-settings')?.addEventListener('click', onSaveIconSettings);
   container.querySelector('#custom-widget-save')?.addEventListener('click', onSaveCustomWidget);
   container.querySelector('#custom-widget-preview-toggle')?.addEventListener('change', updatePreview);
@@ -749,12 +1092,12 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
   container.querySelector('#custom-widget-bulk-delete')?.addEventListener('click', () => {
     const ids = [...selectedWidgetIds];
     if (!ids.length) return;
-    const confirmed = window.confirm(`确定要删除已选中的 ${ids.length} 个组件吗？`);
-    if (!confirmed) return;
-    deleteWidgetLibraryItems(ids);
-    isSelectionMode = false;
-    selectedWidgetIds.clear();
-    renderSelectionState();
+    showAppearanceConfirm(container, icons, `确定要删除已选中的 ${ids.length} 个组件吗？`, () => {
+      deleteWidgetLibraryItems(ids);
+      isSelectionMode = false;
+      selectedWidgetIds.clear();
+      renderSelectionState();
+    });
   });
 
   updateWidgetLibraryList();
