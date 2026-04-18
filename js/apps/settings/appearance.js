@@ -507,7 +507,8 @@ export function renderAppearanceSections({ current, icons, apps = [] }) {
             <div aria-hidden="true" style="display:none;">
               ${apps.map((app) => `<input id="setting-icon-image-${app.id}" type="hidden" value="${escapeHtml(iconImages[app.id] || '')}">`).join('')}
             </div>
-            <div class="appearance-inline-actions">
+            <!-- [模块标注] 图标图片设置双按钮同排模块：仅控制“保存设置 / 重置所有图标图片”同一行展示，便于后续单独调整 -->
+            <div class="appearance-inline-actions appearance-inline-actions--icon-dual">
               <button class="ui-button primary" id="save-custom-icon-settings">${icons.saveWidget}<span>保存设置</span></button>
               <button class="ui-button" id="reset-custom-icon-settings" type="button">${icons.closeSmall}<span>重置所有图标图片</span></button>
             </div>
@@ -558,7 +559,8 @@ export function renderAppearanceSections({ current, icons, apps = [] }) {
                 <input id="setting-icon-border-color" type="color" value="${iconAdjustments.iconBorderColor}">
               </label>
             </div>
-            <div class="appearance-inline-actions">
+            <!-- [模块标注] 图标美化双按钮同排模块：仅控制“保存图标设置 / 恢复默认”同一行展示，便于后续单独调整 -->
+            <div class="appearance-inline-actions appearance-inline-actions--icon-dual">
               <button class="ui-button primary" id="save-icon-settings">${icons.saveWidget}<span>保存图标设置</span></button>
               <button class="ui-button" id="reset-icon-adjustments" type="button">${icons.closeSmall}<span>恢复默认</span></button>
             </div>
@@ -812,15 +814,15 @@ function ensureIconResourceModal(container, icons) {
           <input id="appearance-icon-editor-file" type="file" accept="image/*" style="display:none;" />
           <div class="short-action-row">
             <button class="ui-button" type="button" id="appearance-icon-editor-upload">${icons.uploadLocal}<span>上传本地图片</span></button>
-            <button class="ui-button" type="button" id="appearance-icon-editor-focus-url">${icons.link}<span>使用 URL 链接</span></button>
             <button class="ui-button danger" type="button" id="appearance-icon-editor-delete">${icons.delete}<span>删除</span></button>
           </div>
-          <label class="appearance-form-field">
-            <span>图片链接</span>
+          <!-- [模块标注] 图标编辑弹窗 URL 输入模块：保留唯一 URL 录入入口，后续如需调整输入框视觉只改这一块 -->
+          <label class="appearance-form-field appearance-form-field--icon-editor-url">
+            <span>URL 链接</span>
             <input id="appearance-icon-editor-url" type="url" placeholder="https://example.com/image.jpg" />
           </label>
-          <div class="appearance-inline-actions">
-            <button class="ui-button" type="button" id="appearance-icon-editor-cancel">${icons.closeSmall}<span>取消</span></button>
+          <!-- [模块标注] 图标编辑弹窗主操作模块：仅保留关闭图标与“应用到该图标”，避免与取消按钮重复 -->
+          <div class="appearance-inline-actions appearance-inline-actions--icon-editor-submit">
             <button class="ui-button primary" type="button" id="appearance-icon-editor-save">${icons.saveWidget}<span>应用到该图标</span></button>
           </div>
         </div>
@@ -1398,10 +1400,6 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
     iconEditorModal.querySelector('#appearance-icon-editor-file')?.click();
   });
 
-  iconEditorModal.querySelector('#appearance-icon-editor-focus-url')?.addEventListener('click', () => {
-    iconEditorModal.querySelector('#appearance-icon-editor-url')?.focus();
-  });
-
   iconEditorModal.querySelector('#appearance-icon-editor-delete')?.addEventListener('click', () => {
     if (!activeIconEditorAppId) return;
     const urlInput = iconEditorModal.querySelector('#appearance-icon-editor-url');
@@ -1439,7 +1437,6 @@ export function bindAppearanceEvents(container, { settings, eventBus, current, i
     closeIconEditorModal();
   });
 
-  iconEditorModal.querySelector('#appearance-icon-editor-cancel')?.addEventListener('click', closeIconEditorModal);
   iconEditorModal.querySelector('#appearance-icon-resource-close')?.addEventListener('click', closeIconEditorModal);
   iconEditorModal.querySelector('.managed-resource-modal__mask')?.addEventListener('click', closeIconEditorModal);
 

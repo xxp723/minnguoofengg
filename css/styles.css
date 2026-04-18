@@ -257,6 +257,11 @@ body.has-global-icon-image .app-icon-btn .app-custom-img {
   display: none;
 }
 
+/* [模块标注] 自定义图标图片全覆盖修复模块：仅当应用图标使用自定义图片时移除内边距，确保图片完整铺满桌面与 Dock 图标 */
+.app-icon-btn.has-img {
+  padding: 0;
+}
+
 .app-icon-label {
   display: block;
   font-size: 13px;
@@ -2135,6 +2140,23 @@ body.fullscreen-mode .app-window {
   justify-content: flex-end;
 }
 
+/* [模块标注] 图标设置双按钮同排样式模块：仅作用于图标设置中的两组“保存/恢复”按钮，不影响其他动作区 */
+.appearance-inline-actions--icon-dual {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  justify-content: stretch;
+}
+
+.appearance-inline-actions--icon-dual .ui-button {
+  width: 100%;
+  min-width: 0;
+}
+
+/* [模块标注] 图标编辑弹窗主提交按钮模块：保持主按钮右对齐且不引入额外取消按钮 */
+.appearance-inline-actions--icon-editor-submit {
+  justify-content: flex-end;
+}
+
 /* [模块标注] 图标/壁纸资源卡片模块：统一资源预览、短按钮右对齐与输入框布局，便于后续单独微调 */
 .appearance-settings-stack {
   display: grid;
@@ -2295,6 +2317,34 @@ body.fullscreen-mode .app-window {
   border-radius: 16px;
   background: rgba(255,255,255,0.5);
   border: 1px solid rgba(125, 90, 68, 0.1);
+}
+
+/* [模块标注] 图标编辑弹窗 URL 输入框样式模块：仅作用于单图标编辑弹窗中的唯一 URL 输入区域 */
+.appearance-form-field--icon-editor-url {
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(244,236,225,0.96) 100%);
+  border: 1px solid rgba(125, 90, 68, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.52);
+}
+
+.appearance-form-field--icon-editor-url > span {
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  color: #7D5A44;
+}
+
+.appearance-form-field--icon-editor-url input[type="url"] {
+  min-height: 44px;
+  border-radius: 14px;
+  border-color: rgba(125, 90, 68, 0.16);
+  background: rgba(255,255,255,0.92);
+  box-shadow: inset 0 1px 2px rgba(74, 52, 42, 0.04);
+}
+
+.appearance-form-field--icon-editor-url input[type="url"]:focus {
+  border-color: rgba(74, 52, 42, 0.32);
+  box-shadow: 0 0 0 3px rgba(215, 201, 184, 0.28);
 }
 
 .appearance-slider-wrap {
@@ -2920,6 +2970,10 @@ body.fullscreen-mode .app-window {
   .appearance-inline-actions,
   .appearance-resource-card__actions {
     flex-direction: column;
+  }
+
+  .appearance-inline-actions--icon-dual {
+    grid-template-columns: 1fr;
   }
 
   .custom-widget-actions .ui-button,
