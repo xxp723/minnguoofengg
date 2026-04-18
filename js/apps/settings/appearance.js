@@ -510,7 +510,7 @@ export function renderAppearanceSections({ current, icons, apps = [] }) {
             <!-- [模块标注] 图标图片设置双按钮同排模块：仅控制“保存设置 / 重置所有图标图片”同一行展示，便于后续单独调整 -->
             <div class="appearance-inline-actions appearance-inline-actions--icon-dual">
               <button class="ui-button primary" id="save-custom-icon-settings">${icons.saveWidget}<span>保存设置</span></button>
-              <button class="ui-button" id="reset-custom-icon-settings" type="button">${icons.closeSmall}<span>重置所有图标图片</span></button>
+              <button class="ui-button" id="reset-custom-icon-settings" type="button">${icons.closeSmall}<span>恢复默认</span></button>
             </div>
           </section>
 
@@ -561,7 +561,7 @@ export function renderAppearanceSections({ current, icons, apps = [] }) {
             </div>
             <!-- [模块标注] 图标美化双按钮同排模块：仅控制“保存图标设置 / 恢复默认”同一行展示，便于后续单独调整 -->
             <div class="appearance-inline-actions appearance-inline-actions--icon-dual">
-              <button class="ui-button primary" id="save-icon-settings">${icons.saveWidget}<span>保存图标设置</span></button>
+              <button class="ui-button primary" id="save-icon-settings">${icons.saveWidget}<span>保存设置</span></button>
               <button class="ui-button" id="reset-icon-adjustments" type="button">${icons.closeSmall}<span>恢复默认</span></button>
             </div>
           </section>

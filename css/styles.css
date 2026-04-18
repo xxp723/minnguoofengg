@@ -244,12 +244,12 @@ body.hide-status-bar #top-status-bar {
   z-index: 1;
 }
 
-body.has-global-icon-image .app-icon-btn::after {
+body.has-global-icon-image .app-icon-btn:not(.has-img)::after {
   opacity: 1;
 }
 
-body.has-global-icon-image .app-icon-btn .app-icon-glyph,
-body.has-global-icon-image .app-icon-btn .app-custom-img {
+body.has-global-icon-image .app-icon-btn:not(.has-img) .app-icon-glyph,
+body.has-global-icon-image .app-icon-btn:not(.has-img) .app-custom-img {
   opacity: 0;
 }
 
@@ -260,6 +260,18 @@ body.has-global-icon-image .app-icon-btn .app-custom-img {
 /* [模块标注] 自定义图标图片全覆盖修复模块：仅当应用图标使用自定义图片时移除内边距，确保图片完整铺满桌面与 Dock 图标 */
 .app-icon-btn.has-img {
   padding: 0;
+}
+
+.app-icon-btn.has-img::after {
+  opacity: 0 !important;
+}
+
+.app-icon-btn.has-img .app-custom-img {
+  opacity: 1 !important;
+  display: block;
+  width: 100%;
+  height: 100%;
+  flex: 0 0 100%;
 }
 
 .app-icon-label {
@@ -300,6 +312,10 @@ body.has-global-icon-image .app-icon-btn .app-custom-img {
   height: clamp(40px, calc(var(--icon-size) * 0.84), 80px);
   border-radius: calc(var(--app-icon-radius) * 0.9);
   padding: clamp(4px, calc(var(--icon-size) * 0.08), 6px);
+}
+
+.dock-container .app-icon-btn.has-img {
+  padding: 0;
 }
 
 
