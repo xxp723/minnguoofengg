@@ -683,8 +683,8 @@ export class DesktopEditMode {
     const current = this.loadBuiltinWidgetState(id);
 
     if (id === 'music') {
+      // [模块标注] 音乐组件编辑数据模块：音乐编辑窗仅保留标题、封面、音频与进度相关数据，移除说明文字字段
       const titleInput = document.getElementById('modal-music-title-input');
-      const subtitleInput = document.getElementById('modal-music-subtitle-input');
       const audioNameInput = document.getElementById('modal-music-audio-name');
       const coverPreview = document.getElementById('modal-music-cover-preview');
       const coverPlaceholder = document.getElementById('modal-music-cover-placeholder');
@@ -695,15 +695,13 @@ export class DesktopEditMode {
         title: '编辑音乐组件',
         onOpen: () => {
           if (titleInput) titleInput.value = current.title || '';
-          if (subtitleInput) subtitleInput.value = current.subtitle || '';
           if (audioNameInput) audioNameInput.value = current.audioName || '';
           this.setModalImagePreview(coverPreview, coverPlaceholder, current.coverSrc || '');
         },
         onSave: async () => {
           const next = this.saveBuiltinWidgetState(id, {
             ...draft,
-            title: titleInput?.value?.trim() || '旧梦留声机',
-            subtitle: subtitleInput?.value?.trim() || '与当前主题一致的唱片卡片'
+            title: titleInput?.value?.trim() || '旧梦留声机'
           });
           this.renderBuiltinWidgetElement(id, el);
           this.bindBuiltinWidgetInteractions(id, el);

@@ -200,7 +200,8 @@
                   <img id="modal-avatar-preview" style="display:none;" alt="头像预览" />
                   <div class="modal-img-placeholder" id="modal-avatar-placeholder">尚未设置</div>
                 </div>
-                <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <!-- [模块标注] 头像组件短按钮动作区模块：上传/删除短按钮统一走右对齐动作区，便于后续单独调整 -->
+                <div class="short-action-row">
                   <button type="button" class="modal-btn" id="modal-avatar-upload">上传/URL</button>
                   <button type="button" class="modal-btn" id="modal-avatar-delete" style="background:#c0392b;color:#fff;">删除图片</button>
                 </div>
@@ -253,7 +254,8 @@
                   <img id="modal-ticket2-preview" style="display:none;" alt="图片预览" />
                   <div class="modal-img-placeholder" id="modal-ticket2-placeholder">尚未设置</div>
                 </div>
-                <div style="display:flex;gap:8px;">
+                <!-- [模块标注] 戏票组件短按钮动作区模块：上传/删除短按钮统一走右对齐动作区，便于后续单独调整 -->
+                <div class="short-action-row">
                   <button type="button" class="modal-btn" id="modal-ticket2-upload">上传/URL</button>
                   <button type="button" class="modal-btn" id="modal-ticket2-delete" style="background:#c0392b;color:#fff;">删除图片</button>
                 </div>
@@ -281,16 +283,13 @@
                 <input id="modal-music-title-input" type="text" placeholder="请输入音乐标题" />
               </div>
               <div class="modal-field">
-                <label>说明文字</label>
-                <textarea id="modal-music-subtitle-input" rows="2" placeholder="请输入说明文字"></textarea>
-              </div>
-              <div class="modal-field">
                 <label>封面图片</label>
                 <div class="modal-img-preview">
                   <img id="modal-music-cover-preview" style="display:none;" alt="封面预览" />
                   <div class="modal-img-placeholder" id="modal-music-cover-placeholder">尚未设置</div>
                 </div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                <!-- [模块标注] 音乐组件图片动作区模块：封面上传/删除按钮统一走右对齐动作区，便于后续单独调整 -->
+                <div class="short-action-row">
                   <button type="button" class="modal-btn" id="modal-music-cover-upload">上传/URL</button>
                   <button type="button" class="modal-btn" id="modal-music-cover-delete" style="background:#c0392b;color:#fff;">删除图片</button>
                 </div>
@@ -298,7 +297,8 @@
               <div class="modal-field">
                 <label>音频文件</label>
                 <input id="modal-music-audio-name" type="text" placeholder="未导入音频" readonly />
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <!-- [模块标注] 音乐组件音频动作区模块：音频上传/删除按钮统一走右对齐动作区，便于后续单独调整 -->
+                <div class="short-action-row">
                   <button type="button" class="modal-btn" id="modal-music-audio-upload">上传/URL</button>
                   <button type="button" class="modal-btn" id="modal-music-audio-delete" style="background:#c0392b;color:#fff;">删除音频</button>
                 </div>
@@ -331,7 +331,7 @@
                   <img id="modal-polaroid-image-preview" style="display:none;" alt="拍立得预览" />
                   <div class="modal-img-placeholder" id="modal-polaroid-image-placeholder">尚未设置</div>
                 </div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <div class="short-action-row">
                   <button type="button" class="modal-btn" id="modal-polaroid-image-upload">上传/URL</button>
                   <button type="button" class="modal-btn" id="modal-polaroid-image-delete" style="background:#c0392b;color:#fff;">删除图片</button>
                 </div>
@@ -390,7 +390,8 @@
               </div>
             </div>
           </div>
-          <div class="widget-modal__footer">
+          <!-- [模块标注] 组件编辑弹窗底部短按钮模块：保存类短按钮统一在视觉上右对齐 -->
+          <div class="widget-modal__footer short-action-row">
             <button type="button" class="modal-btn primary" id="widget-modal-save">保存</button>
           </div>
         </div>
