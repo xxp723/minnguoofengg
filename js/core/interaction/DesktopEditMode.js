@@ -368,6 +368,7 @@ export class DesktopEditMode {
       this.resourceModal = document.getElementById('managed-resource-modal');
       this.resourceModalTitle = document.getElementById('managed-resource-modal-title');
       this.resourceModalHint = document.getElementById('managed-resource-modal-hint');
+      this.resourceModalUrlLabel = document.getElementById('managed-resource-modal-url-label');
       this.resourceModalUrlInput = document.getElementById('managed-resource-modal-url');
       this.resourceModalLocalBtn = document.getElementById('managed-resource-modal-local');
       this.resourceModalCancelBtn = document.getElementById('managed-resource-modal-cancel');
@@ -393,7 +394,7 @@ export class DesktopEditMode {
           <p class="managed-resource-modal__hint" id="managed-resource-modal-hint">可从本地导入，也可直接粘贴图片 URL。</p>
           <button type="button" class="modal-btn" id="managed-resource-modal-local">从本地导入图片</button>
           <div class="modal-field">
-            <label for="managed-resource-modal-url">图片 URL</label>
+            <label id="managed-resource-modal-url-label" for="managed-resource-modal-url">图片 URL</label>
             <input id="managed-resource-modal-url" type="url" placeholder="https://example.com/cover.jpg" />
           </div>
           <button type="button" class="modal-btn primary" id="managed-resource-modal-confirm">使用 URL 图片</button>
@@ -405,6 +406,7 @@ export class DesktopEditMode {
     this.resourceModal = modal;
     this.resourceModalTitle = modal.querySelector('#managed-resource-modal-title');
     this.resourceModalHint = modal.querySelector('#managed-resource-modal-hint');
+    this.resourceModalUrlLabel = modal.querySelector('#managed-resource-modal-url-label');
     this.resourceModalUrlInput = modal.querySelector('#managed-resource-modal-url');
     this.resourceModalLocalBtn = modal.querySelector('#managed-resource-modal-local');
     this.resourceModalCancelBtn = modal.querySelector('#managed-resource-modal-cancel');
@@ -412,10 +414,15 @@ export class DesktopEditMode {
     this.resourceModalMask = modal.querySelector('.managed-resource-modal__mask');
   }
 
-  showManagedResourceModal({ title, hint, placeholder, onLocalPick, onUrlConfirm }) {
+  showManagedResourceModal({ title, hint, placeholder, localLabel, urlLabel, confirmLabel, onLocalPick, onUrlConfirm }) {
     if (!this.resourceModal) return;
     this.resourceModalTitle.textContent = title || '选择图片资源';
     this.resourceModalHint.textContent = hint || '可从本地导入，也可直接粘贴图片 URL。';
+    this.resourceModalLocalBtn.textContent = localLabel || '从本地导入图片';
+    if (this.resourceModalUrlLabel) {
+      this.resourceModalUrlLabel.textContent = urlLabel || '图片 URL';
+    }
+    this.resourceModalConfirmBtn.textContent = confirmLabel || '使用 URL 图片';
     this.resourceModalUrlInput.value = '';
     this.resourceModalUrlInput.placeholder = placeholder || 'https://example.com/image.jpg';
 
@@ -528,6 +535,9 @@ export class DesktopEditMode {
       this.showManagedResourceModal({
         title: `选择${label}`,
         hint: `你可以从本地导入${label}，也可以输入 ${label} URL。`,
+        localLabel: '从本地导入图片',
+        urlLabel: '图片 URL',
+        confirmLabel: '使用 URL 图片',
         placeholder: 'https://example.com/image.jpg',
         onLocalPick: async () => {
           const file = await this.pickLocalResource('image/*');
@@ -591,7 +601,10 @@ export class DesktopEditMode {
       this.showManagedResourceModal({
         title: `选择${label}`,
         hint: `你可以从本地导入${label}，也可以输入${urlHint || 'URL 链接'}。`,
-        placeholder: 'https://example.com/resource',
+        localLabel: label.includes('音频') ? '从本地导入音频文件' : '从本地导入文件',
+        urlLabel: label.includes('音频') ? '音频 URL' : '资源 URL',
+        confirmLabel: label.includes('音频') ? '使用 URL 音频' : '使用 URL 资源',
+        placeholder: label.includes('音频') ? 'https://example.com/audio.mp3' : 'https://example.com/resource',
         onLocalPick: async () => {
           const file = await this.pickLocalResource(accept);
           resolve(file || null);
