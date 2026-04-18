@@ -497,7 +497,7 @@ export function renderAppearanceSections({ current, icons, apps = [] }) {
           <!-- [模块标注] 快捷更换图标图片模块：按应用图标网格逐个打开编辑弹窗，便于后续继续维护单图标图片入口 -->
           <section class="ui-card">
             <h3>快捷更换图标图片</h3>
-            <p class="ui-muted" style="margin-bottom: 10px;">点击任意图标，即可单独为该应用上传本地图片或填写 URL 链接；不会再用同一张图覆盖所有图标。</p>
+            <p class="ui-muted" style="margin-bottom: 10px;">点击任意图标，即可单独为该应用上传本地图片或填写 URL 链接。</p>
             <div class="appearance-icon-grid">
               ${apps.map((app) => renderIconQuickTile({
                 app,
