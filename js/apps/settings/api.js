@@ -249,8 +249,8 @@ function renderModelOptions(profile) {
     .join('');
 }
 
-// ===== 设置：API 预设折叠选择器（已完成·本次按名称保存与折叠选择） START =====
-// 说明：该区域只负责渲染主 API 预设入口；存储仍通过 settings.update -> SettingsStore/DB.js/IndexedDB，不使用 localStorage/sessionStorage。
+// ===== 设置：API 预设折叠选择器（已完成·本次预设名称显示与图标移除） START =====
+// 说明：该区域只负责渲染主 API 预设入口；预设选择项已显示名称并去除图标，存储仍通过 settings.update -> SettingsStore/DB.js/IndexedDB，不使用 localStorage/sessionStorage。
 function renderSavedPrimaryConfigs(savedPrimaryConfigs) {
   const savedItems = savedPrimaryConfigs
     .map((item) => {
@@ -258,7 +258,6 @@ function renderSavedPrimaryConfigs(savedPrimaryConfigs) {
       return `
         <div class="api-preset-option" data-saved-primary-id="${escapeHtml(item.id)}">
           <button class="api-preset-option__main" type="button" data-action="apply-saved-primary" data-saved-id="${escapeHtml(item.id)}">
-            <span class="api-preset-option__icon">${renderProviderIcon(item.provider)}</span>
             <span class="api-preset-option__content">
               <span class="api-preset-option__title">${escapeHtml(item.name)}</span>
               <span class="api-preset-option__meta">${escapeHtml(providerMeta.shortLabel)} · ${escapeHtml(item.model || '未设置模型')}</span>
@@ -308,7 +307,7 @@ function renderSavedPrimaryConfigs(savedPrimaryConfigs) {
     </div>
   `;
 }
-// ===== 设置：API 预设折叠选择器（已完成·本次按名称保存与折叠选择） END =====
+// ===== 设置：API 预设折叠选择器（已完成·本次预设名称显示与图标移除） END =====
 
 function renderProviderTrigger(profileKey, profile) {
   const providerMeta = PROVIDER_META[profile.provider];
@@ -940,8 +939,8 @@ export function renderApiSection({ current }) {
               font-size: 12px;
             }
 
-            /* ===== 设置：API 预设折叠选择器样式（已完成·本次按名称保存与折叠选择） START =====
-               说明：仅作用于 API 设置页顶部预设区域和主 API“保存为预设”行；不影响其它设置页或其它应用。 */
+            /* ===== 设置：API 预设折叠选择器样式（已完成·本次预设名称显示与图标移除） START =====
+               说明：仅作用于 API 设置页顶部预设区域和主 API“保存为预设”行；预设项已去除服务商图标，名称短时一行、长时最多两行显示。 */
             #settings-api .api-preset-panel {
               display: grid;
               gap: 10px;
@@ -1073,7 +1072,7 @@ export function renderApiSection({ current }) {
 
             #settings-api .api-preset-option__main {
               display: grid;
-              grid-template-columns: auto minmax(0, 1fr) auto;
+              grid-template-columns: minmax(0, 1fr) auto;
               gap: 8px;
               align-items: center;
               min-width: 0;
@@ -1084,33 +1083,30 @@ export function renderApiSection({ current }) {
               text-align: left;
             }
 
-            #settings-api .api-preset-option__icon {
-              width: 26px;
-              height: 26px;
-              border-radius: 999px;
-              align-items: center;
-              justify-content: center;
-              background: rgba(215, 201, 184, 0.34);
-              color: var(--c-text-main, #4A342A);
-            }
-
             #settings-api .api-preset-option__content {
               min-width: 0;
               display: grid;
               gap: 3px;
             }
 
-            #settings-api .api-preset-option__title,
+            #settings-api .api-preset-option__title {
+              min-width: 0;
+              display: -webkit-box;
+              overflow: hidden;
+              -webkit-box-orient: vertical;
+              -webkit-line-clamp: 2;
+              white-space: normal;
+              overflow-wrap: anywhere;
+              line-height: 1.35;
+              font-size: 12px;
+              font-weight: 700;
+            }
+
             #settings-api .api-preset-option__meta {
               min-width: 0;
               overflow: hidden;
               text-overflow: ellipsis;
               white-space: nowrap;
-            }
-
-            #settings-api .api-preset-option__title {
-              font-size: 12px;
-              font-weight: 700;
             }
 
             #settings-api .api-preset-option__meta {
@@ -1143,7 +1139,7 @@ export function renderApiSection({ current }) {
             #settings-api .api-preset-name-input {
               min-height: 38px;
             }
-            /* ===== 设置：API 预设折叠选择器样式（已完成·本次按名称保存与折叠选择） END ===== */
+            /* ===== 设置：API 预设折叠选择器样式（已完成·本次预设名称显示与图标移除） END ===== */
 
             #settings-api .api-provider-modal,
             #settings-api .api-model-modal {
@@ -1380,8 +1376,8 @@ export function renderApiSection({ current }) {
             }
           </style>
 
-          <!-- ===== 设置：API 预设折叠选择器（已完成·本次按名称保存与折叠选择） START =====
-               说明：已保存预设不再直接陈列；在“新建预设”同栏折叠选择，保存名称由主 API 区域输入框填写。 -->
+          <!-- ===== 设置：API 预设折叠选择器（已完成·本次预设名称显示与图标移除） START =====
+               说明：已保存预设不再直接陈列；在“新建预设”同栏折叠选择，选择项已去除图标并显示预设名称，长名称最多两行。 -->
           <section class="ui-card api-section-card">
             <div class="api-section-head">
               <h3 class="api-section-title">
@@ -1393,7 +1389,7 @@ export function renderApiSection({ current }) {
               ${renderSavedPrimaryConfigs(api.savedPrimaryConfigs)}
             </div>
           </section>
-          <!-- ===== 设置：API 预设折叠选择器（已完成·本次按名称保存与折叠选择） END ===== -->
+          <!-- ===== 设置：API 预设折叠选择器（已完成·本次预设名称显示与图标移除） END ===== -->
 
           ${renderProfileSection('primary', '主API设置', ICONS.main, api.primary, { isPrimary: true })}
 
@@ -1832,13 +1828,13 @@ function switchProviderProfile(container, profileKey, nextProvider) {
   );
 }
 
-// ===== 设置：API 预设折叠选择器刷新（已完成·本次按名称保存与折叠选择） START =====
+// ===== 设置：API 预设折叠选择器刷新（已完成·本次预设名称显示与图标移除） START =====
 function renderSavedPrimaryConfigsInto(container, apiState) {
   const host = container.querySelector('#api-saved-primary-configs');
   if (!host) return;
   host.innerHTML = renderSavedPrimaryConfigs(apiState.savedPrimaryConfigs || []);
 }
-// ===== 设置：API 预设折叠选择器刷新（已完成·本次按名称保存与折叠选择） END =====
+// ===== 设置：API 预设折叠选择器刷新（已完成·本次预设名称显示与图标移除） END =====
 
 function buildSavedPrimaryPreset(profileConfig, existingCount, presetName = '') {
   const normalized = normalizeProfileConfig(profileConfig, profileConfig?.provider || 'openai');

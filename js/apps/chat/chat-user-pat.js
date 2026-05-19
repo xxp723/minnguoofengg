@@ -40,12 +40,13 @@ export function isUserPatSystemMessage(message = {}) {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·本次修改·拍一拍设置仅配置文案]
+   [区域标注·已完成·本次修改·拍一拍设置说明文字已移除]
    说明：
    1. 供 chat-message-settings.js 在“功能玩法”板块内插入“拍一拍”小版块。
    2. 使用抽屉式结构，点击后由 chat-event-click.js 的既有抽屉分支展开/收起。
-   3. 本区已按要求移除设置页“拍一拍”发送按钮；设置页只负责填写气泡功能栏“拍拍”共用的部位/文案。
+   3. 本区已按要求移除设置页“拍一拍”发送按钮和说明性文字；设置页只负责填写气泡功能栏“拍拍”共用的部位/文案。
    4. 气泡功能栏点击“拍拍”时读取同一输入框当前值，最终提示为“你拍了拍角色名的____”。
+   5. 本区域不使用 localStorage/sessionStorage；持久化仍走 DB.js / IndexedDB 既有链路。
    ========================================================================== */
 export function renderUserPatSettingsSection(roleDisplayName = '聊天', patTargetText = '') {
   const safeRoleDisplayName = String(roleDisplayName || '聊天').trim() || '聊天';
@@ -79,7 +80,6 @@ export function renderUserPatSettingsSection(roleDisplayName = '聊天', patTarg
                 maxlength="24"
                 value="${escapeHtml(safePatTargetText)}">
             </div>
-            <div class="msg-settings-pat-editor__hint">这里填写的内容会用于聊天消息气泡功能栏里的“拍拍”。</div>
           </div>
         </div>
       </div>
