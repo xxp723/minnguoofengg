@@ -93,6 +93,21 @@ export class AppManager {
            ========================================================================== */
         const modulePromise = this.loadModule(appMeta);
 
+        /* ========================================================================
+           [区域标注·已完成·地图/旧事应用窗口显示前独立样式预加载]
+           说明：
+           1. 地图应用与旧事（memory）应用必须在窗口显示前完成各自独立 CSS 加载，避免先出现全局 loading/全局样式再切换成应用样式。
+           2. 这里只预加载 CSS 资源，不 mount 应用、不读写持久化数据，不使用 localStorage/sessionStorage。
+           3. link id 与应用内部样式加载函数保持一致，避免重复插入样式表。
+           ======================================================================== */
+        if (appId === 'map') {
+          await this.preloadStylesheet('./js/apps/map/map.css', 'map-app-css');
+        }
+
+        if (appId === 'memory') {
+          await this.preloadStylesheet('./js/apps/memory/memory.css?v=20260519-grand-summary-dock-range-scroll', 'memory-app-css');
+        }
+
         if (appId === 'chat') {
           /* [区域标注·本次需求2·闲谈样式兜底预加载] 窗口显示前确保 chat.css 可用，避免无样式闪烁。 */
           await this.preloadChatCriticalStyles();

@@ -12,8 +12,8 @@ export function buildMapShell() {
     <div class="map-app">
       <div class="map-top-bar">
         <div class="map-top-bar__title-wrap">
-          <!-- 标题点击返回桌面 -->
-          <h1 class="map-title" id="map-title-btn">map</h1>
+          <!-- [地图标题点击返回桌面] 标题文案已改为 Map，点击后通过 EventBus 关闭地图应用返回桌面 -->
+          <h1 class="map-title" id="map-title-btn">Map</h1>
         </div>
         <button class="map-add-btn" id="map-add-btn" title="创建新地图">
           <!-- IconPark 风格加号 -->
@@ -93,12 +93,10 @@ export function bindMapEvents(container, state, context) {
     return String(text ?? '').replace(/[&<>"']/g, c => map[c] || c);
   }
 
-  // 点击标题直接返回桌面
+  // [区域标注·已完成·地图标题点击返回桌面事件] 不再模拟旧关闭按钮，统一通过 AppManager 监听的 app:close 事件返回桌面
   if (titleBtn) {
     titleBtn.addEventListener('click', () => {
-      // 模拟点击窗口关闭按钮
-      const closeBtn = document.querySelector('.app-window[data-app-id="map"] .window-header__btn-close');
-      if (closeBtn) closeBtn.click();
+      context.eventBus?.emit('app:close', { appId: context.appId });
     });
   }
 
