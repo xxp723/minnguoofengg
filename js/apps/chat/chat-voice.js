@@ -162,11 +162,11 @@ export function renderVoiceFeatureButton() {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·本次语音转文字标题去图标与气泡贴合收窄]
+   [区域标注·已完成·本次语音气泡向下展开]
    说明：
    1. 用户模拟语音与 AI 主动语音共用本气泡：播放键 + 波长条 + 0:xx 秒数，默认不直接露出文字。
-   2. 双击展开后的“语音转文字”已去除前置图标，标题字号缩小一圈，转文字正文从顶部直接起步，避免视觉上像从第二行开始。
-   3. 语音气泡宽度会按转文字内容长度输出 CSS 变量，短文本时整个气泡也会同步变短，不再只剩内部文字框单独变窄。
+   2. 双击后在原语音条下方直接展开“语音转文字”区域，不覆盖主语音条，布局参考 QQ / 微信 的分层展示。
+   3. 气泡宽度保持固定，不再随转文字长度变化，避免展开时气泡横向抖动或误以为大小被改动。
    4. 渲染只读取消息对象字段；持久化由 index.js 调用 DB.js / IndexedDB 完成，不使用 localStorage/sessionStorage。
    ========================================================================== */
 function formatVoiceBubbleDuration(seconds = 1) {
@@ -179,14 +179,12 @@ export function renderVoiceBubble(message = {}) {
   const duration = Math.max(1, Math.min(60, Number(message?.voiceDuration || Math.ceil(text.length / 3) || 1)));
   const expanded = Boolean(message?.voiceExpanded);
   const waveBars = [18, 24, 30, 22, 34, 40, 28, 36, 44, 30, 38, 24];
-  const transcriptLength = Math.max(1, text.length || 1);
-  const bubbleWidth = Math.max(98, Math.min(252, 88 + transcriptLength * 11));
 
   return `
     <div class="msg-voice-bubble ${expanded ? 'is-expanded' : ''}"
          data-action="toggle-msg-voice-transcript"
          data-message-id="${escapeHtml(message?.id || '')}"
-         style="--msg-voice-bubble-width:${bubbleWidth}px"
+         style="--msg-voice-bubble-width:220px"
          title="双击展开/收起语音转文字">
       <div class="msg-voice-bubble__main">
         <span class="msg-voice-bubble__play" aria-hidden="true">${VOICE_ICONS.play}</span>
@@ -197,9 +195,9 @@ export function renderVoiceBubble(message = {}) {
         <span class="msg-voice-bubble__download" aria-hidden="true">${VOICE_ICONS.download}</span>
       </div>
       ${expanded ? `
-        <div class="msg-voice-bubble__toggle-hint">语音转文字</div>
-        <div class="msg-voice-bubble__transcript">
-          <span class="msg-voice-bubble__text">${escapeHtml(text)}</span>
+        <div class="msg-voice-bubble__expand">
+          <div class="msg-voice-bubble__expand-label">语音转文字</div>
+          <div class="msg-voice-bubble__expand-text">${escapeHtml(text)}</div>
         </div>
       ` : ''}
     </div>

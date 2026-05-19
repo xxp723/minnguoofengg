@@ -23,13 +23,12 @@
 }
 
 /* ==========================================================================
-   [区域标注·已完成·本次语音气泡展开不变大与上下留白收紧]
+   [区域标注·已完成·本次语音气泡向下展开样式]
    说明：
-   1. 语音消息气泡宽度会配合渲染层输出的 CSS 变量，在上限内按转文字内容长度自适应，短文本时整个气泡也会同步变短。
-   2. 已去除语音气泡独立粗边框与右侧下载箭头，仅保留播放键、波形条与 0:xx 秒数。
-   3. 双击展开后转文字内容改为占用原播放行位置，不再额外撑高气泡；“语音转文字”提示在展开态隐藏，避免上下空白。
-   4. 展开态转文字背景、margin 与内层上下 padding 已收紧，气泡整体维持原有高度与宽度。
-   5. 本区域只做语音气泡视觉展示，不涉及持久化存储逻辑，不使用 localStorage/sessionStorage。
+   1. 语音消息气泡继续保持原有主条宽度，不做点开后覆盖式替换。
+   2. 双击后在主语音条下方展开“语音转文字”区域，分隔线 + 标题 + 正文的层次与 QQ / 微信 保持一致。
+   3. 展开区只向下增加内容，不改变主语音条本身的显示方式。
+   4. 本区域只做语音气泡视觉展示，不涉及持久化存储逻辑，不使用 localStorage/sessionStorage。
    ========================================================================== */
 .msg-bubble--voice {
   min-width: 0;
@@ -54,6 +53,7 @@
   box-shadow: none;
   cursor: pointer;
   user-select: none;
+  overflow: visible;
 }
 
 .msg-voice-bubble__main {
@@ -123,82 +123,78 @@
   white-space: nowrap;
 }
 
-.msg-voice-bubble__toggle-hint {
-  display: block;
-  margin-top: 10px;
+.msg-voice-bubble__expand {
+  width: 100%;
+  box-sizing: border-box;
+  padding-top: 8px;
+  margin-top: 8px;
+  border-top: 1px solid rgba(149, 115, 88, .18);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.msg-bubble--user .msg-voice-bubble__expand {
+  border-top-color: rgba(120, 170, 95, .18);
+}
+
+.msg-voice-bubble__expand-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.2;
-  font-weight: 600;
+  font-weight: 800;
+  letter-spacing: .14em;
   color: rgba(118, 91, 99, .68);
+  white-space: nowrap;
 }
 
-.msg-voice-bubble__sparkle {
-  width: 18px;
-  height: 18px;
+.msg-voice-bubble__expand-label::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+  flex: 0 0 auto;
 }
 
-.msg-voice-bubble__transcript {
+.msg-bubble--user .msg-voice-bubble__expand-label {
+  color: rgba(111, 147, 86, .92);
+}
+
+.msg-voice-bubble__expand-text {
   width: 100%;
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
-  margin-top: 6px;
-  padding: 0;
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
-  text-align: left;
   color: rgba(90, 67, 74, .9);
-  background: rgba(246, 244, 247, .95);
-  border-radius: 13px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
-  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
-.msg-voice-bubble__text {
-  display: block;
-  margin: 0;
-  padding: 0 10px;
-  font-family: inherit;
-  font-size: inherit;
-  line-height: 1.45;
-  font-weight: 500;
-  text-align: left;
+.msg-bubble--user .msg-voice-bubble__expand-text {
+  color: rgba(79, 105, 64, .95);
 }
 
-/* ==========================================================================
-   [区域标注·已完成·本次语音展开态不撑高气泡]
-   说明：
-   1. 只覆盖 .msg-voice-bubble.is-expanded 展开态，不影响普通文字、图片、礼物、转账等其它消息气泡。
-   2. 展开时隐藏播放行与标题提示，让语音转文字直接占用原气泡内容行，避免气泡变高和上下出现空白。
-   3. 转文字单行省略显示，保持原语音气泡大小；再次双击仍由外层 data-action 收起。
-   ========================================================================== */
-.msg-voice-bubble.is-expanded .msg-voice-bubble__main,
-.msg-voice-bubble.is-expanded .msg-voice-bubble__toggle-hint {
-  display: none;
+.msg-voice-bubble.is-expanded {
+  gap: 0;
 }
 
-.msg-voice-bubble.is-expanded .msg-voice-bubble__transcript {
-  display: flex;
-  align-items: center;
-  min-height: 22px;
-  margin-top: 0;
-  padding: 0;
-  background: transparent;
-  border-radius: 0;
+.msg-voice-bubble.is-expanded .msg-voice-bubble__main {
+  padding-bottom: 1px;
 }
 
-.msg-voice-bubble.is-expanded .msg-voice-bubble__text {
-  width: 100%;
-  padding: 0;
-  line-height: 22px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.msg-voice-bubble.is-expanded .msg-voice-bubble__download {
+  color: #7b4f38;
 }
 
-.msg-bubble-row--right .msg-voice-bubble__transcript {
-  text-align: left;
+.msg-bubble--user .msg-voice-bubble.is-expanded .msg-voice-bubble__download {
+  color: #5f8750;
 }
