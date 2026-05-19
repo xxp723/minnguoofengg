@@ -62,12 +62,13 @@
 }
 
 /* ==========================================================================
-   [区域标注·已完成·功能玩法表情包挂载箭头去背景与卡片颜色对齐]
+   [区域标注·已完成·功能玩法拍一拍/表情包挂载箭头去背景与卡片颜色对齐]
    说明：
-   1. 仅服务聊天设置页“功能玩法”板块：HTML卡片开关 + 表情包挂载抽屉。
+   1. 仅服务聊天设置页“功能玩法”板块：HTML卡片开关 + 拍一拍抽屉 + 表情包挂载抽屉。
    2. 外层已对齐“头像与备注 / 自主活动”的左上角标题与同款暖色卡片结构，行内开关继续使用 iPhone 风格滑动开关。
-   3. 表情包挂载使用无圆形背景的 IconPark 风格右箭头图标，展开时抽屉向下滑出，避免整页重绘造成闪屏。
-   4. 本区域只改布局样式，不改 HTML卡片与表情包挂载的 DB.js / IndexedDB 持久化逻辑。
+   3. 拍一拍与表情包挂载均使用无圆形背景的 IconPark 风格右箭头图标，展开时抽屉向下滑出，避免整页重绘造成闪屏。
+   4. 本区域只改布局样式，不改 HTML卡片、拍一拍消息与表情包挂载的 DB.js / IndexedDB 持久化逻辑。
+   5. 不使用 localStorage/sessionStorage，不使用原生弹窗或原生选择器。
    ========================================================================== */
 .msg-settings-feature-play-section {
   display: flex;
@@ -83,6 +84,7 @@
   background: rgba(255, 252, 247, 0.94);
 }
 
+.msg-settings-feature-play-pat,
 .msg-settings-feature-play-sticker {
   display: flex;
   flex-direction: column;
@@ -124,6 +126,7 @@
   height: 15px;
 }
 
+.msg-settings-feature-play-pat.is-open .msg-settings-feature-play-arrow,
 .msg-settings-feature-play-sticker.is-open .msg-settings-feature-play-arrow {
   transform: rotate(90deg);
   color: #4A342A;
@@ -138,6 +141,7 @@
   will-change: max-height, opacity, transform;
 }
 
+.msg-settings-feature-play-pat.is-open .msg-settings-feature-play-drawer,
 .msg-settings-feature-play-sticker.is-open .msg-settings-feature-play-drawer {
   max-height: 260px;
   opacity: 1;
@@ -148,9 +152,68 @@
   padding: 0 0 14px;
 }
 
+.msg-settings-pat-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.msg-settings-pat-editor__line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: rgba(74, 52, 42, 0.72);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.msg-settings-pat-editor__input {
+  min-width: 0;
+  padding: 8px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  box-shadow: none;
+}
+
+.msg-settings-pat-editor__input:focus {
+  border: none;
+  background: transparent;
+}
+
+.msg-settings-pat-editor__send {
+  align-self: flex-end;
+  min-width: 82px;
+  min-height: 32px;
+  border: none;
+  border-radius: 999px;
+  background: #4A342A;
+  color: #fffaf4;
+  padding: 7px 16px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(74, 52, 42, 0.16);
+  transition: transform 0.1s ease, opacity 0.15s ease;
+}
+
+.msg-settings-pat-editor__send:active {
+  transform: scale(0.96);
+  opacity: 0.86;
+}
+
 @media (max-width: 360px) {
+  .msg-settings-feature-play-pat.is-open .msg-settings-feature-play-drawer,
   .msg-settings-feature-play-sticker.is-open .msg-settings-feature-play-drawer {
     max-height: 320px;
+  }
+
+  .msg-settings-pat-editor__line {
+    grid-template-columns: 1fr;
   }
 }
 

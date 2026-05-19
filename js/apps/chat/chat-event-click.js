@@ -173,6 +173,7 @@ import {
   parseVoiceDraftFromModal,
   showVoiceMessageModal
 } from './chat-voice.js';
+import { handleSendUserPatMessage } from './chat-user-pat.js';
 import {
   exportCurrentChatMessages,
   openChatImportJsonFilePicker,
@@ -2336,12 +2337,12 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
        [区域标注·已完成·聊天控制/功能玩法抽屉点击接线修复]
        说明：
        1. 已修复聊天设置页“聊天控制”内四个小板块的右侧 IconPark 风格折叠按钮点击后不展开的问题。
-       2. 本分支同时兼容“聊天控制”小板块与“功能玩法”表情包挂载抽屉，只切换当前点击项的 is-open 与 aria-expanded。
+       2. 本分支同时兼容“聊天控制”小板块与“功能玩法”拍一拍/表情包挂载抽屉，只切换当前点击项的 is-open 与 aria-expanded。
        3. 不重渲染聊天设置页，不写入 DB.js / IndexedDB，避免页面闪屏；具体设置值仍由原输入/开关逻辑持久化。
        4. 不使用 localStorage/sessionStorage，不使用原生弹窗或原生选择器。
        ======================================================================== */
     case 'toggle-settings-sticker-drawer': {
-      const drawerBlock = target.closest('.msg-settings-chat-control-item, .msg-settings-feature-play-sticker');
+      const drawerBlock = target.closest('.msg-settings-chat-control-item, .msg-settings-feature-play-pat, .msg-settings-feature-play-sticker');
       if (!drawerBlock) break;
       const nextOpen = !drawerBlock.classList.contains('is-open');
       drawerBlock.classList.toggle('is-open', nextOpen);
@@ -2429,6 +2430,18 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
       } catch (_) {}
       break;
     }
+
+    /* ========================================================================
+       [区域标注·已完成·本次拍一拍独立模块发送接线]
+       说明：
+       1. 仅把聊天设置页“功能玩法 → 拍一拍”的发送按钮转交给 chat-user-pat.js。
+       2. 消息创建、DB.js / IndexedDB 持久化、局部追加消息与聊天列表摘要刷新均在独立模块内完成。
+       3. 本分支不保留拍一拍内联实现，方便下次直接修改 chat-user-pat.js。
+       4. 不使用 localStorage/sessionStorage，不写双份兜底，不使用原生弹窗或原生选择器。
+       ======================================================================== */
+    case 'send-user-pat-message':
+      await handleSendUserPatMessage({ state, container, db });
+      break;
 
     case 'toggle-mounted-sticker-group': {
       const groupId = String(target.dataset.stickerGroupId || '').trim();

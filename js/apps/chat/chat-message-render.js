@@ -39,6 +39,7 @@ import {
 import { renderTranslationBubbleHtml } from './chat-translation.js';
 import { renderQuotePreview } from './chat-message-quote.js';
 import { renderChatMessageSearchPanelHtml } from './chat-message-search.js';
+import { isUserPatSystemMessage } from './chat-user-pat.js';
 
 const CHAT_MESSAGE_INITIAL_VISIBLE_COUNT = 100;
 const CHAT_MESSAGE_LOAD_MORE_STEP = 100;
@@ -380,17 +381,19 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
     ? sanitizeHtmlCardDocumentForSrcdoc(String(msg?.cardHtml || msg?.content || ''))
     : '';
   /* ======================================================================
-     [区域标注·已完成·AI拍一拍系统小字渲染]
+     [区域标注·已完成·拍一拍独立模块系统小字渲染]
      说明：
-     1. ai_pat_system 复用聊天页既有系统提示小字样式。
-     2. 这里只影响运行时渲染，不新增持久化存储，不使用 localStorage/sessionStorage。
-     3. 拍一拍消息显示为系统小字，不进入普通聊天气泡。
+     1. user_pat_system 的类型判断已转交 chat-user-pat.js，方便下次直接修改拍一拍独立文件。
+     2. ai_pat_system 与 user_pat_system 均复用聊天页既有系统提示小字样式。
+     3. 这里只影响运行时渲染，不新增持久化存储，不使用 localStorage/sessionStorage。
+     4. 拍一拍消息显示为系统小字，不进入普通聊天气泡。
      ====================================================================== */
   const isAiWithdrawSystemMessage = String(msg?.type || '') === 'ai_withdraw_system';
   const isAiPatSystemMessage = String(msg?.type || '') === 'ai_pat_system';
+  const isUserPatSystem = isUserPatSystemMessage(msg);
   const isUserWithdrawSystemMessage = String(msg?.type || '') === 'user_withdraw_system';
   const isHtmlCardInteractionSystemMessage = String(msg?.type || '') === 'html_card_interaction_system';
-  const isTransferSystemMessage = String(msg?.type || '') === 'transfer_system' || isAiWithdrawSystemMessage || isAiPatSystemMessage || isUserWithdrawSystemMessage || isHtmlCardInteractionSystemMessage;
+  const isTransferSystemMessage = String(msg?.type || '') === 'transfer_system' || isAiWithdrawSystemMessage || isAiPatSystemMessage || isUserPatSystem || isUserWithdrawSystemMessage || isHtmlCardInteractionSystemMessage;
   const transferStatus = String(msg?.transferStatus || '').trim() || 'pending';
   const isTransferAccepted = transferStatus === 'accepted';
   const quoteHtml = renderQuotePreview(msg?.quote);
