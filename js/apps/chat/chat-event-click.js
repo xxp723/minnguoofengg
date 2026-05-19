@@ -173,7 +173,10 @@ import {
   parseVoiceDraftFromModal,
   showVoiceMessageModal
 } from './chat-voice.js';
-import { handleSendUserPatMessage } from './chat-user-pat.js';
+import {
+  handleSendUserPatFromBubbleToolbar,
+  handleSendUserPatMessage
+} from './chat-user-pat.js';
 import {
   exportCurrentChatMessages,
   openChatImportJsonFilePicker,
@@ -1812,6 +1815,38 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
       const messageId = String(target.dataset.messageId || state.selectedMessageId || '');
       if (!messageId) break;
       showAiFormatRepairTypeModal(container, messageId);
+      break;
+    }
+
+    /* ========================================================================
+       [区域标注·已完成·本次角色气泡拍拍点击接线]
+       说明：
+       1. 仅响应角色方消息气泡功能栏的“拍拍”按钮，实际合法性由 chat-user-pat.js 再校验。
+       2. 点击后追加 user_pat_system 系统提示小字，并立即以 skipAppendUser 触发下一轮 AI 回复。
+       3. 设置页“拍一拍”分支不自动触发 AI，避免扩大本次修改范围。
+       4. 持久化沿用 chat-user-pat.js 内 DB.js / IndexedDB 链路；不使用 localStorage/sessionStorage，不写双份兜底。
+       ======================================================================== */
+    case 'msg-bubble-pat': {
+      const messageId = String(target.dataset.messageId || state.selectedMessageId || '').trim();
+      if (!messageId || state.isAiSending) break;
+
+      const previousSelectedId = state.selectedMessageId;
+      const previousDeleteConfirmId = state.deleteConfirmMessageId;
+      const previousRewindConfirmId = state.rewindConfirmMessageId;
+      const sent = await handleSendUserPatFromBubbleToolbar({
+        state,
+        container,
+        db,
+        messageId
+      });
+      if (!sent) break;
+
+      state.selectedMessageId = '';
+      state.selectedAsideSegmentId = '';
+      state.deleteConfirmMessageId = '';
+      state.rewindConfirmMessageId = '';
+      refreshMessageBubbleRows(container, state, [previousSelectedId, previousDeleteConfirmId, previousRewindConfirmId, messageId]);
+      await sendMessage(container, state, db, '', settingsManager, { skipAppendUser: true, triggerAi: true });
       break;
     }
 

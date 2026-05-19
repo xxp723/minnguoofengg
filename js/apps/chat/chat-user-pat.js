@@ -20,10 +20,11 @@ import { refreshPanel } from './chat-shell.js';
 /* ==========================================================================
    [区域标注·已完成·本次拍一拍独立模块]
    说明：
-   1. 本文件集中维护聊天设置页“功能玩法 → 拍一拍”的渲染、消息创建与发送处理。
+   1. 本文件集中维护聊天设置页“功能玩法 → 拍一拍”与角色消息气泡功能栏“拍拍”的渲染、消息创建与发送处理。
    2. 拍一拍消息通过当前聊天记录 DB.js / IndexedDB 链路保存，不使用 localStorage/sessionStorage。
    3. 不写双份兜底，不使用原生浏览器弹窗或原生选择器。
    4. 消息类型固定为 user_pat_system，渲染层按系统提示小字显示。
+   5. 角色消息气泡功能栏“拍拍”由 chat-event-click.js 接线后立即触发下一轮 AI 回复。
    ========================================================================== */
 
 export const USER_PAT_SYSTEM_MESSAGE_TYPE = 'user_pat_system';
@@ -87,11 +88,16 @@ export function renderUserPatSettingsSection(roleDisplayName = '聊天') {
    [区域标注·已完成·拍一拍消息创建]
    说明：
    1. 只创建当前聊天内的 user_pat_system 系统提示消息对象。
-   2. 默认部位为“肩膀”，避免空输入导致空白提示。
-   3. 不做长文本过滤，不使用 isLikelyLargeMediaField 之类逻辑。
+   2. 设置页拍一拍默认部位为“肩膀”，避免空输入导致空白提示。
+   3. 角色消息气泡功能栏“拍拍”使用无部位短提示“你拍了拍角色名”。
+   4. 不做长文本过滤，不使用 isLikelyLargeMediaField 之类逻辑。
    ========================================================================== */
-export function createUserPatSystemMessage(session = {}, patTargetText = '') {
-  const patTarget = String(patTargetText || '').trim() || '肩膀';
+function createUserPatSystemMessageBase(session = {}, {
+  content = '',
+  patTarget = '',
+  patSource = 'settings',
+  sourceMessageId = ''
+} = {}) {
   const roleName = String(session.name || session.remark || '对方').trim() || '对方';
   const now = Date.now();
 
@@ -99,20 +105,74 @@ export function createUserPatSystemMessage(session = {}, patTargetText = '') {
     id: `user_pat_system_${now}_${Math.random().toString(16).slice(2)}`,
     role: 'user',
     type: USER_PAT_SYSTEM_MESSAGE_TYPE,
-    content: `你拍了拍${roleName}的${patTarget}`,
-    patTarget,
+    content: String(content || '').trim() || `你拍了拍${roleName}`,
+    patTarget: String(patTarget || '').trim(),
     patRoleName: roleName,
+    patSource,
+    sourceMessageId: String(sourceMessageId || '').trim(),
     timestamp: now
   };
 }
 
+export function createUserPatSystemMessage(session = {}, patTargetText = '') {
+  const patTarget = String(patTargetText || '').trim() || '肩膀';
+  const roleName = String(session.name || session.remark || '对方').trim() || '对方';
+
+  return createUserPatSystemMessageBase(session, {
+    content: `你拍了拍${roleName}的${patTarget}`,
+    patTarget,
+    patSource: 'settings'
+  });
+}
+
+export function createUserPatBubbleSystemMessage(session = {}, sourceMessageId = '') {
+  const roleName = String(session.name || session.remark || '对方').trim() || '对方';
+
+  return createUserPatSystemMessageBase(session, {
+    content: `你拍了拍${roleName}`,
+    patSource: 'message_bubble_toolbar',
+    sourceMessageId
+  });
+}
+
+async function appendAndPersistUserPatSystemMessage({
+  state,
+  container,
+  db,
+  patMessage
+} = {}) {
+  if (!patMessage) return false;
+
+  const session = (Array.isArray(state.sessions) ? state.sessions : [])
+    .find(s => String(s.id) === String(state.currentChatId));
+
+  if (!session) {
+    renderModalNotice(container, '当前聊天不存在，无法拍一拍');
+    return false;
+  }
+
+  state.currentMessages.push(patMessage);
+  session.lastMessage = patMessage.content;
+  session.lastTime = patMessage.timestamp;
+
+  await Promise.all([
+    persistCurrentMessages(state, db),
+    dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions)
+  ]);
+
+  appendCurrentMessageBubble(container, state, patMessage);
+  refreshPanel(container, state, 'chatList');
+  return true;
+}
+
 /* ==========================================================================
-   [区域标注·已完成·拍一拍发送处理]
+   [区域标注·已完成·拍一拍设置页发送处理]
    说明：
    1. 供 chat-event-click.js 在 send-user-pat-message 分支中转交调用。
    2. 追加系统提示小字消息，并复用 persistCurrentMessages / DATA_KEY_SESSIONS 的 IndexedDB 持久化链路。
    3. 只局部追加消息与刷新聊天列表摘要，不重建设置页，避免页面闪屏。
    4. 不使用 localStorage/sessionStorage，不写双份兜底，不使用原生弹窗或原生选择器。
+   5. 设置页拍一拍保持原行为，不自动触发 AI 回复，避免扩大本次修改范围。
    ========================================================================== */
 export async function handleSendUserPatMessage({
   state,
@@ -131,18 +191,56 @@ export async function handleSendUserPatMessage({
 
   const input = container?.querySelector?.('[data-role="settings-user-pat-target-input"]');
   const patMessage = createUserPatSystemMessage(session, input?.value || '');
+  const sent = await appendAndPersistUserPatSystemMessage({
+    state,
+    container,
+    db,
+    patMessage
+  });
 
-  state.currentMessages.push(patMessage);
-  session.lastMessage = patMessage.content;
-  session.lastTime = patMessage.timestamp;
+  if (sent && input) input.value = '';
+  return sent;
+}
 
-  await Promise.all([
-    persistCurrentMessages(state, db),
-    dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions)
-  ]);
+/* ==========================================================================
+   [区域标注·已完成·本次角色气泡拍拍发送处理]
+   说明：
+   1. 供 chat-event-click.js 在 msg-bubble-pat 分支中转交调用。
+   2. 仅允许从角色方消息气泡工具栏触发；用户方气泡不显示也不处理该入口。
+   3. 追加“你拍了拍角色名”系统提示小字，并复用 DB.js / IndexedDB 当前聊天记录持久化链路。
+   4. 本函数只追加系统小字与刷新列表；立即触发 AI 回复由点击事件分支调用 sendMessage(skipAppendUser) 完成。
+   5. 不使用 localStorage/sessionStorage，不写双份兜底，不使用原生弹窗或原生选择器。
+   ========================================================================== */
+export async function handleSendUserPatFromBubbleToolbar({
+  state,
+  container,
+  db,
+  messageId = ''
+} = {}) {
+  if (!state?.currentChatId) return false;
 
-  if (input) input.value = '';
-  appendCurrentMessageBubble(container, state, patMessage);
-  refreshPanel(container, state, 'chatList');
-  return true;
+  const session = (Array.isArray(state.sessions) ? state.sessions : [])
+    .find(s => String(s.id) === String(state.currentChatId));
+
+  if (!session) {
+    renderModalNotice(container, '当前聊天不存在，无法拍一拍');
+    return false;
+  }
+
+  const sourceMessageId = String(messageId || '').trim();
+  const sourceMessage = (Array.isArray(state.currentMessages) ? state.currentMessages : [])
+    .find(message => String(message?.id || '') === sourceMessageId);
+
+  if (!sourceMessage || !['assistant', 'other'].includes(String(sourceMessage.role || ''))) {
+    renderModalNotice(container, '只能对角色消息使用拍拍');
+    return false;
+  }
+
+  const patMessage = createUserPatBubbleSystemMessage(session, sourceMessageId);
+  return appendAndPersistUserPatSystemMessage({
+    state,
+    container,
+    db,
+    patMessage
+  });
 }

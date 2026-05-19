@@ -77,6 +77,19 @@ export function buildPromptPayloadForLatestUserRound(messages = [], shortTermMem
   };
 
   const getAiVisibleContentForMessage = (item = {}, options = {}) => {
+    /* ========================================================================
+       [区域标注·已完成·本次角色气泡拍拍AI上下文]
+       说明：
+       1. user_pat_system 显示层仍是系统提示小字，AI 请求层在这里补充解释。
+       2. 明确告诉 AI：这是 QQ/微信式“拍一拍/戳一戳”社交软件互动，不是真实物理拍打。
+       3. 仅增强运行时 Prompt Payload，不新增持久化存储，不使用 localStorage/sessionStorage。
+       ======================================================================== */
+    if (String(item?.type || '') === 'user_pat_system') {
+      const visibleTip = String(item?.content || '').trim() || '你拍了拍对方';
+      const roleName = String(item?.patRoleName || '对方').trim() || '对方';
+      return `【系统提示小字】${visibleTip}\n请注意：这是一条类似 QQ/微信等社交软件里的“拍一拍/戳一戳”互动提示，不是真实物理上的拍打、触碰或现实动作。你正在扮演“${roleName}”，下一轮回复时请自然回应这次社交软件式拍一拍，不要把它误解成现实中的物理拍打。`;
+    }
+
     if (String(item?.type || '') === 'user_withdraw_system') {
       const systemTipTime = formatWithdrawSystemTipTimeForAi(item.withdrawnAt || item.timestamp);
       const timeAwareInstruction = `【系统提示小字发送时间：${systemTipTime}】当前对话对象在上述时间撤回了一条消息。请务必把这个时间当作撤回系统提示小字发生的时间，并结合“本轮 API 实际请求时间”判断间隔；如果已经过去较久，不要说“刚才/刚刚撤回”，应改用“之前撤回的消息”等符合时间差的表达。`;

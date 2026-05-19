@@ -513,6 +513,13 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
               <button class="msg-bubble-toolbar__btn msg-bubble-toolbar__btn--fix-format" data-action="msg-bubble-fix-format" data-message-id="${escapeHtml(messageId)}" type="button">
                 ${MSG_ICONS.fixFormat}<span>修正</span>
               </button>
+              <!-- ======================================================================
+                   [区域标注·已完成·本次角色气泡拍拍入口]
+                   说明：仅角色方消息气泡功能栏显示“拍拍”，点击后由 chat-user-pat.js 追加系统小字并立即触发 AI 回复。
+                   ====================================================================== -->
+              <button class="msg-bubble-toolbar__btn msg-bubble-toolbar__btn--pat" data-action="msg-bubble-pat" data-message-id="${escapeHtml(messageId)}" type="button">
+                ${MSG_ICONS.pat}<span>拍拍</span>
+              </button>
             ` : ''}
             <button class="msg-bubble-toolbar__btn" data-action="msg-bubble-edit" data-message-id="${escapeHtml(messageId)}" type="button">
               ${MSG_ICONS.edit}<span>编辑</span>

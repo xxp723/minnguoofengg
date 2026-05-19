@@ -60,6 +60,11 @@ export const MSG_ICONS = {
      说明：仅用于用户方消息气泡功能栏；不涉及任何持久化存储读写。
      ======================================================================== */
   withdraw: `<svg viewBox="0 0 48 48" fill="none"><path d="M18 12H8v10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 22c4-9 12-14 23-12c8 2 13 8 13 16c0 10-8 17-18 17c-5 0-10-2-14-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M31 18L21 28M21 18l10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+  /* ========================================================================
+     [区域标注·已完成·本次角色气泡拍拍] IconPark — 角色消息气泡功能栏“拍拍”按钮图标
+     说明：仅用于角色方消息气泡功能栏触发 QQ/微信式拍一拍；不涉及任何持久化存储读写。
+     ======================================================================== */
+  pat: `<svg viewBox="0 0 48 48" fill="none"><path d="M16 25c-4 0-7-3-7-7s3-7 7-7c2.2 0 4.2 1 5.5 2.6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M28 12c3.3 0 6 2.7 6 6v2" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M14 25v5c0 7.2 5.8 13 13 13h2c6.1 0 11-4.9 11-11v-8c0-2.2-1.8-4-4-4c-1 0-2 .4-2.7 1.1" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 24V10a4 4 0 0 1 8 0v13M30 23v-7a4 4 0 0 1 8 0v9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M6 34c3 2 5 2 8 0M5 40c4 2.5 8 2.5 12 0" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
   /* [区域标注·已完成·气泡功能区复制] IconPark — 复制按钮图标 */
   copy: `<svg viewBox="0 0 48 48" fill="none"><path d="M16 16V8h24v24h-8" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M8 16h24v24H8V16Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`,
   /* ========================================================================
