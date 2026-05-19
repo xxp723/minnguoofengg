@@ -44,13 +44,13 @@ import {
 } from './memory-ui.js';
 
 const MEMORY_CSS_ID = 'memory-app-css';
-const MEMORY_CSS_HREF = './js/apps/memory/memory.css?v=20260518-grand-summary-fixed-rollback';
+const MEMORY_CSS_HREF = './js/apps/memory/memory.css?v=20260519-grand-summary-dock-range-scroll';
 
 /* ==========================================================================
    [区域标注·已完成·本次旧事防闪屏与样式版本刷新区]
    说明：
    1. 挂载旧事页面前先加载独立 CSS，避免应用窗口先显示无样式内容。
-   2. 本次为“大总结入口左移 + 固定底栏 + 字数小栏 + 回溯按钮”刷新 CSS 版本号；
+   2. 本次为“大总结底栏去背景 + 字数栏双击滑出 + 多选滚动修复”刷新 CSS 版本号；
       如果页面里已有旧 link，会替换 href，避免继续使用缓存旧样式。
    ========================================================================== */
 function ensureMemoryStyles() {
@@ -322,11 +322,12 @@ async function runGrandSummaryWithSecondaryApi(settingsStore, selectedItems, wor
 }
 
 /* ==========================================================================
-   [区域标注·已完成·本次旧事大总结固定底栏与字数回溯区]
+   [区域标注·已完成·本次旧事大总结底栏去背景、字数栏双击滑出与多选滚动修复区]
    说明：
-   1. 大总结模式底部固定显示字数范围小栏与“全选 / 总结 / 删除 / 回溯 / 取消”操作栏，不因记忆条数少而上移。
-   2. 底栏按钮只保留文字；字数输入框不设置 maxlength/min/max/pattern/step 等输入限制，不使用浏览器原生选择器。
-   3. 总结、删除、回溯的持久化仍由点击事件统一走 memory-db.js → DB.js / IndexedDB，不使用同步存储或双份兜底。
+   1. 大总结模式底部只固定显示“全选 / 总结 / 删除 / 回溯 / 取消”操作栏，已去除底栏外层背景感。
+   2. 自定义字数栏默认隐藏；双击底栏后向上滑出，再次双击底栏后向下收回。
+   3. 底栏按钮只保留文字；字数输入框不设置 maxlength/min/max/pattern/step 等输入限制，不使用浏览器原生选择器。
+   4. 总结、删除、回溯的持久化仍由点击事件统一走 memory-db.js → DB.js / IndexedDB，不使用同步存储或双份兜底。
    ========================================================================== */
 function renderGrandSummaryBar(state, visibleItems = []) {
   if (!state.grandSummaryMode) return '';
@@ -337,9 +338,11 @@ function renderGrandSummaryBar(state, visibleItems = []) {
   const allSelected = total > 0 && count >= total;
   const message = state.grandSummaryMessage || '可多选/全选记忆后进行总结或删除。';
 
+  const rangeVisible = Boolean(state.grandSummaryRangeVisible);
+
   return `
-    <section class="memory-grand-summary-dock" aria-live="polite">
-      <div class="memory-grand-summary-range">
+    <section class="memory-grand-summary-dock ${rangeVisible ? 'is-range-visible' : ''}" aria-live="polite">
+      <div class="memory-grand-summary-range" aria-hidden="${rangeVisible ? 'false' : 'true'}">
         <span class="memory-grand-summary-range__label">总结字数</span>
         <input class="memory-grand-summary-range__input" type="text" inputmode="numeric" data-grand-summary-word-field="min" value="${escapeHtml(state.grandSummaryWordMin ?? '100')}" aria-label="大总结最少字数">
         <span class="memory-grand-summary-range__dash">-</span>
@@ -629,6 +632,7 @@ export async function mount(container, context) {
     grandSummaryMessage: '',
     grandSummaryWordMin: '100',
     grandSummaryWordMax: '200',
+    grandSummaryRangeVisible: false,
     grandSummaryRollback: null,
     settings: context.settings,
     modal: null,
@@ -745,6 +749,7 @@ export async function mount(container, context) {
     state.grandSummarySelectedIds = new Set();
     state.grandSummaryBusy = false;
     state.grandSummaryMessage = '';
+    state.grandSummaryRangeVisible = false;
     state.grandSummaryRollback = null;
   };
 
@@ -866,6 +871,7 @@ export async function mount(container, context) {
       state.grandSummaryMode = !state.grandSummaryMode;
       state.grandSummarySelectedIds = new Set();
       state.grandSummaryBusy = false;
+      state.grandSummaryRangeVisible = false;
       state.grandSummaryMessage = state.grandSummaryMode ? '选择 2 条以上记忆后开始大总结。' : '';
       renderApp(container, state);
       return;
@@ -1162,6 +1168,15 @@ export async function mount(container, context) {
     }
   };
 
+  const handleDoubleClick = (event) => {
+    const dockBar = event.target.closest('.memory-grand-summary-bar');
+    if (!dockBar || !container.contains(dockBar) || !state.grandSummaryMode) return;
+    if (event.target.closest('button, input, textarea')) return;
+
+    state.grandSummaryRangeVisible = !state.grandSummaryRangeVisible;
+    renderKeepingChatScroll(getChatPageScrollTop());
+  };
+
   const handleInput = (event) => {
     const wordField = event.target?.dataset?.grandSummaryWordField;
     if (wordField === 'min' || wordField === 'max') {
@@ -1201,6 +1216,7 @@ export async function mount(container, context) {
   };
 
   container.addEventListener('click', handleClick);
+  container.addEventListener('dblclick', handleDoubleClick);
   container.addEventListener('input', handleInput);
   container.addEventListener('submit', handleSubmit);
 
@@ -1213,6 +1229,7 @@ export async function mount(container, context) {
     handleOpenPayload,
     destroy() {
       container.removeEventListener('click', handleClick);
+      container.removeEventListener('dblclick', handleDoubleClick);
       container.removeEventListener('input', handleInput);
       container.removeEventListener('submit', handleSubmit);
       toast.destroy();
