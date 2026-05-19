@@ -578,7 +578,14 @@ function renderChatMemory(state) {
 
 function renderMainByStage(state) {
   if (state.loading) {
-    return renderEmptyState('正在读取旧事', '正在通过 IndexedDB 加载身份、角色与闲谈记忆。', MEMORY_ICONS.memory);
+    /* ========================================================================
+       [区域标注·已完成·旧事入口无加载文案防闪屏区]
+       说明：
+       1. 旧事窗口显示前已由 AppManager 预加载 memory.css，这里不再渲染“正在读取旧事”加载卡片。
+       2. 数据读取期间保持旧事独立 CSS 背景空壳，读取完成后直接显示正式页面，避免全局/加载界面晃眼。
+       3. 本区不涉及持久化读写；旧事数据仍走 memory-db.js → DB.js / IndexedDB。
+       ======================================================================== */
+    return '';
   }
 
   if (state.stage === 'role-library') {
