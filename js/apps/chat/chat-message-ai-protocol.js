@@ -184,7 +184,7 @@ export function repairAiMessageFormatIfPossible(message, state) {
 /* ======================================================================== */
 /* 协议清理与排序 */
 /* ======================================================================== */
-const AI_PROTOCOL_CLOSING_TAG_REGEX = /(?:\[\s*\/\s*(?:回复|表情|转账|礼物|引用|撤回|语音|文字图|图片|卡片|旁白|心声)\s*\]|【\s*\/\s*(?:语音|文字图)\s*】)/gi;
+const AI_PROTOCOL_CLOSING_TAG_REGEX = /(?:\[\s*\/\s*(?:回复|表情|转账|礼物|引用|撤回|拍一拍|语音|文字图|图片|卡片|旁白|心声)\s*\]|【\s*\/\s*(?:语音|文字图)\s*】)/gi;
 
 function stripAiProtocolClosingTags(value = '') {
   return String(value || '').replace(AI_PROTOCOL_CLOSING_TAG_REGEX, ' ');
@@ -245,7 +245,7 @@ export function cleanAiVisibleBubbleText(text) {
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
     .replace(/<\/?think>/gi, '')
     .replace(/^\s*(?:以下是)?(?:修正后内容|最终输出|回复格式|检查结果|修正结果|正确格式)\s*[：:]\s*/i, '')
-    .replace(/^\s*(?:\*\*)?\s*`?\s*\[\s*(?:回复|表情|引用|礼物|转账|撤回|语音|文字图|图片)\s*\]\s*(?:[^：:\n`*]{1,40}\s*[：:]\s*)?/i, '')
+    .replace(/^\s*(?:\*\*)?\s*`?\s*\[\s*(?:回复|表情|引用|礼物|转账|撤回|拍一拍|语音|文字图|图片)\s*\]\s*(?:[^：:\n`*]{1,40}\s*[：:]\s*)?/i, '')
     .replace(/^\s*\{(?:user|assistant|role|character|mask)_[^}\n]{3,120}\}\s*/i, '')
     .replace(/(?:`|\*\*)+/g, '')
     .replace(/\[\s*消息发送时间\s*[：:][\s\S]*?\]/gi, ' ')
@@ -481,7 +481,8 @@ export function enforceAiReplyMessageCount(messages, chatSettings = {}) {
     ? messages
         .map(message => {
           if (!message) return null;
-          if (String(message.type || '') === 'ai_withdraw_system') return message;
+          /* [区域标注·已完成·AI拍一拍系统小字计数] 拍一拍是系统提示小字，不参与普通 AI 回复气泡数量修正。 */
+          if (String(message.type || '') === 'ai_withdraw_system' || String(message.type || '') === 'ai_pat_system') return message;
           if (message.role !== 'assistant') return null;
           if (String(message.type || '') === 'sticker' && String(message.stickerUrl || '').trim()) {
             return message;
@@ -516,7 +517,7 @@ export function enforceAiReplyMessageCount(messages, chatSettings = {}) {
     let bestLength = 0;
 
     normalizedMessages.forEach((message, index) => {
-      if (String(message.type || '') === 'sticker' || String(message.type || '') === 'ai_withdraw_system' || isTextImageMessage(message) || isVoiceMessage(message) || String(message.type || '') === 'card' || String(message.type || '') === 'transfer' || String(message.type || '') === 'gift') return;
+      if (String(message.type || '') === 'sticker' || String(message.type || '') === 'ai_withdraw_system' || String(message.type || '') === 'ai_pat_system' || isTextImageMessage(message) || isVoiceMessage(message) || String(message.type || '') === 'card' || String(message.type || '') === 'transfer' || String(message.type || '') === 'gift') return;
       const parts = splitSingleBubbleForCount(message.content);
       if (parts.length <= 1) return;
       const currentLength = String(message.content || '').length;
@@ -540,11 +541,11 @@ export function enforceAiReplyMessageCount(messages, chatSettings = {}) {
     );
   }
 
-  const countableMessages = normalizedMessages.filter(message => String(message.type || '') !== 'ai_withdraw_system');
+  const countableMessages = normalizedMessages.filter(message => !['ai_withdraw_system', 'ai_pat_system'].includes(String(message.type || '')));
   if (countableMessages.length > max) {
     let keptCountable = 0;
     normalizedMessages = normalizedMessages.filter(message => {
-      if (String(message.type || '') === 'ai_withdraw_system') return true;
+      if (String(message.type || '') === 'ai_withdraw_system' || String(message.type || '') === 'ai_pat_system') return true;
       keptCountable += 1;
       return keptCountable <= max;
     });
@@ -975,6 +976,47 @@ function parseProtocolRoleAndContent(raw = '', type = '') {
   return { roleName: '', content: text };
 }
 
+/* ========================================================================
+   [区域标注·已完成·AI拍一拍系统小字协议]
+   说明：
+   1. 解析 AI 输出的 **`[拍一拍] 角色名：身体部位`** 协议。
+   2. 生成 type=ai_pat_system 的系统提示小字：角色名拍了拍你的身体部位。
+   3. 这里只做运行时消息对象转换；最终持久化仍由上层统一写入 DB.js / IndexedDB。
+   4. 不使用 localStorage/sessionStorage，不新增双份存储兜底，不使用原生浏览器弹窗。
+   ======================================================================== */
+function normalizeAiPatBodyPart(content = '') {
+  const text = cleanAiProtocolBlockContent(content)
+    .replace(/^\{\s*(?:身体部位|部位)\s*[：:]\s*/i, '')
+    .replace(/\s*\}\s*$/g, '')
+    .replace(/^(?:拍一拍|拍拍|戳一戳|戳戳)\s*[：:]\s*/i, '')
+    .replace(/^(?:拍了拍|拍拍|戳了戳|戳戳)\s*(?:你|你的|妳|妳的)?/i, '')
+    .replace(/^(?:你|你的|妳|妳的)\s*/i, '')
+    .split(/\n+/)[0]
+    .replace(/^[`*_#"“”'《》（）()【】\[\]{}]+|[`*_#"“”'《》（）()【】\[\]{}]+$/g, '')
+    .replace(/[，,。.!！？?；;：:~～…\s]+$/g, '')
+    .trim();
+
+  if (!text) return '';
+  if (/[。！？!?；;]|(?:回复|消息|屏幕|手机|桌子|空气|快点|提醒|解释|因为|然后|顺便)/i.test(text)) return '';
+  return text;
+}
+
+function createAiPatSystemMessageFromProtocol(block = {}) {
+  const roleName = String(block?.roleName || '').trim() || '对方';
+  const bodyPart = normalizeAiPatBodyPart(block?.content || '');
+  if (!bodyPart) return null;
+
+  return {
+    role: 'user',
+    type: 'ai_pat_system',
+    content: `${roleName}拍了拍你的${bodyPart}`,
+    patRoleName: roleName,
+    patBodyPart: bodyPart,
+    __protocolOrder: getAiRuntimeProtocolOrder(block, 0),
+    __protocolEndIndex: block.__protocolEndIndex
+  };
+}
+
 export function extractAiProtocolBlocks(rawText) {
   const visibleText = stripAiProtocolClosingTags(String(rawText || ''))
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
@@ -982,7 +1024,7 @@ export function extractAiProtocolBlocks(rawText) {
     .trim();
   if (!visibleText) return [];
 
-  const markerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情|转账|礼物|引用|撤回|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
+  const markerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情|转账|礼物|引用|撤回|拍一拍|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
   const matches = [...visibleText.matchAll(markerRegex)];
   if (!matches.length) return [];
 
@@ -1043,7 +1085,7 @@ export function bindAsideSegmentsToAiMessages(aiMessages = [], asideSegments = [
   }
 
   const source = String(rawTextWithAside || '');
-  const protocolMarkerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情|转账|礼物|引用|撤回|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
+  const protocolMarkerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情|转账|礼物|引用|撤回|拍一拍|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
   const protocolMarkers = [...source.matchAll(protocolMarkerRegex)]
     .map(match => Number(match.index || 0))
     .sort((a, b) => a - b);
@@ -1163,6 +1205,12 @@ export function buildAiReplyMessages(rawText, state, options = {}) {
           __protocolEndIndex: block.__protocolEndIndex
         });
       }
+      return;
+    }
+
+    if (block.type === '拍一拍') {
+      const patMessage = createAiPatSystemMessageFromProtocol(block);
+      if (patMessage) builtMessages.push(patMessage);
       return;
     }
 

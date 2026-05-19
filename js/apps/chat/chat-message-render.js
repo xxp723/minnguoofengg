@@ -379,10 +379,18 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
   const htmlCardSrcdoc = isHtmlCardMessage
     ? sanitizeHtmlCardDocumentForSrcdoc(String(msg?.cardHtml || msg?.content || ''))
     : '';
+  /* ======================================================================
+     [区域标注·已完成·AI拍一拍系统小字渲染]
+     说明：
+     1. ai_pat_system 复用聊天页既有系统提示小字样式。
+     2. 这里只影响运行时渲染，不新增持久化存储，不使用 localStorage/sessionStorage。
+     3. 拍一拍消息显示为系统小字，不进入普通聊天气泡。
+     ====================================================================== */
   const isAiWithdrawSystemMessage = String(msg?.type || '') === 'ai_withdraw_system';
+  const isAiPatSystemMessage = String(msg?.type || '') === 'ai_pat_system';
   const isUserWithdrawSystemMessage = String(msg?.type || '') === 'user_withdraw_system';
   const isHtmlCardInteractionSystemMessage = String(msg?.type || '') === 'html_card_interaction_system';
-  const isTransferSystemMessage = String(msg?.type || '') === 'transfer_system' || isAiWithdrawSystemMessage || isUserWithdrawSystemMessage || isHtmlCardInteractionSystemMessage;
+  const isTransferSystemMessage = String(msg?.type || '') === 'transfer_system' || isAiWithdrawSystemMessage || isAiPatSystemMessage || isUserWithdrawSystemMessage || isHtmlCardInteractionSystemMessage;
   const transferStatus = String(msg?.transferStatus || '').trim() || 'pending';
   const isTransferAccepted = transferStatus === 'accepted';
   const quoteHtml = renderQuotePreview(msg?.quote);
