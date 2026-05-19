@@ -52,23 +52,11 @@ function generateLocalMapCoverData(mapName, mapDesc) {
     <path d="M320,680 L820,680" stroke-width="24" />
   </g>
 
-  <!-- 主干道交通线以模拟导航样式 -->
-  <g fill="none" stroke-linecap="round">
-    <!-- 拥堵红线 -->
-    <path d="M312,100 L312,250" stroke="#f4b2a3" stroke-width="6" />
-    <path d="M100,442 L250,442" stroke="#f4b2a3" stroke-width="6" />
-    <path d="M600,100 L600,200" stroke="#f4b2a3" stroke-width="4" />
-    <!-- 畅通绿线 -->
-    <path d="M328,500 L328,700" stroke="#a3f4b2" stroke-width="6" />
-    <path d="M500,458 L700,458" stroke="#a3f4b2" stroke-width="6" />
-  </g>
-  
-  <text x="350" y="430" font-family="sans-serif" font-size="20" fill="#a0b0c0" font-weight="bold">${mapName || '地图'}</text>
 </svg>`;
 
   const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   return {
-    prompt: 'local_svg_map',
+    prompt: 'local_svg_map_v2',
     seed: seed,
     url: url
   };
@@ -142,8 +130,8 @@ export function normalizeMapData(rawData) {
     };
 
     // [区域标注·已修改·强制更新旧地图数据到新的本地SVG样式]
-    // 如果不是本地 SVG，则重写为本地地图
-    const isOldStyle = m.imagePrompt !== 'local_svg_map';
+    // 如果不是最新版的本地 SVG (v2)，则重写为本地地图
+    const isOldStyle = m.imagePrompt !== 'local_svg_map_v2';
 
     if (!m.imageUrl || isOldStyle) {
       const cover = generateLocalMapCoverData(mapName, mapDesc);
