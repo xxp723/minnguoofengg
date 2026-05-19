@@ -63,6 +63,7 @@ export function normalizeMapData(rawData) {
   }
 
   // 整理数据字段，如果有地图缺失 imageUrl 则补充生成
+  // 同时如果旧数据包含 "rpg style" 等旧提示词，强制更新为新风格
   let needsSave = false;
   maps = maps.map(m => {
     const mapName = String(m.name || '未命名地图').trim();
@@ -75,7 +76,9 @@ export function normalizeMapData(rawData) {
       points: Array.isArray(m.points) ? m.points : []
     };
 
-    if (!m.imageUrl) {
+    const isOldStyle = m.imagePrompt && (m.imagePrompt.includes('rpg style') || !m.imagePrompt.includes('Google Maps'));
+
+    if (!m.imageUrl || isOldStyle) {
       const cover = generateMapCoverData(mapName, mapDesc);
       mapObj.imageUrl = cover.url;
       mapObj.imagePrompt = cover.prompt;
