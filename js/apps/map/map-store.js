@@ -7,7 +7,72 @@ export const APP_ID = 'map';
 export const STORE_NAME = 'appsData';
 export const DATA_KEY_MAPS = 'map_global_data';
 
-import { generateMapCoverData } from '../../core/services/PollinationsImage.js';
+/* ==========================================================================
+   [区域标注·已修改·本地SVG地图生成器]
+   说明：生成类似高德/百度地图样式的纯2D矢量地图作为封面，替代远端AI生图。
+   ========================================================================== */
+function generateLocalMapCoverData(mapName, mapDesc) {
+  const seed = Math.floor(Math.random() * 1000000);
+  // 用SVG硬编码绘制一个仿高德/百度的标准平面地图
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  <!-- 背景底色 -->
+  <rect width="100%" height="100%" fill="#eef2f5"/>
+  
+  <!-- 水系 (河流) -->
+  <path d="M-50,250 Q150,200 200,850" stroke="#c0dbf9" stroke-width="80" fill="none" stroke-linecap="round"/>
+  <path d="M500,850 Q550,600 850,500" stroke="#c0dbf9" stroke-width="60" fill="none" stroke-linecap="round"/>
+  
+  <!-- 绿地/公园 -->
+  <path d="M50,50 L250,30 L280,180 L100,200 Z" fill="#d2edcd" />
+  <path d="M600,100 L750,80 L780,280 L580,250 Z" fill="#d2edcd" />
+  <path d="M350,650 L550,600 L580,780 L380,800 Z" fill="#d2edcd" />
+
+  <!-- 建筑方块 (浅灰蓝色) -->
+  <g fill="#dde4ec" rx="4">
+    <rect x="350" y="50" width="80" height="120" />
+    <rect x="450" y="60" width="100" height="80" />
+    <rect x="80" y="300" width="100" height="100" />
+    <rect x="200" y="320" width="80" height="80" />
+    <rect x="350" y="250" width="120" height="150" />
+    <rect x="500" y="280" width="100" height="100" />
+    <rect x="650" y="250" width="80" height="180" />
+    <rect x="80" y="500" width="150" height="120" />
+    <rect x="250" y="550" width="80" height="100" />
+    <rect x="650" y="550" width="120" height="100" />
+    <rect x="680" y="700" width="80" height="80" />
+  </g>
+
+  <!-- 道路网 (白色粗线) -->
+  <g stroke="#ffffff" stroke-linecap="square">
+    <path d="M320,-20 L320,820" stroke-width="32" />
+    <path d="M-20,450 L820,450" stroke-width="32" />
+    <path d="M-20,220 L320,220" stroke-width="24" />
+    <path d="M600,-20 L600,450" stroke-width="24" />
+    <path d="M320,680 L820,680" stroke-width="24" />
+  </g>
+
+  <!-- 主干道交通线以模拟导航样式 -->
+  <g fill="none" stroke-linecap="round">
+    <!-- 拥堵红线 -->
+    <path d="M312,100 L312,250" stroke="#f4b2a3" stroke-width="6" />
+    <path d="M100,442 L250,442" stroke="#f4b2a3" stroke-width="6" />
+    <path d="M600,100 L600,200" stroke="#f4b2a3" stroke-width="4" />
+    <!-- 畅通绿线 -->
+    <path d="M328,500 L328,700" stroke="#a3f4b2" stroke-width="6" />
+    <path d="M500,458 L700,458" stroke="#a3f4b2" stroke-width="6" />
+  </g>
+  
+  <text x="350" y="430" font-family="sans-serif" font-size="20" fill="#a0b0c0" font-weight="bold">${mapName || '地图'}</text>
+</svg>`;
+
+  const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  return {
+    prompt: 'local_svg_map',
+    seed: seed,
+    url: url
+  };
+}
 
 /* ==========================================================================
    [区域标注·已完成·地图应用 IndexedDB 专用读写]
@@ -49,7 +114,7 @@ export function normalizeMapData(rawData) {
   if (maps.length === 0 && !source.hasInitialized) {
     const defaultName = '现代都市';
     const defaultDesc = '默认现代都市地图';
-    const cover = generateMapCoverData(defaultName, defaultDesc);
+    const cover = generateLocalMapCoverData(defaultName, defaultDesc);
     maps.push({
       id: `map_default_${Date.now()}`,
       name: defaultName,
@@ -76,12 +141,12 @@ export function normalizeMapData(rawData) {
       points: Array.isArray(m.points) ? m.points : []
     };
 
-    // [区域标注·已修改·强制更新旧地图数据到新的提示词样式]
-    // 只要提示词中没有包含我们新加的独特关键字，或者干脆没有 imagePrompt，就认定为旧样式并重新生成
-    const isOldStyle = !m.imagePrompt || !m.imagePrompt.includes('traffic congestion lines');
+    // [区域标注·已修改·强制更新旧地图数据到新的本地SVG样式]
+    // 如果不是本地 SVG，则重写为本地地图
+    const isOldStyle = m.imagePrompt !== 'local_svg_map';
 
     if (!m.imageUrl || isOldStyle) {
-      const cover = generateMapCoverData(mapName, mapDesc);
+      const cover = generateLocalMapCoverData(mapName, mapDesc);
       mapObj.imageUrl = cover.url;
       mapObj.imagePrompt = cover.prompt;
       mapObj.imageSeed = cover.seed;
@@ -125,7 +190,7 @@ export async function persistMapData(db, state) {
 export function createMapDraft(name, description) {
   const mapName = String(name || '').trim();
   const mapDesc = String(description || '').trim();
-  const cover = generateMapCoverData(mapName, mapDesc);
+  const cover = generateLocalMapCoverData(mapName, mapDesc);
   
   return {
     id: `map_custom_${Date.now()}_${Math.random().toString(16).slice(2)}`,
