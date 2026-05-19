@@ -115,8 +115,9 @@ export class AppManager {
 
         const contentEl = this.windowManager.open(appMeta);
 
-        if (appId === 'chat') {
-          /* [区域标注·本次需求2·闲谈加载提示清理] 清空全局 loading，避免闲谈进入时闪过全局 CSS/加载样式。 */
+        if (appId === 'chat' || appId === 'map' || appId === 'memory') {
+          /* [区域标注·已完成·地图/旧事/闲谈加载提示清理]
+             说明：清空 Window.open 默认的全局 loading，避免地图和旧事进入时先显示全局 CSS/加载样式。 */
           contentEl.innerHTML = '';
         }
 
@@ -172,13 +173,28 @@ export class AppManager {
   }
 
   /* ==========================================================================
-     [区域标注·本次需求2·通用 CSS 预加载工具]
-     说明：与应用内部 loadCSS 使用同一 link id，避免重复插入样式表。
+     [区域标注·已完成·地图/旧事窗口前 CSS 预加载工具]
+     说明：
+     1. 与应用内部样式加载函数使用同一 link id，避免重复插入样式表。
+     2. 如果同 id link 已存在但 href 不是本次目标样式地址，会先更新 href 并等待加载完成，
+        避免旧事继续沿用旧 link 导致独立样式不生效。
      ========================================================================== */
   preloadStylesheet(href, id) {
     return new Promise((resolve) => {
       const existing = document.getElementById(id);
       if (existing) {
+        if (existing.getAttribute('href') !== href) {
+          existing.dataset.loaded = '0';
+          const done = () => {
+            existing.dataset.loaded = '1';
+            resolve();
+          };
+          existing.addEventListener('load', done, { once: true });
+          existing.addEventListener('error', done, { once: true });
+          existing.href = href;
+          return;
+        }
+
         if (existing.dataset.loaded === '1' || existing.sheet) {
           resolve();
           return;
