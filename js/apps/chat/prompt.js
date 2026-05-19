@@ -1071,6 +1071,14 @@ export function getDefaultChatPromptSettings() {
     /* ===== 闲谈应用：时间感知开关 END ===== */
     currentCommand: '',
     customThinkingInstruction: '',
+    /* ======================================================================
+       [区域标注·已完成·本次修改·拍一拍设置默认值]
+       说明：
+       1. 保存聊天设置页“拍一拍”输入框内容，供消息气泡功能栏“拍拍”共用。
+       2. 默认留空；触发“拍拍”时由 chat-user-pat.js 回退为“肩膀”。
+       3. 该字段随当前面具 + 当前聊天对象设置走 DB.js / IndexedDB，不使用 localStorage/sessionStorage。
+       ====================================================================== */
+    userPatTargetText: '',
     /* ===== 闲谈应用：AI每轮回复气泡数量设置 START ===== */
     replyBubbleMin: 1,
     replyBubbleMax: 3,
@@ -1200,6 +1208,14 @@ export function normalizeChatPromptSettings(rawSettings) {
     /* ===== 闲谈应用：时间感知开关 END ===== */
     currentCommand: String(source.currentCommand || defaults.currentCommand),
     customThinkingInstruction: String(source.customThinkingInstruction || defaults.customThinkingInstruction),
+    /* ======================================================================
+       [区域标注·已完成·本次修改·拍一拍设置规范化]
+       说明：
+       1. 规范化聊天设置页“拍一拍”输入框内容，供消息气泡功能栏“拍拍”共用。
+       2. 这里只保留原始短文本设置，不在 prompt 中注入额外规则，不新增任何双份存储。
+       3. 持久化仍由调用方通过 DB.js / IndexedDB 写入当前面具 + 当前聊天对象设置。
+       ====================================================================== */
+    userPatTargetText: String(source.userPatTargetText || defaults.userPatTargetText),
 
     /* ===== 闲谈应用：AI每轮回复气泡数量设置 START ===== */
     replyBubbleMin,

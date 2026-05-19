@@ -40,14 +40,16 @@ export function isUserPatSystemMessage(message = {}) {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·拍一拍设置抽屉HTML]
+   [区域标注·已完成·本次修改·拍一拍设置仅配置文案]
    说明：
    1. 供 chat-message-settings.js 在“功能玩法”板块内插入“拍一拍”小版块。
    2. 使用抽屉式结构，点击后由 chat-event-click.js 的既有抽屉分支展开/收起。
-   3. 输入框只填写身体部位/身体相关位置，最终提示为“你拍了拍角色名的____”。
+   3. 本区已按要求移除设置页“拍一拍”发送按钮；设置页只负责填写气泡功能栏“拍拍”共用的部位/文案。
+   4. 气泡功能栏点击“拍拍”时读取同一输入框当前值，最终提示为“你拍了拍角色名的____”。
    ========================================================================== */
-export function renderUserPatSettingsSection(roleDisplayName = '聊天') {
+export function renderUserPatSettingsSection(roleDisplayName = '聊天', patTargetText = '') {
   const safeRoleDisplayName = String(roleDisplayName || '聊天').trim() || '聊天';
+  const safePatTargetText = String(patTargetText || '').trim();
 
   return `
     <div class="msg-settings-feature-play-pat">
@@ -74,9 +76,10 @@ export function renderUserPatSettingsSection(roleDisplayName = '聊天') {
                 data-role="settings-user-pat-target-input"
                 type="text"
                 placeholder="肩膀"
-                maxlength="24">
+                maxlength="24"
+                value="${escapeHtml(safePatTargetText)}">
             </div>
-            <button class="msg-settings-pat-editor__send" data-action="send-user-pat-message" type="button">拍一拍</button>
+            <div class="msg-settings-pat-editor__hint">这里填写的内容会用于聊天消息气泡功能栏里的“拍拍”。</div>
           </div>
         </div>
       </div>
@@ -85,11 +88,11 @@ export function renderUserPatSettingsSection(roleDisplayName = '聊天') {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·拍一拍消息创建]
+   [区域标注·已完成·本次修改·拍一拍消息创建]
    说明：
    1. 只创建当前聊天内的 user_pat_system 系统提示消息对象。
-   2. 设置页拍一拍默认部位为“肩膀”，避免空输入导致空白提示。
-   3. 角色消息气泡功能栏“拍拍”使用无部位短提示“你拍了拍角色名”。
+   2. 聊天设置页不再发送拍一拍，只配置气泡功能栏“拍拍”共用的部位/文案。
+   3. 角色消息气泡功能栏“拍拍”默认使用“肩膀”，最终提示与设置页输入框相通：你拍了拍角色名的____。
    4. 不做长文本过滤，不使用 isLikelyLargeMediaField 之类逻辑。
    ========================================================================== */
 function createUserPatSystemMessageBase(session = {}, {
@@ -125,11 +128,13 @@ export function createUserPatSystemMessage(session = {}, patTargetText = '') {
   });
 }
 
-export function createUserPatBubbleSystemMessage(session = {}, sourceMessageId = '') {
+export function createUserPatBubbleSystemMessage(session = {}, sourceMessageId = '', patTargetText = '') {
+  const patTarget = String(patTargetText || '').trim() || '肩膀';
   const roleName = String(session.name || session.remark || '对方').trim() || '对方';
 
   return createUserPatSystemMessageBase(session, {
-    content: `你拍了拍${roleName}`,
+    content: `你拍了拍${roleName}的${patTarget}`,
+    patTarget,
     patSource: 'message_bubble_toolbar',
     sourceMessageId
   });
@@ -166,13 +171,11 @@ async function appendAndPersistUserPatSystemMessage({
 }
 
 /* ==========================================================================
-   [区域标注·已完成·拍一拍设置页发送处理]
+   [区域标注·已完成·本次修改·拍一拍设置页不再发送]
    说明：
-   1. 供 chat-event-click.js 在 send-user-pat-message 分支中转交调用。
-   2. 追加系统提示小字消息，并复用 persistCurrentMessages / DATA_KEY_SESSIONS 的 IndexedDB 持久化链路。
-   3. 只局部追加消息与刷新聊天列表摘要，不重建设置页，避免页面闪屏。
-   4. 不使用 localStorage/sessionStorage，不写双份兜底，不使用原生弹窗或原生选择器。
-   5. 设置页拍一拍保持原行为，不自动触发 AI 回复，避免扩大本次修改范围。
+   1. 设置页“拍一拍”按钮已移除；保留本函数仅兼容旧事件分支，避免残留 data-action 触发时报错。
+   2. 本函数不再追加系统提示小字，不再触发 AI，只提示用户改用消息气泡功能栏“拍拍”。
+   3. 不使用 localStorage/sessionStorage，不写双份兜底，不使用原生弹窗或原生选择器。
    ========================================================================== */
 export async function handleSendUserPatMessage({
   state,
@@ -189,25 +192,16 @@ export async function handleSendUserPatMessage({
     return false;
   }
 
-  const input = container?.querySelector?.('[data-role="settings-user-pat-target-input"]');
-  const patMessage = createUserPatSystemMessage(session, input?.value || '');
-  const sent = await appendAndPersistUserPatSystemMessage({
-    state,
-    container,
-    db,
-    patMessage
-  });
-
-  if (sent && input) input.value = '';
-  return sent;
+  renderModalNotice(container, '请在聊天消息气泡功能栏里使用“拍拍”');
+  return false;
 }
 
 /* ==========================================================================
-   [区域标注·已完成·本次角色气泡拍拍发送处理]
+   [区域标注·已完成·本次修改·角色气泡拍拍读取设置页文案]
    说明：
    1. 供 chat-event-click.js 在 msg-bubble-pat 分支中转交调用。
    2. 仅允许从角色方消息气泡工具栏触发；用户方气泡不显示也不处理该入口。
-   3. 追加“你拍了拍角色名”系统提示小字，并复用 DB.js / IndexedDB 当前聊天记录持久化链路。
+   3. 追加“你拍了拍角色名的____”系统提示小字，____ 与聊天设置页“拍一拍”输入框当前内容相通。
    4. 本函数只追加系统小字与刷新列表；立即触发 AI 回复由点击事件分支调用 sendMessage(skipAppendUser) 完成。
    5. 不使用 localStorage/sessionStorage，不写双份兜底，不使用原生弹窗或原生选择器。
    ========================================================================== */
@@ -236,7 +230,9 @@ export async function handleSendUserPatFromBubbleToolbar({
     return false;
   }
 
-  const patMessage = createUserPatBubbleSystemMessage(session, sourceMessageId);
+  const input = container?.querySelector?.('[data-role="settings-user-pat-target-input"]');
+  const patTargetText = input?.value || state?.chatPromptSettings?.userPatTargetText || '';
+  const patMessage = createUserPatBubbleSystemMessage(session, sourceMessageId, patTargetText);
   return appendAndPersistUserPatSystemMessage({
     state,
     container,

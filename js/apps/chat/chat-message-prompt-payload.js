@@ -171,22 +171,29 @@ export function buildPromptPayloadForLatestUserRound(messages = [], shortTermMem
     previousLatestUserTimestamp: Number(previousLatestUserMessage?.timestamp || 0) || 0,
     previousLatestAssistantTimestamp: Number(previousLatestAssistantMessage?.timestamp || 0) || 0
   };
-  const currentUserRoundMessages = currentRoundMessages.map(item => ({
+  const currentUserRoundMessages = currentRoundMessages.map(item => {
     /* ======================================================================
-       [区域标注·已完成·AI引用回复] 当前轮用户消息可引用 ID
-       说明：把消息 id 传给 prompt.js，AI 可用 [引用] 协议引用用户最新一轮消息；不新增存储。
+       [区域标注·已完成·本次修改·系统提示小字AI可见但不可引用]
+       说明：
+       1. 普通用户消息继续把 id 传给 prompt.js，AI 可用 [引用] 协议引用用户最新一轮消息。
+       2. user_pat_system / user_withdraw_system 等系统提示小字继续发送给 AI 阅读，但不暴露可引用 ID，禁止 AI 对系统小字作引用回复。
+       3. 本区只调整运行时 Prompt Payload，不新增存储，不使用 localStorage/sessionStorage。
        ====================================================================== */
-    id: item.id || '',
-    role: item.role,
-    content: getAiVisibleContentForMessage(item, { historySummary: false }),
-    quote: item.quote || null,
-    type: item.type || '',
-    stickerUrl: item.stickerUrl || '',
-    stickerName: item.stickerName || '',
-    imageUrl: item.imageUrl || '',
-    imageName: item.imageName || '',
-    timestamp: Number(item.timestamp || 0) || 0
-  }));
+    const messageType = String(item?.type || '').trim();
+    const isSystemTipMessage = /_system$/.test(messageType) || ['transfer_system', 'html_card_interaction_system'].includes(messageType);
+    return {
+      id: isSystemTipMessage ? '' : (item.id || ''),
+      role: item.role,
+      content: getAiVisibleContentForMessage(item, { historySummary: false }),
+      quote: item.quote || null,
+      type: item.type || '',
+      stickerUrl: item.stickerUrl || '',
+      stickerName: item.stickerName || '',
+      imageUrl: item.imageUrl || '',
+      imageName: item.imageName || '',
+      timestamp: Number(item.timestamp || 0) || 0
+    };
+  });
 
   if (roundLimit <= 0) {
     return {
@@ -202,23 +209,31 @@ export function buildPromptPayloadForLatestUserRound(messages = [], shortTermMem
     };
   }
 
-  const toHistoryPromptItem = (item = {}) => ({
+  const toHistoryPromptItem = (item = {}) => {
     /* ======================================================================
-       [区域标注·已完成·AI引用回复] 历史消息可引用 ID
-       说明：把消息 id 传给 prompt.js，AI 可用 [引用] 协议引用短期记忆范围内的消息；不新增存储。
+       [区域标注·已完成·本次修改·历史系统提示小字AI可见但不可引用]
+       说明：
+       1. 普通历史消息继续把 id 传给 prompt.js，AI 可用 [引用] 协议引用短期记忆范围内的普通消息。
+       2. 历史里的 user_pat_system / user_withdraw_system 等系统提示小字继续发送给 AI 阅读，但不暴露可引用 ID。
+       3. 与 currentUserRoundMessages 保持一致：系统提示小字“只能看，不能引用回复”。
+       4. 本区只调整运行时 Prompt Payload，不新增存储，不使用 localStorage/sessionStorage。
        ====================================================================== */
-    id: item.id || '',
-    role: item.role,
-    content: getAiVisibleContentForMessage(item, { historySummary: true }),
-    quote: item.quote || null,
-    type: item.type || '',
-    stickerUrl: item.stickerUrl || '',
-    stickerName: item.stickerName || '',
-    imageUrl: item.imageUrl || '',
-    imageName: item.imageName || '',
-    /* [区域标注·已修改] 历史消息保留发送时间，供时间感知把“昨天/明天/后天”等相对时间锚定到原消息时间。 */
-    timestamp: Number(item.timestamp || 0) || 0
-  });
+    const messageType = String(item?.type || '').trim();
+    const isSystemTipMessage = /_system$/.test(messageType) || ['transfer_system', 'html_card_interaction_system'].includes(messageType);
+    return {
+      id: isSystemTipMessage ? '' : (item.id || ''),
+      role: item.role,
+      content: getAiVisibleContentForMessage(item, { historySummary: true }),
+      quote: item.quote || null,
+      type: item.type || '',
+      stickerUrl: item.stickerUrl || '',
+      stickerName: item.stickerName || '',
+      imageUrl: item.imageUrl || '',
+      imageName: item.imageName || '',
+      /* [区域标注·已修改] 历史消息保留发送时间，供时间感知把“昨天/明天/后天”等相对时间锚定到原消息时间。 */
+      timestamp: Number(item.timestamp || 0) || 0
+    };
+  };
 
   /* ========================================================================
      [区域标注·已完成·本次短期记忆按轮截取修复] 历史消息按真实对话轮分组

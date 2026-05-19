@@ -266,8 +266,8 @@ export function renderChatMessageSettingsPage({
              [区域标注·已完成·功能玩法合并板块] HTML卡片开关 + 拍一拍 + 表情包挂载抽屉
              说明：
              1. 本区域已按本次要求把“HTML卡片”“拍一拍”和“表情包挂载”合并到同一“功能玩法”板块。
-             2. “拍一拍”使用 chat-user-pat.js 独立模块渲染应用内抽屉式设置区，提交后追加 type=user_pat_system 的聊天系统提示小字。
-             3. “拍一拍”消息由 chat-user-pat.js 通过 currentMessages 与 DB.js / IndexedDB 保存，不使用 localStorage/sessionStorage，不写双份兜底。
+             2. “拍一拍”设置区已按本次修改移除发送按钮，只填写消息气泡功能栏“拍拍”共用的部位/文案。
+             3. “拍拍”触发后的 user_pat_system 消息由 chat-user-pat.js 通过 currentMessages 与 DB.js / IndexedDB 保存，不使用 localStorage/sessionStorage，不写双份兜底。
              4. “HTML卡片”继续使用原 data-action="toggle-html-card"，持久化仍由 index.js 写入 DB.js / IndexedDB。
              5. “表情包挂载”继续使用原 data-action="toggle-mounted-sticker-group" 与分组 id，不改变挂载逻辑。
              6. 拍一拍与表情包列表均通过右侧 IconPark 风格 “>” 折叠按钮抽屉式展开；板块内不使用原生弹窗或原生选择器。
@@ -280,7 +280,7 @@ export function renderChatMessageSettingsPage({
               <button class="msg-ios-switch ${chatSettings.htmlCardEnabled ? 'is-on' : ''}" data-action="toggle-html-card" type="button" aria-label="HTML卡片"></button>
             </div>
             <div class="msg-settings-avatar-divider"></div>
-            ${renderUserPatSettingsSection(roleDisplayName)}
+            ${renderUserPatSettingsSection(roleDisplayName, chatSettings.userPatTargetText || '')}
             <div class="msg-settings-avatar-divider"></div>
             <div class="msg-settings-feature-play-sticker">
               <button

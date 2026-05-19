@@ -143,6 +143,19 @@ export function handleInput(e, state, container, db) {
   }
 
   /* ==========================================================================
+     [区域标注·已完成·本次修改·拍一拍设置输入持久化]
+     说明：
+     1. 聊天设置页“拍一拍”输入框只保存气泡功能栏“拍拍”共用的部位/文案，不再直接发送系统提示小字。
+     2. 设置值写入当前面具 + 当前聊天对象的 chatPromptSettings.userPatTargetText，经 DB.js / IndexedDB 持久化。
+     3. 不使用 localStorage/sessionStorage，不写双份兜底，不使用原生浏览器弹窗或原生选择器。
+     ========================================================================== */
+  if (target.matches('[data-role="settings-user-pat-target-input"]')) {
+    state.chatPromptSettings.userPatTargetText = target.value || '';
+    dbPut(db, getCurrentChatPromptSettingsKey(state), state.chatPromptSettings);
+    return;
+  }
+
+  /* ==========================================================================
      [区域标注·已完成·本次4项修改：短期记忆轮数允许留空]
      说明：
      1. 仅调整“短期记忆”输入保存：允许用户清空输入框，不再强制回填 0 或默认 8。
