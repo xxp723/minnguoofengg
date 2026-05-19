@@ -11,8 +11,10 @@ export function buildMapShell() {
   return `
     <div class="map-app">
       <div class="map-top-bar">
-        <!-- 标题点击返回桌面 -->
-        <h1 class="map-title" id="map-title-btn">map</h1>
+        <div class="map-top-bar__title-wrap">
+          <!-- 标题点击返回桌面 -->
+          <h1 class="map-title" id="map-title-btn">map</h1>
+        </div>
         <button class="map-add-btn" id="map-add-btn" title="创建新地图">
           <!-- IconPark 风格加号 -->
           <svg viewBox="0 0 48 48" fill="none">
