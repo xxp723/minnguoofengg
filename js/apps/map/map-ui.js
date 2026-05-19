@@ -3,9 +3,12 @@
  * 用途: 地图应用的 UI 渲染与交互逻辑。
  */
 import { persistMapData, createMapDraft } from './map-store.js';
+import { generateMapCoverData } from '../../core/services/PollinationsImage.js';
+import { buildMapDetailShell, bindMapDetailEvents } from './map-detail.js';
 
 /* ==========================================================================
    [区域标注·已完成·地图骨架与渲染]
+   说明：包含主页列表、创建弹窗、编辑弹窗
    ========================================================================== */
 export function buildMapShell() {
   return `
@@ -52,6 +55,30 @@ export function buildMapShell() {
           </div>
         </div>
       </div>
+
+      <!-- [区域标注·已完成·地图卡片编辑信息弹窗] -->
+      <div class="map-modal-mask is-hidden" id="map-edit-modal">
+        <div class="map-modal-panel">
+          <div class="map-modal-title">编辑地图信息</div>
+          
+          <div class="map-modal-field">
+            <label class="map-modal-label">地图名称</label>
+            <input type="text" class="map-input" id="map-edit-name" placeholder="请输入地图名称" />
+          </div>
+          
+          <div class="map-modal-field">
+            <label class="map-modal-label">描述地图</label>
+            <textarea class="map-textarea" id="map-edit-desc" placeholder="请输入地图描述..."></textarea>
+          </div>
+          
+          <div class="map-modal-hint" id="map-edit-hint"></div>
+          
+          <div class="map-modal-actions">
+            <button class="map-btn map-btn-cancel" id="map-edit-cancel">取消</button>
+            <button class="map-btn map-btn-confirm" id="map-edit-confirm">确认</button>
+          </div>
+        </div>
+      </div>
     </div>
   `;
 }
@@ -62,15 +89,18 @@ export function renderMapGrid(container, state) {
 
   const maps = Array.isArray(state.maps) ? state.maps : [];
   
-  grid.innerHTML = maps.map(m => `
-    <div class="map-card" data-map-id="${m.id}">
-      <div class="map-card-cover"></div>
-      <div class="map-card-info">
-        <div class="map-card-title">${escapeHtml(m.name)}</div>
-        <div class="map-card-desc">${escapeHtml(m.description || '暂无描述')}</div>
+  grid.innerHTML = maps.map(m => {
+    const bg = m.imageUrl ? `style="background-image: url('${escapeHtml(m.imageUrl)}');"` : '';
+    return `
+      <div class="map-card" data-map-id="${m.id}">
+        <div class="map-card-cover" ${bg}></div>
+        <div class="map-card-info">
+          <div class="map-card-title">${escapeHtml(m.name)}</div>
+          <div class="map-card-desc">${escapeHtml(m.description || '暂无描述')}</div>
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 /* ==========================================================================
@@ -145,10 +175,150 @@ export function bindMapEvents(container, state, context) {
       // 更新持久化与视图
       await persistMapData(context.db, state);
       renderMapGrid(container, state);
+      bindGridEvents(container, state, context);
       
       closeModal();
     });
   }
+
+  // 初次绑定网格卡片事件
+  bindGridEvents(container, state, context);
+}
+
+/* ==========================================================================
+   [区域标注·已完成·地图卡片事件]
+   说明：单击进入详情页，长按编辑地图信息
+   ========================================================================== */
+function bindGridEvents(container, state, context) {
+  const cards = container.querySelectorAll('.map-card');
+  const editModal = container.querySelector('#map-edit-modal');
+  const editName = container.querySelector('#map-edit-name');
+  const editDesc = container.querySelector('#map-edit-desc');
+  const editHint = container.querySelector('#map-edit-hint');
+  const editCancel = container.querySelector('#map-edit-cancel');
+  const editConfirm = container.querySelector('#map-edit-confirm');
+  
+  let currentEditMapId = null;
+
+  const closeEditModal = () => {
+    if (editModal) editModal.classList.add('is-hidden');
+    currentEditMapId = null;
+  };
+
+  if (editCancel) editCancel.addEventListener('click', closeEditModal);
+  if (editModal) editModal.addEventListener('click', e => {
+    if (e.target === editModal) closeEditModal();
+  });
+
+  if (editConfirm) {
+    // 移除旧事件防止重复绑定
+    const newConfirm = editConfirm.cloneNode(true);
+    editConfirm.parentNode.replaceChild(newConfirm, editConfirm);
+    newConfirm.addEventListener('click', async () => {
+      if (!currentEditMapId) return;
+      const name = editName.value.trim();
+      const desc = editDesc.value.trim();
+      if (!name) {
+        editHint.textContent = '地图名称不能为空';
+        return;
+      }
+      editHint.textContent = '';
+      
+      const mapObj = state.maps.find(m => m.id === currentEditMapId);
+      if (mapObj) {
+        mapObj.name = name;
+        mapObj.description = desc;
+        // 只有名称或描述改变且想要重新生成封面时才生成，这里可以保留原图，也可重新生成
+        // 如果想按需更新，目前只更新文字信息
+        await persistMapData(context.db, state);
+        renderMapGrid(container, state);
+        bindGridEvents(container, state, context); // 重新绑定
+      }
+      closeEditModal();
+    });
+  }
+
+  cards.forEach(card => {
+    const mapId = card.dataset.mapId;
+    let pressTimer = null;
+    let isLongPress = false;
+
+    const startPress = (e) => {
+      isLongPress = false;
+      pressTimer = setTimeout(() => {
+        isLongPress = true;
+        // 触发长按编辑
+        currentEditMapId = mapId;
+        const mapObj = state.maps.find(m => m.id === mapId);
+        if (mapObj && editModal) {
+          editName.value = mapObj.name || '';
+          editDesc.value = mapObj.description || '';
+          editHint.textContent = '';
+          editModal.classList.remove('is-hidden');
+        }
+      }, 500); // 500ms 长按
+    };
+
+    const cancelPress = () => {
+      if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      }
+    };
+
+    card.addEventListener('mousedown', startPress);
+    card.addEventListener('touchstart', startPress, { passive: true });
+    
+    card.addEventListener('mousemove', cancelPress);
+    card.addEventListener('touchmove', cancelPress, { passive: true });
+    
+    card.addEventListener('mouseup', (e) => {
+      cancelPress();
+      if (!isLongPress) {
+        // 单击：进入详情页
+        enterMapDetail(container, state, context, mapId);
+      }
+    });
+    card.addEventListener('touchend', (e) => {
+      cancelPress();
+      if (!isLongPress) {
+        // 单击：进入详情页
+        // touchend 时可能也会触发 click，阻止穿透可在需要时 e.preventDefault()，但 passive 为 true 时不可
+        enterMapDetail(container, state, context, mapId);
+      }
+    });
+  });
+}
+
+function enterMapDetail(container, state, context, mapId) {
+  const mapObj = state.maps.find(m => m.id === mapId);
+  if (!mapObj) return;
+
+  const appDiv = container.querySelector('.map-app');
+  if (appDiv) appDiv.style.display = 'none'; // 隐藏主页
+
+  // 创建详情页容器
+  let detailDiv = container.querySelector('.map-detail-wrapper');
+  if (!detailDiv) {
+    detailDiv = document.createElement('div');
+    detailDiv.className = 'map-detail-wrapper';
+    container.appendChild(detailDiv);
+  }
+
+  detailDiv.innerHTML = buildMapDetailShell(mapObj);
+  detailDiv.style.display = 'block';
+
+  // 绑定详情页事件并提供返回回调
+  bindMapDetailEvents(detailDiv, mapObj, state, context, () => {
+    detailDiv.style.display = 'none';
+    detailDiv.innerHTML = ''; // 清理详情页
+    if (appDiv) {
+      appDiv.style.display = 'block';
+      // 返回主页时重新渲染主页以更新可能有变化的标记数量等
+      renderMapGrid(container, state);
+      bindGridEvents(container, state, context);
+    }
+  });
 }
 
 function escapeHtml(text) {
