@@ -1,35 +1,81 @@
 /**
  * 文件名: js/apps/map/index.js
- * 用途: 地图（Map）应用空白入口模块。
- *       本次仅完成应用注册与可打开的空白页面；地图 UI/CSS 留待后续单独实现。
- * 位置: /js/apps/map/index.js
- * 架构层: 应用层（由 AppManager 动态加载）
+ * 用途: 地图应用入口接线模块。
+ *       负责加载 CSS、初始化 IndexedDB 数据、创建运行时状态、
+ *       绑定/解绑事件与 AppManager 挂载生命周期。
  */
+import { loadMapData } from './map-store.js';
+import { buildMapShell, renderMapGrid, bindMapEvents } from './map-ui.js';
 
 /* ==========================================================================
-   [区域标注·本次需求·地图空白应用入口已完成]
-   说明：
-   - 本模块只提供 AppManager 需要的 mount / unmount 生命周期。
-   - 不写入任何 localStorage/sessionStorage，也不做双份存储兜底。
-   - 当前页面保持空白，仅预留 .map-app-shell 作为后续地图 CSS/UI 的挂载根节点。
-   - 后续如需制作地图 UI，可直接在本区域扩展 DOM，并单独新增/接入地图样式。
+   [区域标注·已完成·地图应用加载 CSS 工具函数]
+   说明：动态加载独立的 map.css，避免无样式闪屏。
    ========================================================================== */
-export async function mount(container) {
-  container.replaceChildren();
+function loadMapCSS(href, id) {
+  return new Promise((resolve) => {
+    let existing = document.getElementById(id);
+    if (existing) {
+      if (existing.dataset.loaded === '1' || existing.sheet) {
+        existing.dataset.loaded = '1';
+        return resolve();
+      }
+      existing.addEventListener('load', () => { existing.dataset.loaded = '1'; resolve(); }, { once: true });
+      existing.addEventListener('error', () => { existing.dataset.loaded = '1'; resolve(); }, { once: true });
+      return;
+    }
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    link.id = id;
+    link.addEventListener('load', () => { link.dataset.loaded = '1'; resolve(); }, { once: true });
+    link.addEventListener('error', () => { link.dataset.loaded = '1'; resolve(); }, { once: true });
+    document.head.appendChild(link);
+  });
+}
 
-  const shell = document.createElement('div');
-  shell.className = 'map-app-shell';
-  shell.dataset.app = 'map';
+function removeMapCSS(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
 
-  container.appendChild(shell);
+/* ==========================================================================
+   [区域标注·已完成·地图主页入口]
+   ========================================================================== */
+export async function mount(container, context) {
+  // 1. 预加载地图应用独立 CSS
+  await loadMapCSS('./js/apps/map/map.css', 'map-app-css');
+  
+  // 2. 读取 IndexedDB 数据
+  const db = context.db;
+  const mapData = await loadMapData(db);
+  
+  const state = {
+    destroyed: false,
+    ...mapData
+  };
+
+  // 3. 渲染应用骨架
+  container.innerHTML = buildMapShell();
+  
+  // 4. 渲染初始卡片网格
+  renderMapGrid(container, state);
+  
+  // 5. 绑定交互事件
+  bindMapEvents(container, state, context);
 
   return {
+    state,
     destroy() {
-      shell.remove();
+      state.destroyed = true;
+      removeMapCSS('map-app-css');
+      container.innerHTML = '';
     }
   };
 }
 
+/* ==========================================================================
+   [区域标注·已完成·地图应用卸载]
+   ========================================================================== */
 export async function unmount(instance) {
   if (instance && typeof instance.destroy === 'function') {
     instance.destroy();
