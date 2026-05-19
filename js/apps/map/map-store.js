@@ -76,7 +76,7 @@ export function normalizeMapData(rawData) {
       points: Array.isArray(m.points) ? m.points : []
     };
 
-    const isOldStyle = m.imagePrompt && (m.imagePrompt.includes('rpg style') || !m.imagePrompt.includes('Google Maps'));
+    const isOldStyle = m.imagePrompt && !m.imagePrompt.includes('No 3D buildings');
 
     if (!m.imageUrl || isOldStyle) {
       const cover = generateMapCoverData(mapName, mapDesc);

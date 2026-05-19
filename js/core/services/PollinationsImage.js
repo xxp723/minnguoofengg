@@ -60,8 +60,8 @@ export function preloadPollinationsImage(url) {
  */
 export function generateMapCoverData(mapName, mapDesc) {
   const seed = Math.floor(Math.random() * 1000000);
-  // 修改为类似高德/百度现代城市2D矢量地图UI风格
-  const prompt = `A modern 2D digital city map UI screenshot of ${mapName || 'city'}, similar to Google Maps or Amap UI. clean flat vector style design, light grey and white roads, green park areas, light blue water, clean layout. ${mapDesc || ''}`;
+  // 严格要求平面2D街道地图，不要3D高楼，参考高德地图样式
+  const prompt = `A completely flat 2D top-down street map of ${mapName || 'city'}, exactly like standard Amap or Google Maps mobile navigation UI. No 3D buildings, no isometric view. Only flat colored shapes: light grey blocks, white thick intersecting roads, flat green park areas, flat light blue river or lake water, clean layout. ${mapDesc || ''}`;
   const url = buildPollinationsImageUrl(prompt, { seed, width: 1024, height: 1024 });
   
   preloadPollinationsImage(url);
