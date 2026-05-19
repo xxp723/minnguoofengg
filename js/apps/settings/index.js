@@ -112,7 +112,13 @@ export async function mount(container, context) {
   const current = await hydrateAppearancePersistence(await settings.getAll());
   const registry = new Registry();
   await registry.initDefaults();
+
+  // ===== 设置：图标设置/快捷更换图标图片应用列表（已完成·地图应用已包含） START =====
+  // 说明：Registry 默认注册包含 id 为 map 的“地图”应用；appearance.js 会用此列表渲染快捷更换图标图片入口，
+  // 因此地图应用会出现在“图标设置 > 快捷更换图标图片”中，并可通过 iconImages.map 应用图标美化。
   const apps = registry.getAll();
+  // ===== 设置：图标设置/快捷更换图标图片应用列表（已完成·地图应用已包含） END =====
+
   const importInputId = `settings-custom-widget-import-${appId}`;
 
   // 当前页面状态
