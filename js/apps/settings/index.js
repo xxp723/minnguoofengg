@@ -113,11 +113,17 @@ export async function mount(container, context) {
   const registry = new Registry();
   await registry.initDefaults();
 
-  // ===== 设置：图标设置/快捷更换图标图片应用列表（已完成·地图应用已包含） START =====
-  // 说明：Registry 默认注册包含 id 为 map 的“地图”应用；appearance.js 会用此列表渲染快捷更换图标图片入口，
-  // 因此地图应用会出现在“图标设置 > 快捷更换图标图片”中，并可通过 iconImages.map 应用图标美化。
-  const apps = registry.getAll();
-  // ===== 设置：图标设置/快捷更换图标图片应用列表（已完成·地图应用已包含） END =====
+  // ===== 设置：图标设置/快捷更换图标图片应用列表（已完成·地图应用稳定显示） START =====
+  // 说明：
+  // - Registry 默认注册包含 id 为 map 的“地图”应用；这里再做一次显式兜正，确保设置页快捷更换图标图片列表一定包含地图入口且不会重复。
+  // - appearance.js 会用此 apps 列表渲染“图标设置 > 快捷更换图标图片”，地图应用通过 iconImages.map 保存并应用图标美化。
+  // - 本区域不涉及持久化读写，不使用 localStorage/sessionStorage，也不做长文本/大图过滤。
+  const registryApps = registry.getAll();
+  const mapApp = registry.get('map');
+  const apps = mapApp && !registryApps.some((app) => app.id === 'map')
+    ? [...registryApps, mapApp]
+    : registryApps;
+  // ===== 设置：图标设置/快捷更换图标图片应用列表（已完成·地图应用稳定显示） END =====
 
   const importInputId = `settings-custom-widget-import-${appId}`;
 

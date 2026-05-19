@@ -30,12 +30,37 @@ export class Desktop {
     this.eventBus.on('desktop:changed', ({ config }) => {
       this.render(config);
     });
-    this.eventBus.on('settings:changed', () => {
+    /* ==========================================================================
+       [区域标注·本次需求·地图图标图片美化同步·已完成]
+       说明：
+       - “设置 > 图标设置 > 快捷更换图标图片”保存后的 iconImages 会随设置事件同步到桌面图标缓存。
+       - 地图应用使用同一套 appId=map 映射，不做特殊过滤、不写 localStorage/sessionStorage、不写双份兜底存储。
+       - 只在事件 payload 明确包含 iconImages 时更新缓存，避免其它外观设置事件误清空已保存图标。
+       ========================================================================== */
+    const syncIconImagesFromAppearance = (appearance = {}) => {
+      if (!appearance || !Object.prototype.hasOwnProperty.call(appearance, 'iconImages')) return;
+      this.setIconImages(appearance.iconImages || {});
+    };
+
+    this.eventBus.on('settings:changed', ({ settings } = {}) => {
+      syncIconImagesFromAppearance(settings?.appearance || {});
       this.refreshCustomIconImages();
     });
-    this.eventBus.on('settings:appearance-changed', () => {
+    this.eventBus.on('settings:appearance-changed', (appearance = {}) => {
+      syncIconImagesFromAppearance(appearance);
       this.refreshCustomIconImages();
     });
+  }
+
+  /* ==========================================================================
+     [区域标注·本次需求·地图图标图片美化缓存入口·已完成]
+     说明：
+     - 由 main.js 启动阶段和设置应用保存事件传入 appearance.iconImages。
+     - 这里仅维护桌面渲染所需的内存快照，持久化仍统一由设置模块通过 db.js / IndexedDB 完成。
+     - 不使用 localStorage/sessionStorage，也不按内容长度过滤图片 DataURL。
+     ========================================================================== */
+  setIconImages(iconImages = {}) {
+    this._iconImagesCache = iconImages && typeof iconImages === 'object' ? { ...iconImages } : {};
   }
 
   async loadIconImagesCache() {

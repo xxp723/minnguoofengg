@@ -149,6 +149,15 @@ class MiniPhoneApp {
         document.body.classList.add('hide-status-bar');
       }
 
+      /* ==========================================================================
+         [区域标注·本次需求·地图图标图片美化启动同步·已完成]
+         说明：
+         - 启动阶段先把 settings.appearance.iconImages 同步给桌面渲染器，再渲染桌面。
+         - 确保“图标设置 > 快捷更换图标图片”里保存的地图 appId=map 自定义图标能首屏直接生效，避免先显示默认图标再刷新造成闪屏。
+         - 持久化仍只读取 settings（db.js / IndexedDB），不使用 localStorage/sessionStorage，不写双份兜底存储。
+         ========================================================================== */
+      this.desktop.setIconImages(currentSettings.appearance?.iconImages || {});
+
       // 5) 渲染桌面
       const desktopState = await this.desktopConfig.getConfig();
       this.desktop.render(desktopState);
