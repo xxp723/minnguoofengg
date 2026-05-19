@@ -249,26 +249,23 @@ function renderModelOptions(profile) {
     .join('');
 }
 
-// ===== 设置：顶部 API 预设选择器（已完成·本次 API 预设上移） START =====
+// ===== 设置：API 预设折叠选择器（已完成·本次按名称保存与折叠选择） START =====
 // 说明：该区域只负责渲染主 API 预设入口；存储仍通过 settings.update -> SettingsStore/DB.js/IndexedDB，不使用 localStorage/sessionStorage。
 function renderSavedPrimaryConfigs(savedPrimaryConfigs) {
   const savedItems = savedPrimaryConfigs
     .map((item) => {
       const providerMeta = PROVIDER_META[item.provider] || PROVIDER_META.openai;
       return `
-        <div class="api-preset-item" data-saved-primary-id="${escapeHtml(item.id)}">
-          <button class="api-preset-card" type="button" data-action="apply-saved-primary" data-saved-id="${escapeHtml(item.id)}">
-            <span class="api-preset-card__icon">${renderProviderIcon(item.provider)}</span>
-            <span class="api-preset-card__content">
-              <span class="api-preset-card__title">${escapeHtml(item.name)}</span>
-              <span class="api-preset-card__meta">
-                <span>${escapeHtml(providerMeta.shortLabel)}</span>
-                <span>${escapeHtml(item.model || '未设置模型')}</span>
-              </span>
+        <div class="api-preset-option" data-saved-primary-id="${escapeHtml(item.id)}">
+          <button class="api-preset-option__main" type="button" data-action="apply-saved-primary" data-saved-id="${escapeHtml(item.id)}">
+            <span class="api-preset-option__icon">${renderProviderIcon(item.provider)}</span>
+            <span class="api-preset-option__content">
+              <span class="api-preset-option__title">${escapeHtml(item.name)}</span>
+              <span class="api-preset-option__meta">${escapeHtml(providerMeta.shortLabel)} · ${escapeHtml(item.model || '未设置模型')}</span>
             </span>
-            <span class="api-preset-card__arrow">${ICONS.apply}</span>
+            <span class="api-preset-option__apply">${ICONS.apply}</span>
           </button>
-          <button class="api-preset-delete" type="button" data-action="delete-saved-primary" data-saved-id="${escapeHtml(item.id)}" aria-label="删除预设 ${escapeHtml(item.name)}">
+          <button class="api-preset-option__delete" type="button" data-action="delete-saved-primary" data-saved-id="${escapeHtml(item.id)}" aria-label="删除预设 ${escapeHtml(item.name)}">
             ${ICONS.delete}
           </button>
         </div>
@@ -278,27 +275,40 @@ function renderSavedPrimaryConfigs(savedPrimaryConfigs) {
 
   return `
     <div class="api-preset-panel">
-      <button class="api-preset-new" type="button" data-action="new-primary-preset">
-        <span class="api-preset-new__icon">${ICONS.add}</span>
-        <span class="api-preset-new__content">
+      <div class="api-preset-new">
+        <button class="api-preset-new__button" type="button" data-action="new-primary-preset" aria-label="新建 API 预设">
+          <span class="api-preset-new__icon">${ICONS.add}</span>
           <span class="api-preset-new__title">新建预设</span>
-          <span class="api-preset-new__desc">选择后填写或修改 URL、Key、模型，再保存为预设</span>
-        </span>
-      </button>
-      ${
-        savedPrimaryConfigs.length
-          ? `<div class="api-preset-list">${savedItems}</div>`
-          : `
-            <div class="api-empty-state">
-              <span class="api-empty-state__icon">${ICONS.storage}</span>
-              <span>当前还没有已保存的 API 预设</span>
-            </div>
-          `
-      }
+        </button>
+        <div class="api-preset-dropdown">
+          <button
+            class="api-preset-dropdown__trigger"
+            type="button"
+            data-action="toggle-primary-preset-menu"
+            aria-expanded="false"
+            ${savedPrimaryConfigs.length ? '' : 'disabled'}
+          >
+            <span>${savedPrimaryConfigs.length ? '选择已保存预设' : '暂无已保存预设'}</span>
+            <span class="api-preset-dropdown__arrow">${ICONS.chevronDown}</span>
+          </button>
+          <div class="api-preset-dropdown__menu hidden" data-primary-preset-menu>
+            ${
+              savedPrimaryConfigs.length
+                ? savedItems
+                : `
+                  <div class="api-empty-state">
+                    <span class="api-empty-state__icon">${ICONS.storage}</span>
+                    <span>当前还没有已保存的 API 预设</span>
+                  </div>
+                `
+            }
+          </div>
+        </div>
+      </div>
     </div>
   `;
 }
-// ===== 设置：顶部 API 预设选择器（已完成·本次 API 预设上移） END =====
+// ===== 设置：API 预设折叠选择器（已完成·本次按名称保存与折叠选择） END =====
 
 function renderProviderTrigger(profileKey, profile) {
   const providerMeta = PROVIDER_META[profile.provider];
@@ -523,10 +533,20 @@ function renderProfileSection(profileKey, title, icon, profile, { isPrimary = fa
         ${
           isPrimary
             ? `
-              <button class="ui-button api-btn api-btn--ghost api-actions__full" data-action="save-primary-preset" type="button">
-                <span class="api-btn__icon">${ICONS.storage}</span>
-                <span>保存为预设</span>
-              </button>
+              <div class="api-preset-save-row api-actions__full">
+                <input
+                  id="api-primary-preset-name"
+                  class="api-input api-preset-name-input"
+                  type="text"
+                  value=""
+                  placeholder="输入预设名字"
+                  autocomplete="off"
+                >
+                <button class="ui-button api-btn api-btn--ghost" data-action="save-primary-preset" type="button">
+                  <span class="api-btn__icon">${ICONS.storage}</span>
+                  <span>保存为预设</span>
+                </button>
+              </div>
             `
             : `
               <div class="api-actions__placeholder api-actions__full"></div>
@@ -590,10 +610,11 @@ export function renderApiSection({ current }) {
             }
 
             #settings-api .api-provider-badge__icon,
-            #settings-api .api-preset-card__icon,
-            #settings-api .api-preset-card__arrow,
             #settings-api .api-preset-new__icon,
-            #settings-api .api-preset-delete,
+            #settings-api .api-preset-dropdown__arrow,
+            #settings-api .api-preset-option__icon,
+            #settings-api .api-preset-option__apply,
+            #settings-api .api-preset-option__delete,
             #settings-api .api-empty-state__icon,
             #settings-api .api-provider-trigger__icon,
             #settings-api .api-provider-option__icon,
@@ -919,45 +940,61 @@ export function renderApiSection({ current }) {
               font-size: 12px;
             }
 
-            /* ===== 设置：顶部 API 预设选择器样式（已完成·本次 API 预设上移） START =====
-               说明：仅作用于 API 设置页顶部预设区域；不影响其它设置页或其它应用。 */
-            #settings-api .api-preset-panel,
-            #settings-api .api-preset-list {
+            /* ===== 设置：API 预设折叠选择器样式（已完成·本次按名称保存与折叠选择） START =====
+               说明：仅作用于 API 设置页顶部预设区域和主 API“保存为预设”行；不影响其它设置页或其它应用。 */
+            #settings-api .api-preset-panel {
               display: grid;
               gap: 10px;
             }
 
-            #settings-api .api-preset-new,
-            #settings-api .api-preset-card {
+            #settings-api .api-preset-new {
+              display: grid;
+              grid-template-columns: auto minmax(0, 1fr);
+              gap: 10px;
+              align-items: center;
               width: 100%;
               min-width: 0;
-              border: 1px solid rgba(125, 90, 68, 0.14);
+              padding: 10px;
+              border: 1px dashed rgba(125, 90, 68, 0.14);
               border-radius: 16px;
-              background: rgba(245, 241, 234, 0.86);
+              background: rgba(215, 201, 184, 0.24);
+              color: var(--c-text-main, #4A342A);
+              box-sizing: border-box;
+            }
+
+            #settings-api .api-preset-new__button,
+            #settings-api .api-preset-dropdown__trigger,
+            #settings-api .api-preset-option__main,
+            #settings-api .api-preset-option__delete {
               color: var(--c-text-main, #4A342A);
               cursor: pointer;
               font-family: var(--font-retro);
-              text-align: left;
             }
 
-            #settings-api .api-preset-new {
-              display: flex;
+            #settings-api .api-preset-new__button {
+              display: inline-flex;
               align-items: center;
-              gap: 12px;
-              padding: 13px 14px;
-              background: rgba(215, 201, 184, 0.24);
-              border-style: dashed;
+              gap: 7px;
+              min-height: 32px;
+              padding: 0 10px 0 6px;
+              border: 0;
+              border-radius: 999px;
+              background: rgba(245, 241, 234, 0.72);
+              font-size: 13px;
+              font-weight: 700;
+              white-space: nowrap;
             }
 
-            #settings-api .api-preset-new:active,
-            #settings-api .api-preset-card:active,
-            #settings-api .api-preset-delete:active {
+            #settings-api .api-preset-new__button:active,
+            #settings-api .api-preset-dropdown__trigger:active,
+            #settings-api .api-preset-option__main:active,
+            #settings-api .api-preset-option__delete:active {
               transform: translateY(1px);
             }
 
             #settings-api .api-preset-new__icon {
-              width: 34px;
-              height: 34px;
+              width: 24px;
+              height: 24px;
               border-radius: 999px;
               align-items: center;
               justify-content: center;
@@ -966,47 +1003,90 @@ export function renderApiSection({ current }) {
               flex: 0 0 auto;
             }
 
-            #settings-api .api-preset-new__content,
-            #settings-api .api-preset-card__content {
-              min-width: 0;
-              display: grid;
-              gap: 5px;
+            #settings-api .api-preset-new__icon svg {
+              width: 13px;
+              height: 13px;
             }
 
-            #settings-api .api-preset-new__title,
-            #settings-api .api-preset-card__title {
+            #settings-api .api-preset-dropdown {
+              position: relative;
               min-width: 0;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
-              font-size: 13px;
+            }
+
+            #settings-api .api-preset-dropdown__trigger {
+              width: 100%;
+              min-height: 34px;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 8px;
+              padding: 0 10px;
+              border: 1px solid rgba(125, 90, 68, 0.14);
+              border-radius: 12px;
+              background: rgba(245, 241, 234, 0.86);
+              font-size: 12px;
               font-weight: 700;
+              text-align: left;
             }
 
-            #settings-api .api-preset-new__desc {
-              font-size: 11px;
-              line-height: 1.45;
-              color: rgba(74, 52, 42, 0.68);
+            #settings-api .api-preset-dropdown__trigger[disabled] {
+              opacity: 0.62;
+              cursor: not-allowed;
             }
 
-            #settings-api .api-preset-item {
+            #settings-api .api-preset-dropdown__arrow {
+              color: rgba(74, 52, 42, 0.74);
+              transition: transform 0.18s ease;
+            }
+
+            #settings-api .api-preset-dropdown__trigger[aria-expanded="true"] .api-preset-dropdown__arrow {
+              transform: rotate(180deg);
+            }
+
+            #settings-api .api-preset-dropdown__menu {
+              position: absolute;
+              z-index: 8;
+              top: calc(100% + 8px);
+              left: 0;
+              right: 0;
+              display: grid;
+              gap: 8px;
+              max-height: 230px;
+              overflow-y: auto;
+              padding: 8px;
+              border: 1px solid rgba(125, 90, 68, 0.14);
+              border-radius: 16px;
+              background: #fffdf8;
+              box-shadow: 0 14px 32px rgba(84, 58, 44, 0.16);
+            }
+
+            #settings-api .api-preset-dropdown__menu.hidden {
+              display: none;
+            }
+
+            #settings-api .api-preset-option {
               display: grid;
               grid-template-columns: minmax(0, 1fr) auto;
-              gap: 8px;
+              gap: 6px;
               align-items: stretch;
             }
 
-            #settings-api .api-preset-card {
+            #settings-api .api-preset-option__main {
               display: grid;
               grid-template-columns: auto minmax(0, 1fr) auto;
-              gap: 10px;
+              gap: 8px;
               align-items: center;
-              padding: 12px;
+              min-width: 0;
+              padding: 9px 10px;
+              border: 1px solid rgba(125, 90, 68, 0.12);
+              border-radius: 13px;
+              background: rgba(245, 241, 234, 0.86);
+              text-align: left;
             }
 
-            #settings-api .api-preset-card__icon {
-              width: 30px;
-              height: 30px;
+            #settings-api .api-preset-option__icon {
+              width: 26px;
+              height: 26px;
               border-radius: 999px;
               align-items: center;
               justify-content: center;
@@ -1014,43 +1094,56 @@ export function renderApiSection({ current }) {
               color: var(--c-text-main, #4A342A);
             }
 
-            #settings-api .api-preset-card__meta {
-              display: flex;
-              flex-wrap: wrap;
-              gap: 6px;
-              color: rgba(74, 52, 42, 0.72);
-              font-size: 11px;
+            #settings-api .api-preset-option__content {
+              min-width: 0;
+              display: grid;
+              gap: 3px;
             }
 
-            #settings-api .api-preset-card__meta span {
-              display: inline-flex;
-              align-items: center;
-              min-height: 22px;
-              max-width: 100%;
-              padding: 0 8px;
-              border-radius: 999px;
-              background: rgba(255, 255, 255, 0.46);
+            #settings-api .api-preset-option__title,
+            #settings-api .api-preset-option__meta {
+              min-width: 0;
               overflow: hidden;
               text-overflow: ellipsis;
               white-space: nowrap;
             }
 
-            #settings-api .api-preset-card__arrow {
+            #settings-api .api-preset-option__title {
+              font-size: 12px;
+              font-weight: 700;
+            }
+
+            #settings-api .api-preset-option__meta {
+              font-size: 11px;
+              color: rgba(74, 52, 42, 0.68);
+            }
+
+            #settings-api .api-preset-option__apply {
               color: rgba(74, 52, 42, 0.74);
             }
 
-            #settings-api .api-preset-delete {
-              width: 42px;
+            #settings-api .api-preset-option__delete {
+              width: 36px;
               min-height: 100%;
               border: 1px solid rgba(192, 57, 43, 0.12);
-              border-radius: 16px;
+              border-radius: 13px;
               background: rgba(192, 57, 43, 0.1);
               color: #9f2c21;
               align-items: center;
               justify-content: center;
-              cursor: pointer;
             }
-            /* ===== 设置：顶部 API 预设选择器样式（已完成·本次 API 预设上移） END ===== */
+
+            #settings-api .api-preset-save-row {
+              display: grid;
+              grid-template-columns: minmax(0, 1fr) auto;
+              gap: 8px;
+              align-items: center;
+            }
+
+            #settings-api .api-preset-name-input {
+              min-height: 38px;
+            }
+            /* ===== 设置：API 预设折叠选择器样式（已完成·本次按名称保存与折叠选择） END ===== */
 
             #settings-api .api-provider-modal,
             #settings-api .api-model-modal {
@@ -1287,8 +1380,8 @@ export function renderApiSection({ current }) {
             }
           </style>
 
-          <!-- ===== 设置：顶部 API 预设选择器（已完成·本次 API 预设上移） START =====
-               说明：已保存预设从页面底部移到这里；“新建预设”会清空主 API 表单，填写后点击主 API 区域的“保存为预设”。 -->
+          <!-- ===== 设置：API 预设折叠选择器（已完成·本次按名称保存与折叠选择） START =====
+               说明：已保存预设不再直接陈列；在“新建预设”同栏折叠选择，保存名称由主 API 区域输入框填写。 -->
           <section class="ui-card api-section-card">
             <div class="api-section-head">
               <h3 class="api-section-title">
@@ -1300,7 +1393,7 @@ export function renderApiSection({ current }) {
               ${renderSavedPrimaryConfigs(api.savedPrimaryConfigs)}
             </div>
           </section>
-          <!-- ===== 设置：顶部 API 预设选择器（已完成·本次 API 预设上移） END ===== -->
+          <!-- ===== 设置：API 预设折叠选择器（已完成·本次按名称保存与折叠选择） END ===== -->
 
           ${renderProfileSection('primary', '主API设置', ICONS.main, api.primary, { isPrimary: true })}
 
@@ -1739,20 +1832,20 @@ function switchProviderProfile(container, profileKey, nextProvider) {
   );
 }
 
-// ===== 设置：顶部 API 预设选择器刷新（已完成·本次 API 预设上移） START =====
+// ===== 设置：API 预设折叠选择器刷新（已完成·本次按名称保存与折叠选择） START =====
 function renderSavedPrimaryConfigsInto(container, apiState) {
   const host = container.querySelector('#api-saved-primary-configs');
   if (!host) return;
   host.innerHTML = renderSavedPrimaryConfigs(apiState.savedPrimaryConfigs || []);
 }
-// ===== 设置：顶部 API 预设选择器刷新（已完成·本次 API 预设上移） END =====
+// ===== 设置：API 预设折叠选择器刷新（已完成·本次按名称保存与折叠选择） END =====
 
-function buildSavedPrimaryPreset(profileConfig, existingCount) {
+function buildSavedPrimaryPreset(profileConfig, existingCount, presetName = '') {
   const normalized = normalizeProfileConfig(profileConfig, profileConfig?.provider || 'openai');
   const providerMeta = PROVIDER_META[normalized.provider];
   return {
     id: `saved-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    name: `${providerMeta.shortLabel} · ${normalized.model || '未设置模型'} · ${existingCount + 1}`,
+    name: presetName.trim() || `${providerMeta.shortLabel} · ${normalized.model || '未设置模型'} · ${existingCount + 1}`,
     provider: normalized.provider,
     apiKey: normalized.apiKey,
     baseUrl: normalized.baseUrl,
@@ -2041,12 +2134,20 @@ export function bindApiEvents(container, { settings }) {
     });
   });
 
-  // ===== 设置：顶部 API 预设保存（已完成·本次 API 预设上移） START =====
+  // ===== 设置：API 预设按名称保存（已完成·本次按名称保存与折叠选择） START =====
   // 说明：保存预设只写入 settings.update({ api })，即项目 IndexedDB 持久化链路；不使用浏览器 localStorage/sessionStorage。
   container.querySelector('[data-action="save-primary-preset"]')?.addEventListener('click', async () => {
     try {
       const fallback = currentApiCache || normalizeApiSettings({});
       const snapshot = collectApiStateFromForm(container, fallback);
+      const presetNameInput = container.querySelector('#api-primary-preset-name');
+      const presetName = presetNameInput?.value?.trim() || '';
+
+      if (!presetName) {
+        setResultByProfile(container, 'primary', 'error', '请先输入预设名字');
+        return;
+      }
+
       const nextApi = {
         ...snapshot,
         savedPrimaryConfigs: normalizeSavedPrimaryConfigs(snapshot.savedPrimaryConfigs)
@@ -2066,24 +2167,26 @@ export function bindApiEvents(container, { settings }) {
       }
 
       nextApi.savedPrimaryConfigs = [
-        buildSavedPrimaryPreset(snapshot.primary, nextApi.savedPrimaryConfigs.length),
+        buildSavedPrimaryPreset(snapshot.primary, nextApi.savedPrimaryConfigs.length, presetName),
         ...nextApi.savedPrimaryConfigs
       ].slice(0, 20);
 
       await settings.update({ api: nextApi });
       currentApiCache = nextApi;
 
+      if (presetNameInput) presetNameInput.value = '';
       renderSavedPrimaryConfigsInto(container, nextApi);
-      setResultByProfile(container, 'primary', 'success', '已保存到顶部“API预设配置”');
+      setResultByProfile(container, 'primary', 'success', `已保存预设：${presetName}`);
     } catch (error) {
       setResultByProfile(container, 'primary', 'error', `保存失败：${error?.message || '未知错误'}`);
     }
   });
-  // ===== 设置：顶部 API 预设保存（已完成·本次 API 预设上移） END =====
+  // ===== 设置：API 预设按名称保存（已完成·本次按名称保存与折叠选择） END =====
 
   container.addEventListener('click', async (event) => {
     const target = event.target.closest([
       '[data-action="new-primary-preset"]',
+      '[data-action="toggle-primary-preset-menu"]',
       '[data-action="apply-saved-primary"]',
       '[data-action="delete-saved-primary"]',
       '[data-action="open-provider-modal"]',
@@ -2097,13 +2200,24 @@ export function bindApiEvents(container, { settings }) {
 
     const action = target.getAttribute('data-action');
 
-    // ===== 设置：顶部 API 预设选择/新建/删除事件（已完成·本次 API 预设上移） START =====
+    // ===== 设置：API 预设折叠选择/新建/删除事件（已完成·本次按名称保存与折叠选择） START =====
     if (action === 'new-primary-preset') {
       fillProfileForm(container, 'primary', getDefaultProfileConfig('openai'));
-      setResultByProfile(container, 'primary', 'success', '已选择“新建预设”，请填写 URL、Key 和模型后保存为预设');
+      const presetNameInput = container.querySelector('#api-primary-preset-name');
+      if (presetNameInput) presetNameInput.value = '';
+      setResultByProfile(container, 'primary', 'success', '已新建预设草稿，请填写 URL、Key、模型和预设名字后保存');
       return;
     }
-    // ===== 设置：顶部 API 预设选择/新建/删除事件（已完成·本次 API 预设上移） END =====
+
+    if (action === 'toggle-primary-preset-menu') {
+      const menu = container.querySelector('[data-primary-preset-menu]');
+      if (!menu) return;
+      const isOpen = !menu.classList.contains('hidden');
+      menu.classList.toggle('hidden', isOpen);
+      target.setAttribute('aria-expanded', String(!isOpen));
+      return;
+    }
+    // ===== 设置：API 预设折叠选择/新建/删除事件（已完成·本次按名称保存与折叠选择） END =====
 
     if (action === 'open-provider-modal') {
       const profileKey = target.getAttribute('data-profile');
@@ -2166,6 +2280,12 @@ export function bindApiEvents(container, { settings }) {
 
     if (action === 'apply-saved-primary') {
       fillProfileForm(container, 'primary', savedItem);
+      const presetNameInput = container.querySelector('#api-primary-preset-name');
+      const menu = container.querySelector('[data-primary-preset-menu]');
+      const menuTrigger = container.querySelector('[data-action="toggle-primary-preset-menu"]');
+      if (presetNameInput) presetNameInput.value = savedItem.name;
+      if (menu) menu.classList.add('hidden');
+      if (menuTrigger) menuTrigger.setAttribute('aria-expanded', 'false');
       setResultByProfile(container, 'primary', 'success', `已应用预设：${savedItem.name}`);
       return;
     }
