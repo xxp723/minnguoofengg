@@ -31,6 +31,9 @@ const ICONPARK_ICONS = {
   /* 世情 - Earth (地球) */
   worldbook: '<svg width="28" height="28" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="3"/><ellipse cx="24" cy="24" rx="9" ry="20" stroke="currentColor" stroke-width="3"/><line x1="6" y1="18" x2="42" y2="18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="6" y1="30" x2="42" y2="30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
 
+  /* 地图 - Map (地图定位，本区域已完成：地图应用桌面图标注册) */
+  map: '<svg width="28" height="28" viewBox="0 0 48 48" fill="none"><path d="M6 10L18 5L30 10L42 5V38L30 43L18 38L6 43V10Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M18 5V38" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M30 10V43" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 14C20.7 14 18 16.7 18 20C18 24.5 24 31 24 31C24 31 30 24.5 30 20C30 16.7 27.3 14 24 14Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="24" cy="20" r="2" fill="currentColor"/></svg>',
+
   /* 观书 - BookOpen (打开的书) */
   reader: '<svg width="28" height="28" viewBox="0 0 48 48" fill="none"><path d="M4 8h16c2.2 0 4 1.8 4 4v28c-2.2-2-5.4-2-8-2H4V8Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M44 8H28c-2.2 0-4 1.8-4 4v28c2.2-2 5.4-2 8-2h12V8Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>',
 
@@ -58,6 +61,8 @@ export class Registry {
       { id: 'memory', name: '旧事', icon: ICONPARK_ICONS.memory, entry: '../../apps/memory/index.js' },
       { id: 'forum', name: '茶馆', icon: ICONPARK_ICONS.forum, entry: '../../apps/forum/index.js' },
       { id: 'worldbook', name: '世情', icon: ICONPARK_ICONS.worldbook, entry: '../../apps/worldbook/index.js' },
+      /* [区域标注·本次需求·地图应用注册已完成] 仅注册地图入口；页面 UI/CSS 留待后续单独实现。 */
+      { id: 'map', name: '地图', icon: ICONPARK_ICONS.map, entry: '../../apps/map/index.js' },
       { id: 'reader', name: '观书', icon: ICONPARK_ICONS.reader, entry: '../../apps/reader/index.js' },
       { id: 'doujin', name: '戏笔', icon: ICONPARK_ICONS.doujin, entry: '../../apps/doujin/index.js' },
       { id: 'textgame', name: '梦笺', icon: ICONPARK_ICONS.textgame, entry: '../../apps/textgame/index.js' },
