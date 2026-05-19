@@ -5,8 +5,8 @@
  */
 
 /* ==========================================================================
-   [区域标注·已完成·Pollinations图片服务]
-   说明：提供构建 URL 和后台预加载的功能。
+   [区域标注·已修改·Pollinations图片服务]
+   说明：提供构建 URL 和后台预加载的功能。更新了地图生图提示词。
    ========================================================================== */
 
 /**
@@ -60,8 +60,9 @@ export function preloadPollinationsImage(url) {
  */
 export function generateMapCoverData(mapName, mapDesc) {
   const seed = Math.floor(Math.random() * 1000000);
-  // 严格要求平面2D街道地图，不要3D高楼，参考高德地图样式
-  const prompt = `A completely flat 2D top-down street map of ${mapName || 'city'}, exactly like standard Amap or Google Maps mobile navigation UI. No 3D buildings, no isometric view. Only flat colored shapes: light grey blocks, white thick intersecting roads, flat green park areas, flat light blue river or lake water, clean layout. ${mapDesc || ''}`;
+  // [区域标注·已修改·地图应用生图提示词更新]
+  // 严格要求平面2D街道地图，清晰显示出道路、建筑（仅以方块表明）、河流、交通，参考高德地图样式
+  const prompt = `A clean, completely flat 2D top-down street map of ${mapName || 'city'}, exactly like modern Amap mobile navigation UI. It must clearly show thick intersecting white and colored roads with traffic congestion lines, buildings indicated only by simple flat color blocks. No 3D buildings, no isometric view. Includes distinct flat light blue rivers, and flat green parks. Very clean UI layout, soft pastel colors. ${mapDesc || ''}`;
   const url = buildPollinationsImageUrl(prompt, { seed, width: 1024, height: 1024 });
   
   preloadPollinationsImage(url);

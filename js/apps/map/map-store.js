@@ -76,7 +76,9 @@ export function normalizeMapData(rawData) {
       points: Array.isArray(m.points) ? m.points : []
     };
 
-    const isOldStyle = m.imagePrompt && !m.imagePrompt.includes('No 3D buildings');
+    // [区域标注·已修改·强制更新旧地图数据到新的提示词样式]
+    // 只要提示词中没有包含我们新加的独特关键字，或者干脆没有 imagePrompt，就认定为旧样式并重新生成
+    const isOldStyle = !m.imagePrompt || !m.imagePrompt.includes('traffic congestion lines');
 
     if (!m.imageUrl || isOldStyle) {
       const cover = generateMapCoverData(mapName, mapDesc);
