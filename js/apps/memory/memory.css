@@ -1333,7 +1333,7 @@ button.memory-chat-top-bar__title:active {
    说明：
    1. 大总结入口已移动到标题栏左侧，右侧只保留搜索和“+”，标题栏左右按钮数量更均衡。
    2. 大总结模式下操作底栏固定贴近页面底部，已去除外层阴影和底栏整块背景。
-   3. 自定义字数栏默认隐藏；双击底栏空白/提示区域后向上滑出，再次双击后向下收回。
+   3. 自定义字数栏默认隐藏；双击底栏空白/提示区域后向上滑出，再次双击后向下收回，外层背景已与底栏统一为透明。
    4. 多选模式恢复整页上下滑动；底栏保持 sticky，不再用 overflow:hidden 卡住页面。
    5. 底栏按钮只保留文字；字数输入框无 maxlength/min/max/pattern/step 限制；多选态使用 IconPark 对钩，不使用浏览器原生 checkbox/select。
    ========================================================================== */
@@ -1423,7 +1423,7 @@ button.memory-chat-top-bar__title:active {
   padding: 0 10px;
   border: 0 solid transparent;
   border-radius: 14px 14px 0 0;
-  background: color-mix(in srgb, var(--memory-card) 94%, #ffffff);
+  background: transparent;
   color: var(--memory-text);
   display: inline-flex;
   align-items: center;
