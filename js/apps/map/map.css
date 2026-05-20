@@ -904,7 +904,8 @@
   }
 }
 
-/* [区域标注·已完成·详情页地图换算比例尺与地点描述卡片样式] 左上固定磨砂比例尺；单击地点后显示应用内描述卡片。 */
+/* [区域标注·已完成·详情页地图换算比例尺与地点坐标详情卡片样式]
+   说明：左上固定磨砂比例尺；单击地点后显示应用内地点名称、描述与坐标，本区域已按需求放大地点名称和坐标说明文字。 */
 .map-detail-scale-panel {
   position: absolute;
   top: 66px;
@@ -952,7 +953,7 @@
   right: 12px;
   top: 112px;
   z-index: 23;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid rgba(255, 255, 255, 0.34);
   border-radius: 16px;
   background: rgba(245, 241, 234, 0.88);
@@ -970,14 +971,15 @@
 }
 
 .map-point-info-title {
-  font-size: 14px;
+  font-size: 18px;
+  line-height: 1.22;
   font-weight: 800;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .map-point-info-desc {
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 16px;
+  line-height: 1.5;
   color: var(--c-text-cocoa, #5C4B43);
 }
 

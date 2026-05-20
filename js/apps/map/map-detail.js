@@ -122,7 +122,7 @@ export function buildMapDetailShell(mapData) {
            说明：
            1. 默认优先选择创建当前地图时绑定的 sourceWorldBookId；若已删除，则随机显示一本局部世界书。
            2. 只发送已开启世界书条目的标题和内容给副 API。
-           3. 副 API 一次性生成 5 个新地点（名称 + 描述），确认后直接写入 IndexedDB。 -->
+           3. 点击“生成地点”后只调用副 API 一次，一次性生成 5 个地点（名称 + 描述）并直接写入 IndexedDB。 -->
       <div class="map-modal-mask is-hidden" id="map-detail-ai-modal">
         <div class="map-modal-panel map-ai-modal-panel">
           <div class="map-modal-title">AI自动生成新地点</div>
@@ -140,7 +140,7 @@ export function buildMapDetailShell(mapData) {
             </div>
           </div>
 
-          <div class="map-ai-status" id="map-detail-ai-status">选择世界书后点击生成，AI 将一次性返回 5 个新地点。</div>
+          <div class="map-ai-status" id="map-detail-ai-status">选择世界书后点击生成，将只调用副 API 一次并直接添加 5 个新地点。</div>
           <div class="map-ai-locations-preview is-hidden" id="map-detail-ai-preview"></div>
           <div class="map-modal-hint" id="map-detail-ai-hint"></div>
 
@@ -249,8 +249,6 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
 
   let localBooks = [];
   let selectedBookId = '';
-  let parsedAiLocations = [];
-  let aiParsed = false;
   let aiBusy = false;
 
   const renderAllMarkers = () => {
@@ -434,14 +432,12 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
       item.addEventListener('click', (e) => {
         e.stopPropagation();
         selectedBookId = item.dataset.wbId || '';
-        parsedAiLocations = [];
-        aiParsed = false;
         if (aiPreviewEl) {
           aiPreviewEl.classList.add('is-hidden');
           aiPreviewEl.innerHTML = '';
         }
         if (aiConfirmBtn) aiConfirmBtn.textContent = '生成地点';
-        setAiStatus('已选择世界书，点击生成后将一次性返回 5 个新地点。');
+        setAiStatus('已选择世界书，点击生成后将只调用副 API 一次并直接添加 5 个新地点。');
         setAiHint('');
         closeAllDetailDropdowns();
         renderAiWorldbookOptions();
@@ -449,10 +445,10 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
     });
   };
 
-  const renderAiLocationsPreview = () => {
+  const renderAiLocationsPreview = (locations = []) => {
     if (!aiPreviewEl) return;
 
-    if (!parsedAiLocations.length) {
+    if (!locations.length) {
       aiPreviewEl.innerHTML = '';
       aiPreviewEl.classList.add('is-hidden');
       return;
@@ -460,9 +456,9 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
 
     aiPreviewEl.classList.remove('is-hidden');
     aiPreviewEl.innerHTML = `
-      <div class="map-ai-location-title">即将添加的 5 个地点</div>
+      <div class="map-ai-location-title">已添加的 5 个地点</div>
       <div class="map-ai-location-list">
-        ${parsedAiLocations.map((location, index) => `
+        ${locations.map((location, index) => `
           <div class="map-ai-location-item">
             <span>${escapeHtml(location.name || `地点${index + 1}`)}</span>
             <small>${escapeHtml(location.description || '暂无描述')}</small>
@@ -480,13 +476,11 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
   const openAiPointsModal = async () => {
     localBooks = await loadLocalWorldBooksFromDb(context.db);
     selectedBookId = chooseDefaultWorldBookId(localBooks, mapData.sourceWorldBookId);
-    parsedAiLocations = [];
-    aiParsed = false;
     aiBusy = false;
 
     setAiHint('');
     setAiStatus(localBooks.length
-      ? '选择世界书后点击生成，AI 将一次性返回 5 个新地点。'
+      ? '选择世界书后点击生成，将只调用副 API 一次并直接添加 5 个新地点。'
       : '暂无局部世界书，请先在世情应用创建或导入局部世界书。');
 
     if (aiConfirmBtn) {
@@ -867,7 +861,7 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
 
   /* ==========================================================================
      [区域标注·已完成·详情页AI自动生成新地点]
-     说明：默认回填当前地图来源世界书；若该世界书已删除则随机显示；仅把已开启条目的标题和内容发送给副 API，一次性生成 5 个地点。
+     说明：默认回填当前地图来源世界书；若该世界书已删除则随机显示；仅把已开启条目的标题和内容发送给副 API；点击后只调用一次副 API，并把 5 个新地点直接写入 IndexedDB。
      ========================================================================== */
   aiPointsBtn?.addEventListener('click', openAiPointsModal);
 
@@ -886,52 +880,43 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
   aiConfirmBtn?.addEventListener('click', async () => {
     if (aiBusy) return;
 
-    if (!aiParsed) {
-      const book = selectedBook();
-      if (!book) {
-        setAiHint('请先选择局部世界书');
-        return;
-      }
-
-      aiBusy = true;
-      aiConfirmBtn.disabled = true;
-      aiConfirmBtn.classList.add('is-loading');
-      setAiHint('');
-      setAiStatus('正在调用副 API 生成 5 个新地点，最长等待 45 秒...');
-
-      try {
-        const payload = await requestMapLocationsBySecondaryApi(context, book, mapData);
-        parsedAiLocations = normalizeGeneratedLocations(payload);
-        renderAiLocationsPreview();
-        aiParsed = true;
-        aiConfirmBtn.textContent = '添加5个地点';
-        setAiStatus('地点生成完成，确认后将直接添加到当前地图。');
-      } catch (error) {
-        console.error('[Map] 详情页 AI 自动生成地点失败:', error);
-        setAiHint(error?.message || 'AI生成地点失败，请检查副 API 设置');
-        setAiStatus('生成失败，请检查副 API 配置后重试。');
-      } finally {
-        aiBusy = false;
-        aiConfirmBtn.disabled = false;
-        aiConfirmBtn.classList.remove('is-loading');
-      }
+    const book = selectedBook();
+    if (!book) {
+      setAiHint('请先选择局部世界书');
       return;
     }
 
-    if (!parsedAiLocations.length) {
-      setAiHint('副 API 没有返回可用地点');
-      return;
+    aiBusy = true;
+    aiConfirmBtn.disabled = true;
+    aiConfirmBtn.classList.add('is-loading');
+    setAiHint('');
+    setAiStatus('正在调用副 API 一次性生成并添加 5 个新地点，最长等待 45 秒...');
+
+    try {
+      const payload = await requestMapLocationsBySecondaryApi(context, book, mapData);
+      const generatedLocations = normalizeGeneratedLocations(payload);
+      const positions = distributeNewPointPositions(mapData.points || [], generatedLocations.length);
+
+      if (!Array.isArray(mapData.points)) mapData.points = [];
+      generatedLocations.forEach((location, index) => {
+        const pos = positions[index] || { x: 50, y: 50 };
+        mapData.points.push(createMapPointDraft(location.name, location.description, pos.x, pos.y, mapData.distanceScale));
+      });
+
+      await persistMapData(context.db, state);
+      renderAllMarkers();
+      renderAiLocationsPreview(generatedLocations);
+      setAiStatus('已成功添加 5 个新地点，并同步写入当前地图 IndexedDB。');
+      closeAiPointsModal();
+    } catch (error) {
+      console.error('[Map] 详情页 AI 自动生成地点失败:', error);
+      setAiHint(error?.message || 'AI生成地点失败，请检查副 API 设置');
+      setAiStatus('生成失败，请检查副 API 配置后重试。');
+    } finally {
+      aiBusy = false;
+      aiConfirmBtn.disabled = false;
+      aiConfirmBtn.classList.remove('is-loading');
     }
-
-    const positions = distributeNewPointPositions(mapData.points || [], parsedAiLocations.length);
-    parsedAiLocations.forEach((location, index) => {
-      const pos = positions[index] || { x: 50, y: 50 };
-      mapData.points.push(createMapPointDraft(location.name, location.description, pos.x, pos.y, mapData.distanceScale));
-    });
-
-    await persistMapData(context.db, state);
-    renderAllMarkers();
-    closeAiPointsModal();
   });
 
   /* ==========================================================================
@@ -1028,7 +1013,7 @@ function buildWorldBookPlainText(book) {
    说明：
    1. 只读取 settings.api.secondary；不回退主 API。
    2. 只发送已开启条目的标题和内容。
-   3. 一次性要求副 API 返回 5 个地点（名称 + 描述）。
+   3. 每次点击只发起一次副 API 请求，并要求一次性返回 5 个地点（名称 + 描述）。
    ========================================================================== */
 function trimSlash(value = '') {
   return String(value || '').replace(/\/+$/, '');
