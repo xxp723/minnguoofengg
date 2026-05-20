@@ -366,6 +366,11 @@
   -webkit-backdrop-filter: blur(14px);
 }
 
+/* [区域标注·已完成·分类下拉默认收起状态] 弹窗打开时保持收起，点击分类栏才展开，避免遮挡地图名称输入框。 */
+.map-dropdown-body.is-hidden {
+  display: none;
+}
+
 .map-dropdown-list {
   display: flex;
   flex-direction: column;
