@@ -89,12 +89,14 @@ export function buildMapShell() {
         </div>
       </div>
 
-      <!-- [区域标注·已完成·AI自动生成地图弹窗]
+      <!-- [区域标注·已完成·AI自动生成地图弹窗与解析加速]
            说明：
            1. 读取世情应用里的局部世界书，只从 DB.js / IndexedDB 的 worldbook::all-books 读取。
            2. 点击“确认解析”后只调用设置应用副 API；不回退主 API，不写双份存储兜底。
-           3. AI 解析结果以输入框形式展示：分类、地图名称、描述地图；用户可继续手动修改。
-           4. 点击“创建地图”后写入地图应用 IndexedDB，并带入已自动避让过的地点图标坐标。 -->
+           3. 只把所选局部世界书中已开启条目的“标题 + 内容”发送给 AI；不发送关闭条目、不发送关键词、不做长文本字段过滤。
+           4. AI 只负责解析分类、地图名、描述和地点清单；地点坐标由前端自动分布避让，减少输出长度和 JSON 失败率。
+           5. AI 解析结果以输入框形式展示：分类、地图名称、描述地图；用户可继续手动修改。
+           6. 点击“创建地图”后写入地图应用 IndexedDB，并带入已自动避让过的地点图标坐标。 -->
       <div class="map-modal-mask is-hidden" id="map-ai-modal">
         <div class="map-modal-panel map-ai-modal-panel">
           <div class="map-modal-title">AI自动生成地图</div>
@@ -467,8 +469,11 @@ export function bindMapEvents(container, state, context) {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·AI自动生成地图逻辑区]
-   说明：副 API 解析世界书、生成地图表单与地点坐标；持久化只写地图 IndexedDB。
+   [区域标注·已完成·AI自动生成地图逻辑区：开启条目解析与加速]
+   说明：
+   1. 副 API 只解析所选局部世界书中已开启条目的“标题 + 内容”，不发送关键词和关闭条目。
+   2. AI 只生成地图表单与地点清单，坐标由前端自动避让生成，降低响应时间和 JSON 截断/跑偏概率。
+   3. 持久化只写地图 IndexedDB；不使用 localStorage/sessionStorage，不写双份存储兜底。
    ========================================================================== */
 function bindAiMapGenerator(container, state, context, helpers) {
   const modal = container.querySelector('#map-ai-modal');
@@ -525,7 +530,7 @@ function bindAiMapGenerator(container, state, context, helpers) {
     isBusy = false;
 
     setHint('');
-    setStatus(localBooks.length ? '选择一本局部世界书后点击确认解析。' : '暂无局部世界书，请先在世情应用创建或导入局部世界书。');
+    setStatus(localBooks.length ? '选择一本局部世界书后点击确认解析，仅会发送已开启条目的标题和内容。' : '暂无局部世界书，请先在世情应用创建或导入局部世界书。');
     if (resultEl) resultEl.classList.add('is-hidden');
     if (confirmBtn) {
       confirmBtn.textContent = '确认解析';
@@ -634,10 +639,10 @@ function bindAiMapGenerator(container, state, context, helpers) {
 
     wbList.innerHTML = localBooks.map(bookItem => {
       const activeClass = bookItem.id === selectedBookId ? 'is-active' : '';
-      const count = Array.isArray(bookItem.entries) ? bookItem.entries.length : 0;
+      const count = getEnabledWorldBookEntries(bookItem).length;
       return `<button class="map-dropdown-item ${activeClass}" data-wb-id="${escapeAttr(bookItem.id)}" type="button">
         <span>${escapeHtml(bookItem.name || '未命名世界书')}</span>
-        <small>${count} 条目</small>
+        <small>${count} 开启条目</small>
       </button>`;
     }).join('');
 
@@ -650,7 +655,7 @@ function bindAiMapGenerator(container, state, context, helpers) {
         if (resultEl) resultEl.classList.add('is-hidden');
         if (confirmBtn) confirmBtn.textContent = '确认解析';
         if (previewEl) previewEl.innerHTML = '';
-        setStatus('已选择世界书，点击确认解析。');
+        setStatus('已选择世界书，点击确认解析。仅会发送已开启条目的标题和内容。');
         setHint('');
         helpers.closeAllDropdowns();
         renderWorldBookOptions();
@@ -691,7 +696,7 @@ function bindAiMapGenerator(container, state, context, helpers) {
     confirmBtn.disabled = true;
     confirmBtn.classList.add('is-loading');
     setHint('');
-    setStatus('正在调用副 API 解析世界书...');
+    setStatus('正在调用副 API 解析已开启条目的标题和内容...');
 
     try {
       const payload = await requestMapPlanBySecondaryApi(context, book, helpers.getCategoryList());
@@ -767,8 +772,11 @@ function bindAiMapGenerator(container, state, context, helpers) {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·世界书 IndexedDB 读取区]
-   说明：只读取世情应用 worldbook::all-books 记录中的局部世界书；持久化访问统一走项目 DB.js / IndexedDB。
+   [区域标注·已完成·世界书 IndexedDB 读取与开启条目精简区]
+   说明：
+   1. 只读取世情应用 worldbook::all-books 记录中的局部世界书；持久化访问统一走项目 DB.js / IndexedDB。
+   2. 发送给地图 AI 前，只保留 enabled !== false 的开启条目，并且只发送条目标题和内容。
+   3. 不发送关键词，不发送关闭条目，不使用 localStorage/sessionStorage，不做长文本/大媒体字段过滤。
    ========================================================================== */
 async function loadLocalWorldBooks(db) {
   try {
@@ -789,20 +797,35 @@ async function loadLocalWorldBooks(db) {
   }
 }
 
+function getEnabledWorldBookEntries(book) {
+  return (Array.isArray(book?.entries) ? book.entries : [])
+    .filter(entry => entry && entry.enabled !== false)
+    .map((entry, index) => ({
+      title: String(entry.title || entry.name || `条目${index + 1}`).trim() || `条目${index + 1}`,
+      content: String(entry.content || entry.text || entry.description || '').trim()
+    }))
+    .filter(entry => entry.title || entry.content);
+}
+
 function buildWorldBookPlainText(book) {
-  const entries = Array.isArray(book?.entries) ? book.entries : [];
+  const entries = getEnabledWorldBookEntries(book);
+  if (!entries.length) return '';
+
   return [
     `世界书名称：${book?.name || '未命名世界书'}`,
-    ...entries.map((entry, index) => {
-      const enabled = entry?.enabled === false ? '关闭' : '开启';
-      return `条目${index + 1}（${enabled}）：${entry?.name || '未命名条目'}\n关键词：${Array.isArray(entry?.keywords) ? entry.keywords.join('，') : ''}\n内容：${entry?.content || ''}`;
-    })
+    ...entries.map((entry, index) => [
+      `条目${index + 1}：${entry.title}`,
+      entry.content ? `内容：${entry.content}` : ''
+    ].filter(Boolean).join('\n'))
   ].join('\n\n');
 }
 
 /* ==========================================================================
-   [区域标注·已完成·地图AI副API调用区]
-   说明：只读取 settings.api.secondary；不回退主 API，不写双份请求兜底。
+   [区域标注·已完成·地图AI副API调用区：精简提示词与失败提示优化]
+   说明：
+   1. 只读取 settings.api.secondary；不回退主 API，不写双份请求兜底。
+   2. 请求正文只包含开启世界书条目的标题和内容，不发送关键词、关闭条目或双份数据。
+   3. AI 不再输出地点坐标，坐标由前端自动分布避让，减少解析耗时与无效 JSON。
    ========================================================================== */
 function trimSlash(value = '') {
   return String(value || '').replace(/\/+$/, '');
@@ -826,6 +849,23 @@ function normalizeSecondaryApiProfile(apiSettings = {}) {
     baseUrl: trimSlash(secondary.baseUrl || defaultBaseUrlMap[provider]),
     model: String(secondary.model || '').trim()
   };
+}
+
+function extractApiErrorMessage(payload, fallback = '副 API 请求失败') {
+  if (!payload) return fallback;
+  if (typeof payload === 'string') return payload;
+  return payload?.error?.message ||
+    payload?.error?.msg ||
+    payload?.message ||
+    payload?.detail ||
+    payload?.msg ||
+    fallback;
+}
+
+function getMapAiMaxTokens(global = {}) {
+  const configured = Number(global.maxTokens ?? 2048);
+  const safeValue = Number.isFinite(configured) ? configured : 2048;
+  return Math.max(1200, Math.min(4096, safeValue));
 }
 
 function extractAiText(payload) {
@@ -859,12 +899,13 @@ async function requestMapPlanBySecondaryApi(context, book, categories) {
   const profile = normalizeSecondaryApiProfile(allSettings?.api || {});
   const global = allSettings?.api?.global || {};
   const temperature = Number(global.temperature ?? 0.7);
-  const maxTokens = Number(global.maxTokens ?? 2048);
+  const maxTokens = getMapAiMaxTokens(global);
 
   if (!profile.apiKey) throw new Error('副 API Key 不能为空');
   if (!profile.model) throw new Error('请先在设置应用选择副 API 模型');
 
   const promptText = buildAiMapPrompt(book, categories);
+  if (!promptText) throw new Error('该局部世界书没有开启条目，无法解析地图');
 
   if (profile.provider === 'gemini') {
     const response = await fetch(`${trimSlash(profile.baseUrl)}/models/${encodeURIComponent(profile.model)}:generateContent?key=${encodeURIComponent(profile.apiKey)}`, {
@@ -876,9 +917,11 @@ async function requestMapPlanBySecondaryApi(context, book, categories) {
       })
     });
     const payload = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(payload?.error?.message || '副 API 请求失败');
-    const parsed = extractJsonObject(extractAiText(payload));
-    if (!parsed) throw new Error('副 API 没有返回有效 JSON');
+    if (!response.ok) throw new Error(extractApiErrorMessage(payload, `副 API 请求失败（HTTP ${response.status}）`));
+    const aiText = extractAiText(payload);
+    if (!String(aiText || '').trim()) throw new Error('副 API 返回为空，请检查模型是否可用');
+    const parsed = extractJsonObject(aiText);
+    if (!parsed) throw new Error('副 API 没有返回有效 JSON，可能是模型输出了说明文字或响应被截断');
     return parsed;
   }
 
@@ -898,9 +941,11 @@ async function requestMapPlanBySecondaryApi(context, book, categories) {
       })
     });
     const payload = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(payload?.error?.message || '副 API 请求失败');
-    const parsed = extractJsonObject(extractAiText(payload));
-    if (!parsed) throw new Error('副 API 没有返回有效 JSON');
+    if (!response.ok) throw new Error(extractApiErrorMessage(payload, `副 API 请求失败（HTTP ${response.status}）`));
+    const aiText = extractAiText(payload);
+    if (!String(aiText || '').trim()) throw new Error('副 API 返回为空，请检查模型是否可用');
+    const parsed = extractJsonObject(aiText);
+    if (!parsed) throw new Error('副 API 没有返回有效 JSON，可能是模型输出了说明文字或响应被截断');
     return parsed;
   }
 
@@ -914,37 +959,43 @@ async function requestMapPlanBySecondaryApi(context, book, categories) {
       model: profile.model,
       temperature,
       max_tokens: maxTokens,
+      stream: false,
       messages: [{ role: 'user', content: promptText }]
     })
   });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error?.message || '副 API 请求失败');
-  const parsed = extractJsonObject(extractAiText(payload));
-  if (!parsed) throw new Error('副 API 没有返回有效 JSON');
+  if (!response.ok) throw new Error(extractApiErrorMessage(payload, `副 API 请求失败（HTTP ${response.status}）`));
+  const aiText = extractAiText(payload);
+  if (!String(aiText || '').trim()) throw new Error('副 API 返回为空，请检查模型是否可用');
+  const parsed = extractJsonObject(aiText);
+  if (!parsed) throw new Error('副 API 没有返回有效 JSON，可能是模型输出了说明文字或响应被截断');
   return parsed;
 }
 
 function buildAiMapPrompt(book, categories) {
+  const worldBookText = buildWorldBookPlainText(book);
+  if (!worldBookText) return '';
+
   return [
-    '你是地图应用的世界书解析器。请根据用户提供的局部世界书内容，生成一个可用于游戏/剧情地图的 JSON。',
-    '必须严格只返回 JSON，不要 Markdown，不要解释。',
+    '你是地图应用的世界书解析器。请根据局部世界书中已开启条目的标题和内容，生成游戏/剧情地图 JSON。',
+    '只返回 JSON，不要 Markdown，不要解释，不要输出 JSON 以外的字符。',
     `已有地图分类：${categories.join('、')}`,
-    'JSON 格式：{"category":"分类","name":"地图名称","description":"不超过500字的地图描述","locations":[{"name":"地点名称","description":"地点描述","x":0-100,"y":0-100}]}',
+    'JSON格式：{"category":"分类","name":"地图名称","description":"不超过500字的地图描述","locations":[{"name":"地点名称","description":"地点描述"}]}',
     '要求：',
-    '1. category 必须优先从已有分类中选择最贴切的一项；如果都不适合，可以写一个新的短分类名。',
-    '2. description 不能超过500字，要概括地图地貌、势力/区域关系、主要氛围。',
-    '3. locations 只列出世界书中明确或强相关的重要地点，建议 6-18 个。',
-    '4. 每个地点必须有 x/y 百分比坐标，坐标要分散、间距合理，不准重叠。',
+    '1. category 优先从已有分类中选择；都不适合时写一个短分类名。',
+    '2. description 概括地貌、势力/区域关系和主要氛围，不超过500字。',
+    '3. locations 只列出世界书中明确或强相关的重要地点，建议 5-14 个，最多不要超过18个。',
+    '4. 每个地点只写 name 和 description，不要写 x/y 坐标。',
     '5. 不要添加和世界书无关的地点。',
     '',
-    '局部世界书内容：',
-    buildWorldBookPlainText(book)
+    '局部世界书已开启条目：',
+    worldBookText
   ].join('\n');
 }
 
 /* ==========================================================================
    [区域标注·已完成·AI地图结果规范化与地点避让区]
-   说明：即使副 API 返回坐标过近，也会在前端重新避让，确保地点图标合理分散不重合。
+   说明：AI 只需返回地点清单；若旧模型仍返回坐标也会兼容读取，并统一在前端重新避让，确保地点图标合理分散不重合。
    ========================================================================== */
 function normalizeAiMapPayload(payload, categories) {
   const category = String(payload?.category || '').trim() || categories[0] || '现代都市';
