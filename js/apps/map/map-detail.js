@@ -130,7 +130,9 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
     let pinchCenterY = 0;
 
     const applyTransform = () => {
-      canvasEl.style.transform = `translate(${currentX}px, ${currentY}px) scale(${currentScale})`;
+      canvasEl.style.left = `${currentX}px`;
+      canvasEl.style.top = `${currentY}px`;
+      canvasEl.style.transform = `scale(${currentScale})`;
     };
 
     const constrainTransform = () => {
@@ -175,10 +177,29 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
       applyTransform();
     };
 
+    let fitFrameId = null;
+    const scheduleFitMapToViewport = () => {
+      if (fitFrameId) {
+        cancelAnimationFrame(fitFrameId);
+      }
+
+      fitFrameId = requestAnimationFrame(() => {
+        fitFrameId = null;
+
+        const rect = viewportEl.getBoundingClientRect();
+        if (rect.width <= 1 || rect.height <= 1) {
+          scheduleFitMapToViewport();
+          return;
+        }
+
+        fitMapToViewport();
+      });
+    };
+
     const initImageCanvas = () => {
       naturalWidth = imageEl.naturalWidth || 800;
       naturalHeight = imageEl.naturalHeight || 800;
-      fitMapToViewport();
+      scheduleFitMapToViewport();
     };
 
     if (imageEl.complete) {
@@ -188,7 +209,7 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
       imageEl.addEventListener('error', initImageCanvas, { once: true });
     }
 
-    window.addEventListener('resize', fitMapToViewport);
+    window.addEventListener('resize', scheduleFitMapToViewport);
 
     viewportEl.addEventListener('touchstart', (e) => {
       if (!modal.classList.contains('is-hidden')) return;
