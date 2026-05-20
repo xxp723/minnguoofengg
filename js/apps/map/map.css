@@ -127,7 +127,6 @@
   flex: 1;
   overflow-y: auto;
   padding: 12px 24px 40px 24px;
-  /* 隐藏滚动条 */
   scrollbar-width: none;
 }
 .map-content-scroll::-webkit-scrollbar {
@@ -172,8 +171,6 @@
   position: relative;
   overflow: hidden;
 }
-
-/* 移除原来的毛玻璃占位伪元素，以便清晰显示封面图 */
 
 .map-card-info {
   padding: 12px;
@@ -467,7 +464,7 @@
 
 .map-modal-hint {
   font-size: 12px;
-  color: #D32F2F; /* 错误提示红 */
+  color: #D32F2F;
   margin-top: 4px;
   min-height: 16px;
 }
@@ -536,9 +533,8 @@
 }
 
 /* ==========================================================================
-   [区域标注·已修改·地图详情页全屏完整展示]
-   说明：详情页保持真实图片画布完整适配手机屏幕，默认展示整张地图；
-         放大后可平移查看，缩小时不会小于完整适配比例，避免只显示局部。
+   [区域标注·已完成·地图详情页全屏完整展示]
+   说明：详情页保持真实图片画布适配手机屏幕；新增地点拖动与手动重新生成按钮样式也集中在本区域。
    ========================================================================== */
 .map-detail-wrapper {
   position: absolute;
@@ -546,7 +542,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 10; /* 盖住应用主页 */
+  z-index: 10;
   display: none;
 }
 
@@ -597,7 +593,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(0, 0, 0, 0.3); /* 透明/半透明背景 */
+  background: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   z-index: 20;
@@ -646,7 +642,55 @@
   color: #fff;
 }
 
-/* 标记容器与标记点 */
+/* [区域标注·已完成·详情页手动重新生成地图按钮样式] 右下角固定磨砂透明圆形按钮，使用 IconPark 风格 SVG。 */
+.map-detail-regen-btn {
+  position: absolute;
+  right: 18px;
+  bottom: 34px;
+  width: 52px;
+  height: 52px;
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 22;
+  cursor: pointer;
+  transition: transform 0.16s ease, background-color 0.16s ease, opacity 0.16s ease;
+}
+
+.map-detail-regen-btn:active {
+  transform: scale(0.93);
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.map-detail-regen-btn:disabled {
+  opacity: 0.72;
+  cursor: default;
+}
+
+.map-detail-regen-btn svg {
+  width: 25px;
+  height: 25px;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45));
+}
+
+.map-detail-regen-btn.is-loading svg {
+  animation: mapRegenSpin 0.8s linear infinite;
+}
+
+@keyframes mapRegenSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* [区域标注·已完成·地点标记图标样式] 地点使用 IconPark 风格定位图标，支持长按拖动。 */
 .map-detail-markers {
   position: absolute;
   top: 0;
@@ -654,26 +698,40 @@
   width: 100%;
   height: 100%;
   z-index: 15;
-  pointer-events: none; /* 让背景能接收点击 */
+  pointer-events: none;
 }
 
 .map-point-marker {
   position: absolute;
-  transform: translate(-50%, -100%); /* 让坐标刚好处于图标底部中间 */
+  transform: translate(-50%, -100%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  pointer-events: auto; /* 让自身能接收 hover 等事件 */
-  cursor: pointer;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.map-point-marker:active {
+  cursor: grabbing;
 }
 
 .map-point-icon {
-  width: 12px;
-  height: 12px;
-  background-color: #ff4d4f;
-  border: 2px solid #fff;
-  border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  width: 24px;
+  height: 30px;
+  color: #E94B4B;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.32));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-point-icon svg {
+  width: 24px;
+  height: 30px;
+  display: block;
 }
 
 .map-point-label {
@@ -688,7 +746,10 @@
   -webkit-backdrop-filter: blur(4px);
 }
 
-/* 添加模式下鼠标指针变化 */
-.map-detail-page.is-add-mode .map-detail-canvas {
-  cursor: crosshair;
+.map-detail-page.is-dragging-point .map-detail-viewport {
+  cursor: grabbing;
+}
+
+.map-detail-page.is-dragging-point .map-point-marker {
+  cursor: grabbing;
 }

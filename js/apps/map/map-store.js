@@ -1,6 +1,6 @@
 /**
  * 文件名: js/apps/map/map-store.js
- * 用途: 地图应用的数据层。封装 IndexedDB 读写，不使用 localStorage/sessionStorage。
+ * 用途: 地图应用的数据层。封装 IndexedDB 读写，仅使用项目 DB 模块持久化。
  */
 
 export const APP_ID = 'map';
@@ -8,12 +8,25 @@ export const STORE_NAME = 'appsData';
 export const DATA_KEY_MAPS = 'map_global_data';
 
 /* ==========================================================================
+   [区域标注·已完成·地图真实距离比例尺换算]
+   说明：生成的本地地图以 SVG 原始像素作为稳定比例尺，默认 1px ≈ 1m。
+         AI 可基于地点保存的 realXMeter/realYMeter 计算地图内两点直线距离。
+   ========================================================================== */
+export const MAP_REAL_SCALE = {
+  widthPx: 2400,
+  heightPx: 1600,
+  metersPerPixel: 1,
+  widthMeters: 2400,
+  heightMeters: 1600
+};
+
+/* ==========================================================================
    [区域标注·已完成·本地SVG地图生成器]
    说明：每次新建“现代都市”地图时，使用随机种子生成不同的现代都市地图。
          现代都市分支已处理：道路不重叠、无桥梁、细河流、湖泊/绿化/建筑互相避让、
          建筑不铺满街区；其他分类只生成基础底色占位图。
    ========================================================================== */
-function generateLocalMapCoverData(mapName, category) {
+export function generateLocalMapCoverData(mapName, category) {
   const seed = Math.floor(Math.random() * 1000000);
 
   if (category !== '现代都市') {
@@ -331,7 +344,7 @@ function generateLocalMapCoverData(mapName, category) {
 
 /* ==========================================================================
    [区域标注·已完成·地图应用 IndexedDB 专用读写]
-   说明：直接读写 DB.js 中 appsData 仓库，禁用 localStorage
+   说明：直接读写 DB.js 中 appsData 仓库，不接入 Web Storage 兜底。
    ========================================================================== */
 export async function dbGet(db, key) {
   try {
@@ -382,6 +395,7 @@ export function normalizeMapData(rawData) {
       imageUrl: cover.url,
       imagePrompt: cover.prompt,
       imageSeed: cover.seed,
+      distanceScale: normalizeMapDistanceScale(),
       points: []
     });
   }
@@ -397,7 +411,8 @@ export function normalizeMapData(rawData) {
       category: mapCategory,
       description: String(m.description || '').trim(),
       createdAt: Number(m.createdAt || Date.now()),
-      points: Array.isArray(m.points) ? m.points : []
+      points: Array.isArray(m.points) ? m.points.map(point => normalizeMapPoint(point)) : [],
+      distanceScale: normalizeMapDistanceScale(m.distanceScale)
     };
 
     // [区域标注·已完成·旧封面升级到现代都市 v6 去长圆棒随机组合样式]
@@ -451,6 +466,82 @@ export async function loadMapData(db) {
   return data;
 }
 
+/* ==========================================================================
+   [区域标注·已完成·地图地点真实距离字段规范化]
+   说明：地点持久化时保留 x/y 百分比坐标，并同步 realXMeter/realYMeter，禁止使用任何 Web Storage 兜底。
+   ========================================================================== */
+export function normalizeMapDistanceScale(scale) {
+  const source = scale && typeof scale === 'object' ? scale : {};
+  const metersPerPixel = Number(source.metersPerPixel || MAP_REAL_SCALE.metersPerPixel) || 1;
+  const widthPx = Number(source.widthPx || MAP_REAL_SCALE.widthPx) || MAP_REAL_SCALE.widthPx;
+  const heightPx = Number(source.heightPx || MAP_REAL_SCALE.heightPx) || MAP_REAL_SCALE.heightPx;
+
+  return {
+    widthPx,
+    heightPx,
+    metersPerPixel,
+    widthMeters: widthPx * metersPerPixel,
+    heightMeters: heightPx * metersPerPixel
+  };
+}
+
+export function normalizeMapPoint(point, distanceScale = MAP_REAL_SCALE) {
+  const source = point && typeof point === 'object' ? point : {};
+  const scale = normalizeMapDistanceScale(distanceScale);
+  const x = Math.max(0, Math.min(100, Number(source.x || 0)));
+  const y = Math.max(0, Math.min(100, Number(source.y || 0)));
+
+  return {
+    id: String(source.id || `point_${Date.now()}_${Math.random().toString(16).slice(2)}`),
+    name: String(source.name || '').trim(),
+    description: String(source.description || '').trim(),
+    x,
+    y,
+    realXMeter: Math.round((x / 100) * scale.widthMeters * 100) / 100,
+    realYMeter: Math.round((y / 100) * scale.heightMeters * 100) / 100,
+    metersPerPixel: scale.metersPerPixel
+  };
+}
+
+export function createMapPointDraft(name, description, x, y, scale = MAP_REAL_SCALE) {
+  const normalizedScale = normalizeMapDistanceScale(scale);
+  const normalizedX = Math.max(0, Math.min(100, Number(x || 0)));
+  const normalizedY = Math.max(0, Math.min(100, Number(y || 0)));
+
+  return normalizeMapPoint({
+    id: `point_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    name,
+    description,
+    x: normalizedX,
+    y: normalizedY,
+    realXMeter: (normalizedX / 100) * normalizedScale.widthMeters,
+    realYMeter: (normalizedY / 100) * normalizedScale.heightMeters,
+    metersPerPixel: normalizedScale.metersPerPixel
+  }, normalizedScale);
+}
+
+export function updateMapPointPosition(point, x, y, scale = MAP_REAL_SCALE) {
+  if (!point) return null;
+
+  const updated = createMapPointDraft(point.name, point.description, x, y, scale);
+  point.x = updated.x;
+  point.y = updated.y;
+  point.realXMeter = updated.realXMeter;
+  point.realYMeter = updated.realYMeter;
+  point.metersPerPixel = updated.metersPerPixel;
+  return point;
+}
+
+export function regenerateMapImage(mapObj) {
+  const cover = generateLocalMapCoverData(mapObj?.name || '未命名地图', mapObj?.category || '现代都市');
+  return {
+    imageUrl: cover.url,
+    imagePrompt: cover.prompt,
+    imageSeed: cover.seed,
+    distanceScale: normalizeMapDistanceScale(mapObj?.distanceScale)
+  };
+}
+
 export async function persistMapData(db, state) {
   const data = normalizeMapData(state);
   await dbPut(db, DATA_KEY_MAPS, data);
@@ -472,6 +563,7 @@ export function createMapDraft(name, description, category) {
     imageUrl: cover.url,
     imagePrompt: cover.prompt,
     imageSeed: cover.seed,
+    distanceScale: normalizeMapDistanceScale(),
     points: []
   };
 }
