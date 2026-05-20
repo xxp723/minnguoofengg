@@ -325,9 +325,9 @@
 }
 
 .map-category-add-btn {
-  width: 40px;
-  min-width: 40px;
-  height: 40px;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
   border: none;
   border-radius: 50%;
   background: rgba(44, 24, 16, 0.08);
@@ -347,8 +347,8 @@
 }
 
 .map-category-add-btn svg {
-  width: 17px;
-  height: 17px;
+  width: 14px;
+  height: 14px;
 }
 
 .map-dropdown-body {
@@ -396,6 +396,7 @@
   text-align: left;
   outline: none;
   cursor: pointer;
+  touch-action: manipulation;
   transition: background-color 0.16s ease, color 0.16s ease, transform 0.1s ease;
 }
 
@@ -497,6 +498,36 @@
 
 .map-btn-confirm {
   background: var(--c-text-espresso, #2C1810);
+  color: #ffffff;
+}
+
+/* [区域标注·已完成·分类删除确认弹窗样式] 与创建弹窗同源风格，删除按钮使用应用内危险态，不调用原生弹窗。 */
+.map-delete-category-panel {
+  width: 276px;
+}
+
+.map-delete-category-text {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--c-text-espresso, #2C1810);
+  text-align: center;
+}
+
+.map-delete-category-text span {
+  font-weight: 700;
+}
+
+.map-delete-category-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--c-text-cocoa, #5C4B43);
+  text-align: center;
+  opacity: 0.78;
+}
+
+.map-btn-danger {
+  background: #B84A3A;
   color: #ffffff;
 }
 

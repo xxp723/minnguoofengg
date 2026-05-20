@@ -87,6 +87,21 @@ export function buildMapShell() {
         </div>
       </div>
 
+      <!-- [区域标注·已完成·分类长按删除确认弹窗] 长按展开列表中的分类后，用应用内弹窗确认删除，不使用浏览器原生 confirm。 -->
+      <div class="map-modal-mask is-hidden" id="map-delete-category-modal">
+        <div class="map-modal-panel map-delete-category-panel">
+          <div class="map-modal-title">删除分类</div>
+          <div class="map-delete-category-text">
+            确认删除分类「<span id="map-delete-category-name"></span>」吗？
+          </div>
+          <div class="map-delete-category-tip">只会删除分类选项，不会删除已经创建的地图。</div>
+          <div class="map-modal-actions">
+            <button class="map-btn map-btn-cancel" id="map-delete-category-cancel" type="button">取消</button>
+            <button class="map-btn map-btn-danger" id="map-delete-category-confirm" type="button">删除</button>
+          </div>
+        </div>
+      </div>
+
       <!-- [区域标注·已完成·地图卡片编辑信息弹窗] -->
       <div class="map-modal-mask is-hidden" id="map-edit-modal">
         <div class="map-modal-panel">
@@ -160,7 +175,14 @@ export function bindMapEvents(container, state, context) {
   const catNewInput = container.querySelector('#map-category-new-input');
   const catNewSave = container.querySelector('#map-category-new-save');
 
+  // [区域标注·已完成·分类长按删除确认弹窗 DOM] 使用应用内确认弹窗，不使用浏览器原生 confirm。
+  const deleteCategoryModal = container.querySelector('#map-delete-category-modal');
+  const deleteCategoryNameEl = container.querySelector('#map-delete-category-name');
+  const deleteCategoryCancel = container.querySelector('#map-delete-category-cancel');
+  const deleteCategoryConfirm = container.querySelector('#map-delete-category-confirm');
+
   let selectedCategory = '现代都市';
+  let pendingDeleteCategory = '';
 
   // 辅助函数：转义 HTML 实体
   function escapeHtml(text) {
@@ -194,12 +216,60 @@ export function bindMapEvents(container, state, context) {
     }
   });
 
+  function getCategoryList() {
+    return Array.isArray(state.categories) && state.categories.length > 0
+      ? state.categories
+      : ['现代都市', '西方魔幻', '古代宫廷', '古代仙侠', '未来科幻'];
+  }
+
+  // [区域标注·已完成·分类长按删除确认弹窗交互] 长按分类项后弹出应用内确认框，确认后写入 IndexedDB。
+  function openDeleteCategoryModal(categoryName) {
+    pendingDeleteCategory = String(categoryName || '').trim();
+    if (!pendingDeleteCategory || !deleteCategoryModal) return;
+
+    if (deleteCategoryNameEl) deleteCategoryNameEl.textContent = pendingDeleteCategory;
+    if (dropdownBody) dropdownBody.classList.add('is-hidden');
+    if (catNewWrap) catNewWrap.classList.add('is-hidden');
+    deleteCategoryModal.classList.remove('is-hidden');
+  }
+
+  function closeDeleteCategoryModal() {
+    if (deleteCategoryModal) deleteCategoryModal.classList.add('is-hidden');
+    pendingDeleteCategory = '';
+  }
+
+  if (deleteCategoryCancel) {
+    deleteCategoryCancel.addEventListener('click', closeDeleteCategoryModal);
+  }
+
+  if (deleteCategoryModal) {
+    deleteCategoryModal.addEventListener('click', (e) => {
+      if (e.target === deleteCategoryModal) closeDeleteCategoryModal();
+    });
+  }
+
+  if (deleteCategoryConfirm) {
+    deleteCategoryConfirm.addEventListener('click', async () => {
+      const target = pendingDeleteCategory;
+      if (!target) return;
+
+      const nextCategories = getCategoryList().filter(c => c !== target);
+      state.categories = nextCategories.length > 0 ? nextCategories : ['现代都市'];
+      if (!state.categories.includes(selectedCategory)) {
+        selectedCategory = state.categories[0] || '现代都市';
+      }
+
+      await persistMapData(context.db, state);
+      renderCategories();
+      closeDeleteCategoryModal();
+      hintEl.textContent = '';
+    });
+  }
+
   // [区域标注·已完成·渲染创建地图分类列表]
   function renderCategories() {
     if (!dropdownListEl) return;
-    const cats = Array.isArray(state.categories) && state.categories.length > 0
-      ? state.categories
-      : ['现代都市', '西方魔幻', '古代宫廷', '古代仙侠', '未来科幻'];
+    const cats = getCategoryList();
 
     if (!cats.includes(selectedCategory)) {
       selectedCategory = cats[0] || '现代都市';
@@ -214,8 +284,37 @@ export function bindMapEvents(container, state, context) {
 
     const items = dropdownListEl.querySelectorAll('.map-dropdown-item');
     items.forEach(item => {
+      let categoryPressTimer = null;
+
+      const clearCategoryPressTimer = () => {
+        if (categoryPressTimer) {
+          clearTimeout(categoryPressTimer);
+          categoryPressTimer = null;
+        }
+      };
+
+      // [区域标注·已完成·分类项长按删除触发] 长按 600ms 后打开删除确认弹窗，短按仍为选择分类。
+      item.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        item.dataset.longPressDelete = '';
+        clearCategoryPressTimer();
+        categoryPressTimer = setTimeout(() => {
+          item.dataset.longPressDelete = '1';
+          openDeleteCategoryModal(item.dataset.cat);
+        }, 600);
+      });
+
+      item.addEventListener('pointerup', clearCategoryPressTimer);
+      item.addEventListener('pointercancel', clearCategoryPressTimer);
+      item.addEventListener('pointerleave', clearCategoryPressTimer);
+
       item.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (item.dataset.longPressDelete === '1') {
+          item.dataset.longPressDelete = '';
+          return;
+        }
+
         selectedCategory = item.dataset.cat;
         if (dropdownVal) dropdownVal.textContent = selectedCategory;
         if (dropdownBody) dropdownBody.classList.add('is-hidden');
