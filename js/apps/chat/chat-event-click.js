@@ -153,7 +153,8 @@ import {
   findInnerVoiceForMessage,
   findLatestInnerVoice,
   isAssistantAvatarClick,
-  getMessageIdFromAvatarClick
+  getMessageIdFromAvatarClick,
+  clearInnerVoiceHistory
 } from './chat-inner-voice.js';
 import {
   createGiftPayRequestMessage,
@@ -1704,6 +1705,22 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
       showClearAllMessagesModal(container, state);
       break;
 
+    /* ========================================================================
+       [区域标注·已完成·清空聊天消息弹窗同步心声开关]
+       说明：
+       1. 仅切换当前应用内弹窗里的 iPhone 风格开关显示状态，不立即写入 DB.js / IndexedDB。
+       2. 用户点击“清空”确认后，才按开关状态决定是否同步清空当前聊天窗口心声历史。
+       3. 不使用浏览器原生弹窗/选择器，不使用 localStorage/sessionStorage。
+       ======================================================================== */
+    case 'toggle-clear-inner-voice-history': {
+      const toggle = target.closest('[data-role="clear-inner-voice-history-toggle"]');
+      if (!toggle) break;
+      const nextEnabled = String(toggle.getAttribute('aria-checked') || 'false') !== 'true';
+      toggle.setAttribute('aria-checked', nextEnabled ? 'true' : 'false');
+      toggle.classList.toggle('is-on', nextEnabled);
+      break;
+    }
+
     case 'confirm-clear-current-chat-images': {
       const { changedIds } = expireCurrentChatImages(state.currentMessages);
       if (!changedIds.length) {
@@ -1723,13 +1740,28 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
     }
 
     case 'confirm-clear-all-messages': {
-      clearCurrentChatMessages(state);
+      /* ======================================================================
+         [区域标注·已完成·清空聊天消息确认处理·可同步心声历史]
+         说明：
+         1. 默认只清空当前聊天消息；仅当弹窗开关开启时同步清空当前聊天窗口心声历史。
+         2. 聊天消息、会话摘要与心声历史都统一写入 DB.js / IndexedDB。
+         3. 不使用 localStorage/sessionStorage，不写双份存储兜底，不做长文本过滤。
+         ====================================================================== */
+      const clearInnerVoiceToggle = container.querySelector('[data-role="clear-inner-voice-history-toggle"]');
+      const shouldClearInnerVoiceHistory = String(clearInnerVoiceToggle?.getAttribute('aria-checked') || 'false') === 'true';
+      const clearResult = clearCurrentChatMessages(state, {
+        clearInnerVoiceHistory: shouldClearInnerVoiceHistory
+      });
       resetMessageSelectionState(state);
       refreshCurrentSessionLastMessage(state);
-      await Promise.all([
+      const persistTasks = [
         persistCurrentMessages(state, db),
         dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions)
-      ]);
+      ];
+      if (clearResult.clearInnerVoiceHistory) {
+        persistTasks.push(clearInnerVoiceHistory(db, state.activeMaskId, state.currentChatId));
+      }
+      await Promise.all(persistTasks);
       closeModal(container);
       renderCurrentChatMessage(container, state);
       break;

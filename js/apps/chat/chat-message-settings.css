@@ -700,6 +700,96 @@
   transform: translateX(20px);
 }
 
+/* ==========================================================================
+   [区域标注·已完成·清空聊天消息弹窗同步心声历史开关样式]
+   说明：
+   1. 仅服务“清空聊天消息”应用内弹窗里的“同步清空所有心声记录”开关。
+   2. 开关视觉参考 iPhone 滑动开关，并与闲谈暖棕主题 UI 保持统一。
+   3. 样式层不涉及持久化存储；确认清空时由 JS 通过 DB.js / IndexedDB 写入。
+   ========================================================================== */
+.msg-clear-inner-voice-toggle {
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px 13px;
+  border: 1px solid rgba(74, 52, 42, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.88);
+  color: #4A342A;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(74, 52, 42, 0.05);
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.msg-clear-inner-voice-toggle:active {
+  transform: scale(0.99);
+  background: rgba(248, 242, 235, 0.96);
+}
+
+.msg-clear-inner-voice-toggle__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.msg-clear-inner-voice-toggle__text strong {
+  font-size: 13px;
+  line-height: 1.25;
+  font-weight: 800;
+}
+
+.msg-clear-inner-voice-toggle__text em {
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(74, 52, 42, 0.5);
+  font-style: normal;
+}
+
+.msg-clear-inner-voice-toggle__switch {
+  width: 46px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(74, 52, 42, 0.18);
+  padding: 3px;
+  box-sizing: border-box;
+  position: relative;
+  flex: 0 0 auto;
+  transition: background 0.18s ease;
+}
+
+.msg-clear-inner-voice-toggle__switch::after {
+  content: "";
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fffaf4;
+  box-shadow: 0 3px 8px rgba(74, 52, 42, 0.22);
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.18s ease;
+}
+
+.msg-clear-inner-voice-toggle.is-on {
+  border-color: rgba(74, 52, 42, 0.16);
+  background: rgba(255, 250, 246, 0.96);
+}
+
+.msg-clear-inner-voice-toggle.is-on .msg-clear-inner-voice-toggle__switch {
+  background: #4A342A;
+}
+
+.msg-clear-inner-voice-toggle.is-on .msg-clear-inner-voice-toggle__switch::after {
+  transform: translateX(18px);
+}
+
 .msg-settings-textarea {
   width: 100%;
   min-height: 96px;

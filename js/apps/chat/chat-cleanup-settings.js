@@ -131,11 +131,11 @@ export function renderChatCleanupSettingsSection({ broomIcon = '' } = {}) {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·清空聊天消息弹窗独立维护]
+   [区域标注·已完成·清空聊天消息弹窗独立维护·同步清空心声历史选项]
    说明：
    1. 弹窗使用闲谈应用内 chat-modal 样式，不使用 alert/confirm/prompt。
-   2. 真正清空和持久化由 index.js 写入 DB.js / IndexedDB。
-   3. 本弹窗已随清理板块迁移到 chat-cleanup-settings.js，后续修改清空聊天消息优先改这里。
+   2. 真正清空和持久化由点击处理层统一写入 DB.js / IndexedDB。
+   3. 本弹窗已新增“同步清空所有心声记录”iPhone 风格开关；后续修改清空聊天消息优先改这里。
    ========================================================================== */
 export function showClearAllMessagesModal(container, state) {
   const mask = container.querySelector('[data-role="modal-mask"]');
@@ -150,7 +150,15 @@ export function showClearAllMessagesModal(container, state) {
       <button class="chat-modal-close" data-action="close-modal" type="button">${TAB_ICONS.close}</button>
     </div>
     <div class="chat-modal-body">
-      <div class="chat-modal-hint">是否清空与“${escapeHtml(session.name || '未命名')}”的全部聊天消息？<br>此操作只清空当前聊天界面的消息，不删除联系人。</div>
+      <div class="chat-modal-hint">是否清空与“${escapeHtml(session.name || '未命名')}”的全部聊天消息？<br>此操作默认只清空当前聊天界面的消息，不删除联系人。</div>
+      <!-- [区域标注·已完成·清空聊天消息弹窗·同步清空心声历史开关] -->
+      <button class="msg-clear-inner-voice-toggle" data-action="toggle-clear-inner-voice-history" data-role="clear-inner-voice-history-toggle" type="button" aria-checked="false">
+        <span class="msg-clear-inner-voice-toggle__text">
+          <strong>同步清空所有心声记录</strong>
+          <em>开启后会同时清空这个聊天窗口内角色的心声历史</em>
+        </span>
+        <span class="msg-clear-inner-voice-toggle__switch" aria-hidden="true"></span>
+      </button>
     </div>
     <div class="chat-modal-footer">
       <button class="chat-modal-btn chat-modal-btn--secondary" data-action="close-modal" type="button">取消</button>
@@ -212,23 +220,26 @@ export function showClearCurrentChatImagesModal(container, state) {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·本窗口图片过期处理]
+   [区域标注·已完成·清空聊天消息状态入口·可同步心声历史]
    说明：
-   1. 只处理当前聊天窗口 currentMessages 中仍保存 imageUrl 的 type:image 消息。
-   2. 清理时删除 imageUrl，保留 content/imageName/imageDescription，界面显示“已过期”。
-   3. 本函数只更新传入消息数组；真正持久化由 index.js 统一写入 DB.js / IndexedDB。
+   1. 只处理当前聊天窗口 currentMessages 的清空状态，不删除联系人。
+   2. 是否同步清空心声历史由“清空聊天消息”弹窗开关决定。
+   3. 真正持久化由点击处理层统一写入 DB.js / IndexedDB，不使用 localStorage/sessionStorage。
    ========================================================================== */
-export function clearCurrentChatMessages(state) {
+export function clearCurrentChatMessages(state, { clearInnerVoiceHistory = false } = {}) {
   /* ==========================================================================
-     [区域标注·已完成·清空聊天消息状态处理]
+     [区域标注·已完成·清空聊天消息状态处理·可同步心声历史]
      说明：
-     1. 只清空当前聊天窗口的 currentMessages，联系人与会话仍由 index.js 保留。
-     2. 真正持久化由 index.js 统一调用 persistCurrentMessages/dbPut 写入 DB.js / IndexedDB。
-     3. 与清理图片同属本独立清理板块，后续修改清空聊天消息优先改这里。
+     1. 只清空当前聊天窗口的 currentMessages，联系人与会话仍由点击处理层保留。
+     2. 真正持久化由点击处理层统一调用 persistCurrentMessages/dbPut 写入 DB.js / IndexedDB。
+     3. 本函数返回本次是否勾选同步清空心声历史；心声历史清空由 chat-inner-voice.js 的 DB.js / IndexedDB 函数完成。
      ========================================================================== */
-  if (!state?.currentChatId) return false;
+  if (!state?.currentChatId) return { cleared: false, clearInnerVoiceHistory: false };
   state.currentMessages = [];
-  return true;
+  return {
+    cleared: true,
+    clearInnerVoiceHistory: Boolean(clearInnerVoiceHistory)
+  };
 }
 
 export function expireCurrentChatImages(messages = []) {

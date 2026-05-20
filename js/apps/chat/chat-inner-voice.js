@@ -224,7 +224,7 @@ function parseInnerVoiceLabeledPayload(s) {
    [区域标注·已修改·心声历史独立存储] IndexedDB 存储键与标准化
    说明：
    1. 心声历史独立保存在 DB.js / IndexedDB，不依赖 currentMessages。
-   2. 删除当前聊天消息/清空当前聊天记录不会删除心声历史。
+   2. 清空聊天消息默认不会删除心声历史；仅在清空弹窗勾选“同步清空所有心声记录”时同步清空。
    3. 不使用 localStorage/sessionStorage，不写双份兜底存储。
    ========================================================================== */
 const DATA_KEY_INNER_VOICE_HISTORY = (maskId, chatId) => `chat_inner_voice_history::${maskId || 'default'}::${chatId || 'none'}`;
@@ -261,10 +261,23 @@ async function persistInnerVoiceHistoryList(db, maskId, chatId, list) {
 }
 
 /* ==========================================================================
+   [区域标注·已完成·清空聊天消息可选同步清空心声历史]
+   说明：
+   1. 仅在“清空聊天消息”弹窗开关开启时调用，清空当前面具 + 当前聊天窗口的心声历史。
+   2. 持久化统一写入 DB.js / IndexedDB 对应心声历史键，不使用 localStorage/sessionStorage。
+   3. 不写双份存储兜底，不按长文本字段过滤。
+   ========================================================================== */
+export async function clearInnerVoiceHistory(db, maskId, chatId) {
+  if (!db || !chatId) return false;
+  await dbPut(db, DATA_KEY_INNER_VOICE_HISTORY(maskId, chatId), []);
+  return true;
+}
+
+/* ==========================================================================
    [区域标注·已修改·心声历史独立存储] 保存每轮生成的心声
    说明：
    1. 每次 AI 回复提取到心声后都追加到独立历史记录。
-   2. 该历史与聊天消息分离，删除聊天消息不会同步删除这里的数据。
+   2. 该历史与聊天消息分离；清空聊天消息仅在弹窗勾选同步清空时才会删除这里的数据。
    3. 持久化只通过 DB.js / IndexedDB；不使用 localStorage/sessionStorage。
    ========================================================================== */
 export async function persistInnerVoiceHistoryEntry(db, state, innerVoice, messageId = '') {
