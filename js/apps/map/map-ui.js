@@ -203,10 +203,11 @@ export function bindMapEvents(container, state, context) {
     // 绑定选项点击事件
     const items = dropdownListEl.querySelectorAll('.map-dropdown-item');
     items.forEach(item => {
-      item.addEventListener('click', () => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation(); // 阻止冒泡，避免触发 document.click 把菜单关了还没选上
         selectedCategory = item.dataset.cat;
-        dropdownVal.textContent = selectedCategory;
-        dropdownBody.classList.add('is-hidden');
+        if (dropdownVal) dropdownVal.textContent = selectedCategory;
+        if (dropdownBody) dropdownBody.classList.add('is-hidden');
         renderCategories(); // 更新高亮状态
       });
     });
@@ -214,7 +215,8 @@ export function bindMapEvents(container, state, context) {
 
   // 绑定展开新建分类框
   if (newCatBtn) {
-    newCatBtn.addEventListener('click', () => {
+    newCatBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       catNewWrap.classList.remove('is-hidden');
       catNewInput.value = '';
       catNewInput.focus();
@@ -223,7 +225,8 @@ export function bindMapEvents(container, state, context) {
 
   // 保存新建分类
   if (catNewSave) {
-    catNewSave.addEventListener('click', async () => {
+    catNewSave.addEventListener('click', async (e) => {
+      e.stopPropagation();
       const newCat = catNewInput.value.trim();
       if (!newCat) {
         hintEl.textContent = '分类名称不能为空';
@@ -236,6 +239,7 @@ export function bindMapEvents(container, state, context) {
       }
       selectedCategory = newCat;
       catNewWrap.classList.add('is-hidden');
+      if (dropdownBody) dropdownBody.classList.add('is-hidden');
       renderCategories();
       hintEl.textContent = '';
     });
