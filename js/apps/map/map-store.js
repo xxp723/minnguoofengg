@@ -412,13 +412,18 @@ export function normalizeMapDistanceScale(scale) {
   const metersPerPixel = Number(source.metersPerPixel || MAP_REAL_SCALE.metersPerPixel) || 1;
   const widthPx = Number(source.widthPx || MAP_REAL_SCALE.widthPx) || MAP_REAL_SCALE.widthPx;
   const heightPx = Number(source.heightPx || MAP_REAL_SCALE.heightPx) || MAP_REAL_SCALE.heightPx;
+  const displayUnitName = String(source.displayUnitName || '').trim();
+  const displayUnitSymbol = String(source.displayUnitSymbol || '').trim();
 
   return {
     widthPx,
     heightPx,
     metersPerPixel,
     widthMeters: widthPx * metersPerPixel,
-    heightMeters: heightPx * metersPerPixel
+    heightMeters: heightPx * metersPerPixel,
+    // [区域标注·已完成·详情页自定义比例尺显示单位持久化] 仅保存显示单位，真实距离仍使用米制字段计算。
+    displayUnitName,
+    displayUnitSymbol
   };
 }
 

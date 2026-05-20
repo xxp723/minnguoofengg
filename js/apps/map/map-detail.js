@@ -15,6 +15,7 @@ import {
    说明：详情页新增的浮动按钮与弹窗按钮统一使用 IconPark 风格图标；AI 自动生成地点只调用副 API。
    ========================================================================== */
 const DETAIL_ICONS = {
+  edit: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M8 40H40" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M13 31L31.5 12.5C33.4 10.6 36.5 10.6 38.4 12.5L39.5 13.6C41.4 15.5 41.4 18.6 39.5 20.5L21 39L12 40L13 31Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M28 16L36 24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
   ai: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 5l4.9 13.1L42 23l-13.1 4.9L24 41l-4.9-13.1L6 23l13.1-4.9L24 5Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M38 6l1.8 4.2L44 12l-4.2 1.8L38 18l-1.8-4.2L32 12l4.2-1.8L38 6Z" fill="currentColor"/></svg>`,
   multi: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M10 14H26" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M10 24H26" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M10 34H26" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M32 14L35 17L40 11" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 24L35 27L40 21" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 34L35 37L40 31" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   trash: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M9 12H39" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M19 5H29" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M34 12L32 39C31.8 41.2 29.9 43 27.7 43H20.3C18.1 43 16.2 41.2 16 39L14 12" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 19V34M28 19V34" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`
@@ -73,7 +74,11 @@ export function buildMapDetailShell(mapData) {
       </div>
 
       <!-- [区域标注·已完成·详情页右下角浮动操作按钮]
-           说明：从上到下依次为 AI 自动生成新地点、多选地点、删除已选地点、重新生成地图。 -->
+           说明：从上到下依次为编辑地点与比例尺、AI 自动生成新地点、多选地点、删除已选地点、重新生成地图。 -->
+      <button class="map-detail-fab map-detail-edit-btn" id="map-detail-edit" type="button" title="编辑地点与比例尺" aria-label="编辑地点与比例尺">
+        ${DETAIL_ICONS.edit}
+      </button>
+
       <button class="map-detail-fab map-detail-ai-points-btn" id="map-detail-ai-points" type="button" title="AI自动生成新地点" aria-label="AI自动生成新地点">
         ${DETAIL_ICONS.ai}
       </button>
@@ -114,6 +119,53 @@ export function buildMapDetailShell(mapData) {
           <div class="map-modal-actions">
             <button class="map-btn map-btn-cancel" id="map-point-cancel">取消</button>
             <button class="map-btn map-btn-confirm" id="map-point-confirm">确认</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- [区域标注·已完成·详情页编辑地点与比例尺弹窗]
+           说明：
+           1. 弹窗顶部可自定义比例尺显示单位，例如“千米 / km”，只影响显示文本，不改变底层米制距离计算。
+           2. 下方使用 iPhone 风格开关切换“一次性展示所有地点编辑窗”或“只选择一个地点编辑”。
+           3. 保存后通过 persistMapData 写入 IndexedDB，不使用 localStorage/sessionStorage 或双份兜底存储。 -->
+      <div class="map-modal-mask is-hidden" id="map-detail-edit-modal">
+        <div class="map-modal-panel map-detail-edit-panel">
+          <div class="map-modal-title">编辑地点与比例尺</div>
+
+          <div class="map-detail-edit-section">
+            <div class="map-detail-edit-section-title">比例尺显示单位</div>
+            <div class="map-detail-unit-grid">
+              <div class="map-modal-field">
+                <label class="map-modal-label">单位名称</label>
+                <input type="text" class="map-input" id="map-detail-unit-name" placeholder="例如：千米" />
+              </div>
+              <div class="map-modal-field">
+                <label class="map-modal-label">单位符号</label>
+                <input type="text" class="map-input" id="map-detail-unit-symbol" placeholder="例如：km" />
+              </div>
+            </div>
+          </div>
+
+          <div class="map-detail-edit-section">
+            <div class="map-detail-edit-switch-row">
+              <div>
+                <div class="map-detail-edit-section-title">地点编辑</div>
+                <div class="map-detail-edit-tip">开启后一次性展示所有地点名称和描述编辑窗</div>
+              </div>
+              <button class="map-ios-switch" id="map-detail-edit-all-toggle" type="button" role="switch" aria-checked="false">
+                <span></span>
+              </button>
+            </div>
+
+            <div class="map-detail-edit-point-picker" id="map-detail-edit-point-picker"></div>
+            <div class="map-detail-edit-points" id="map-detail-edit-points"></div>
+          </div>
+
+          <div class="map-modal-hint" id="map-detail-edit-hint"></div>
+
+          <div class="map-modal-actions">
+            <button class="map-btn map-btn-cancel" id="map-detail-edit-cancel" type="button">取消</button>
+            <button class="map-btn map-btn-confirm" id="map-detail-edit-save" type="button">保存</button>
           </div>
         </div>
       </div>
@@ -205,6 +257,7 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
   const backBtn = container.querySelector('#map-detail-back');
   const addPointBtn = container.querySelector('#map-detail-add-point');
   const regenerateBtn = container.querySelector('#map-detail-regenerate');
+  const editBtn = container.querySelector('#map-detail-edit');
   const aiPointsBtn = container.querySelector('#map-detail-ai-points');
   const multiSelectBtn = container.querySelector('#map-detail-multi-select');
   const deleteSelectedBtn = container.querySelector('#map-detail-delete-selected');
@@ -226,6 +279,16 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
   const inputDesc = container.querySelector('#map-point-desc');
   const hintEl = container.querySelector('#map-point-hint');
 
+  const editModal = container.querySelector('#map-detail-edit-modal');
+  const editCancelBtn = container.querySelector('#map-detail-edit-cancel');
+  const editSaveBtn = container.querySelector('#map-detail-edit-save');
+  const editUnitNameInput = container.querySelector('#map-detail-unit-name');
+  const editUnitSymbolInput = container.querySelector('#map-detail-unit-symbol');
+  const editAllToggle = container.querySelector('#map-detail-edit-all-toggle');
+  const editPointPicker = container.querySelector('#map-detail-edit-point-picker');
+  const editPointsEl = container.querySelector('#map-detail-edit-points');
+  const editHintEl = container.querySelector('#map-detail-edit-hint');
+
   const aiModal = container.querySelector('#map-detail-ai-modal');
   const aiCancelBtn = container.querySelector('#map-detail-ai-cancel');
   const aiConfirmBtn = container.querySelector('#map-detail-ai-confirm');
@@ -246,6 +309,8 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
   let selectedPointId = null;
   let selectionMode = false;
   let selectedPointIds = new Set();
+  let editShowAllPoints = false;
+  let editSelectedPointId = '';
 
   let localBooks = [];
   let selectedBookId = '';
@@ -267,6 +332,31 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
 
   const setAiStatus = (text) => {
     if (aiStatusEl) aiStatusEl.textContent = text || '';
+  };
+
+  const getDisplayDistanceUnit = () => {
+    const scale = mapData.distanceScale && typeof mapData.distanceScale === 'object' ? mapData.distanceScale : {};
+    return {
+      name: String(scale.displayUnitName || '').trim(),
+      symbol: String(scale.displayUnitSymbol || '').trim()
+    };
+  };
+
+  const formatMetersByDisplayUnit = (meters, mode = 'distance') => {
+    const unit = getDisplayDistanceUnit();
+    const symbol = unit.symbol || (mode === 'scale' ? 'm' : '米');
+    const numeric = Number(meters || 0);
+
+    if (!unit.symbol && !unit.name) {
+      if (mode === 'scale') return numeric >= 1000 ? `${(numeric / 1000).toFixed(2)}km` : `${numeric}m`;
+      return numeric >= 1000 ? `${(numeric / 1000).toFixed(2)}公里` : `${numeric.toFixed(1)}米`;
+    }
+
+    const value = symbol.toLowerCase() === 'km' || unit.name === '千米' || unit.name === '公里'
+      ? numeric / 1000
+      : numeric;
+    const fixed = Math.abs(value) >= 100 ? value.toFixed(0) : value.toFixed(2).replace(/\.?0+$/, '');
+    return `${fixed}${symbol || unit.name}`;
   };
 
   const updateDeleteSelectedButton = () => {
@@ -304,15 +394,12 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
     return Math.sqrt(dx * dx + dy * dy);
   };
 
-  const formatDistance = (meters) => {
-    if (meters >= 1000) return `${(meters / 1000).toFixed(2)}公里`;
-    return `${meters.toFixed(1)}米`;
-  };
+  const formatDistance = (meters) => formatMetersByDisplayUnit(meters, 'distance');
 
   const updateScaleText = () => {
     if (!scaleMainEl) return;
     const metersPerPixel = Number(mapData.distanceScale?.metersPerPixel || 1);
-    scaleMainEl.textContent = `比例尺：1px ≈ ${metersPerPixel >= 1000 ? `${(metersPerPixel / 1000).toFixed(2)}km` : `${metersPerPixel}m`}`;
+    scaleMainEl.textContent = `比例尺：1px ≈ ${formatMetersByDisplayUnit(metersPerPixel, 'scale')}`;
   };
 
   const hidePointInfo = () => {
@@ -471,6 +558,131 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
   const closeAiPointsModal = () => {
     aiModal?.classList.add('is-hidden');
     closeAllDetailDropdowns();
+  };
+
+  /* ==========================================================================
+     [区域标注·已完成·详情页编辑地点与比例尺交互]
+     说明：编辑弹窗只读写当前 mapData，并通过 persistMapData 同步 IndexedDB；无 Web Storage 兜底。
+     ========================================================================== */
+  const setEditHint = (text) => {
+    if (editHintEl) editHintEl.textContent = text || '';
+  };
+
+  const renderEditPointPicker = () => {
+    if (!editPointPicker) return;
+    const points = Array.isArray(mapData.points) ? mapData.points : [];
+
+    if (editShowAllPoints || !points.length) {
+      editPointPicker.innerHTML = points.length ? '' : '<div class="map-detail-edit-empty">当前地图暂无地点</div>';
+      return;
+    }
+
+    if (!editSelectedPointId || !points.some(point => point.id === editSelectedPointId)) {
+      editSelectedPointId = points[0]?.id || '';
+    }
+
+    editPointPicker.innerHTML = points.map((point) => {
+      const activeClass = point.id === editSelectedPointId ? 'is-active' : '';
+      return `<button class="map-detail-edit-point-tab ${activeClass}" data-point-id="${escapeHtml(point.id)}" type="button">${escapeHtml(point.name || '未命名地点')}</button>`;
+    }).join('');
+
+    editPointPicker.querySelectorAll('.map-detail-edit-point-tab').forEach((item) => {
+      item.addEventListener('click', () => {
+        editSelectedPointId = item.dataset.pointId || '';
+        renderEditPointPicker();
+        renderEditPointEditors();
+      });
+    });
+  };
+
+  const renderEditPointEditors = () => {
+    if (!editPointsEl) return;
+    const points = Array.isArray(mapData.points) ? mapData.points : [];
+    const editablePoints = editShowAllPoints
+      ? points
+      : points.filter(point => point.id === editSelectedPointId);
+
+    if (!editablePoints.length) {
+      editPointsEl.innerHTML = '<div class="map-detail-edit-empty">请选择一个地点进行编辑</div>';
+      return;
+    }
+
+    editPointsEl.innerHTML = editablePoints.map((point, index) => `
+      <div class="map-detail-edit-point-card" data-point-id="${escapeHtml(point.id)}">
+        <div class="map-detail-edit-point-title">${escapeHtml(point.name || `地点${index + 1}`)}</div>
+        <div class="map-modal-field">
+          <label class="map-modal-label">地点名称</label>
+          <input type="text" class="map-input map-detail-edit-point-name" value="${escapeHtml(point.name || '')}" placeholder="请输入地点名称" />
+        </div>
+        <div class="map-modal-field">
+          <label class="map-modal-label">描述地点</label>
+          <textarea class="map-textarea map-detail-edit-point-desc" placeholder="请输入地点描述...">${escapeHtml(point.description || '')}</textarea>
+        </div>
+      </div>
+    `).join('');
+  };
+
+  const renderEditModalContent = () => {
+    if (editAllToggle) {
+      editAllToggle.classList.toggle('is-on', editShowAllPoints);
+      editAllToggle.setAttribute('aria-checked', editShowAllPoints ? 'true' : 'false');
+    }
+    renderEditPointPicker();
+    renderEditPointEditors();
+  };
+
+  const openEditModal = () => {
+    const unit = getDisplayDistanceUnit();
+    if (editUnitNameInput) editUnitNameInput.value = unit.name || '';
+    if (editUnitSymbolInput) editUnitSymbolInput.value = unit.symbol || '';
+    const points = Array.isArray(mapData.points) ? mapData.points : [];
+    editSelectedPointId = points[0]?.id || '';
+    editShowAllPoints = false;
+    setEditHint('');
+    renderEditModalContent();
+    editModal?.classList.remove('is-hidden');
+  };
+
+  const closeEditModal = () => {
+    editModal?.classList.add('is-hidden');
+    setEditHint('');
+  };
+
+  const saveEditModal = async () => {
+    const unitName = editUnitNameInput?.value?.trim() || '';
+    const unitSymbol = editUnitSymbolInput?.value?.trim() || '';
+
+    if (!mapData.distanceScale || typeof mapData.distanceScale !== 'object') {
+      mapData.distanceScale = {};
+    }
+    mapData.distanceScale.displayUnitName = unitName;
+    mapData.distanceScale.displayUnitSymbol = unitSymbol;
+
+    const cards = Array.from(editPointsEl?.querySelectorAll('.map-detail-edit-point-card') || []);
+    for (const card of cards) {
+      const pointId = card.dataset.pointId || '';
+      const point = (mapData.points || []).find(item => item.id === pointId);
+      if (!point) continue;
+
+      const nextName = card.querySelector('.map-detail-edit-point-name')?.value?.trim() || '';
+      const nextDesc = card.querySelector('.map-detail-edit-point-desc')?.value?.trim() || '';
+
+      if (!nextName) {
+        setEditHint('地点名称不能为空');
+        return;
+      }
+
+      point.name = nextName;
+      point.description = nextDesc;
+    }
+
+    await persistMapData(context.db, state);
+    updateScaleText();
+    if (distanceTextEl) distanceTextEl.textContent = '';
+    selectedPointId = null;
+    hidePointInfo();
+    renderAllMarkers();
+    closeEditModal();
   };
 
   const openAiPointsModal = async () => {
@@ -714,7 +926,7 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
     });
 
     viewportEl.addEventListener('touchstart', (e) => {
-      if (!modal.classList.contains('is-hidden') || !aiModal.classList.contains('is-hidden') || !deletePointsModal.classList.contains('is-hidden') || draggingPointId || selectionMode) return;
+      if (!modal.classList.contains('is-hidden') || !editModal.classList.contains('is-hidden') || !aiModal.classList.contains('is-hidden') || !deletePointsModal.classList.contains('is-hidden') || draggingPointId || selectionMode) return;
 
       if (e.touches.length === 2) {
         e.preventDefault();
@@ -733,7 +945,7 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
     }, { passive: false });
 
     viewportEl.addEventListener('touchmove', (e) => {
-      if (!modal.classList.contains('is-hidden') || !aiModal.classList.contains('is-hidden') || !deletePointsModal.classList.contains('is-hidden') || draggingPointId || selectionMode) return;
+      if (!modal.classList.contains('is-hidden') || !editModal.classList.contains('is-hidden') || !aiModal.classList.contains('is-hidden') || !deletePointsModal.classList.contains('is-hidden') || draggingPointId || selectionMode) return;
 
       clearMarkerPressTimer();
 
@@ -834,6 +1046,21 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
     await persistMapData(context.db, state);
     renderAllMarkers();
     closeModal();
+  });
+
+  /* ==========================================================================
+     [区域标注·已完成·详情页编辑按钮与应用内编辑弹窗]
+     说明：编辑比例尺显示单位、单个地点或全部地点名称与描述；保存后直接同步 IndexedDB。
+     ========================================================================== */
+  editBtn?.addEventListener('click', openEditModal);
+  editCancelBtn?.addEventListener('click', closeEditModal);
+  editSaveBtn?.addEventListener('click', saveEditModal);
+  editModal?.addEventListener('click', (e) => {
+    if (e.target === editModal) closeEditModal();
+  });
+  editAllToggle?.addEventListener('click', () => {
+    editShowAllPoints = !editShowAllPoints;
+    renderEditModalContent();
   });
 
   /* ==========================================================================
