@@ -22,8 +22,8 @@ export const MAP_REAL_SCALE = {
 
 /* ==========================================================================
    [区域标注·已完成·本地SVG地图生成器]
-   说明：现代都市地图使用占比式避让生成：建筑约40%、道路约20%、绿化约30%、水域约10%。
-         河流/湖泊/绿化不会与建筑重叠；湖泊/绿化不会与道路重叠；其它分类只生成基础底色占位图。
+   说明：现代都市地图使用占比式避让生成：建筑约40%、道路约20%、绿化约30%、河流约5%、湖泊约5%。
+         除“河流与道路可相交”这个例外外，河流/湖泊/建筑/绿化/道路互不重叠；其它分类只生成基础底色占位图。
    ========================================================================== */
 export function generateLocalMapCoverData(mapName, category) {
   const seed = Math.floor(Math.random() * 1000000);
@@ -40,16 +40,16 @@ export function generateLocalMapCoverData(mapName, category) {
 
   /* ==========================================================================
      [区域标注·已完成·现代都市占比式避让地图生成]
-     说明：按近似视觉占比生成：建筑 40%、道路 20%、绿化带 30%、河流/湖泊水域 10%。
+     说明：按近似视觉占比生成：建筑 40%、道路 20%、绿化带 30%、河流 5%、湖泊 5%。
            通过矩形保留区避让，保证：
-           1. 河流、湖泊、绿化带不会和建筑物重叠。
-           2. 湖泊、绿化带不会和道路重叠。
+           1. 除“河流与道路可相交”外，河流/湖泊/建筑/绿化/道路互不重叠。
+           2. 湖泊、绿化带、建筑不会压住道路；建筑也不会压住河流/湖泊/绿化带。
            3. 允许在周围或附近相邻，但不互相压盖。
      ========================================================================== */
   const W = 2400;
   const H = 1600;
   const TOTAL_AREA = W * H;
-  const SVG_NS_PROMPT = 'urban_svg_map_v7_ratio_avoid';
+  const SVG_NS_PROMPT = 'urban_svg_map_v8_ratio_strict_avoid';
 
   let currentSeed = seed;
   const rand = () => {
@@ -94,7 +94,7 @@ export function generateLocalMapCoverData(mapName, category) {
   }
 
   function isFreeForWater(rect, gap = 0) {
-    return !overlapsAny(rect, roadRects, gap) && !overlapsAny(rect, parkRects, gap) && !overlapsAny(rect, buildingRects, gap);
+    return !overlapsAny(rect, roadRects, gap) && !overlapsAny(rect, waterRects, gap) && !overlapsAny(rect, parkRects, gap) && !overlapsAny(rect, buildingRects, gap);
   }
 
   function isFreeForPark(rect, gap = 0) {
@@ -130,43 +130,58 @@ export function generateLocalMapCoverData(mapName, category) {
 
   [...verticalRoads, ...horizontalRoads].forEach(rect => addRect(rect, roadRects));
 
-  roadRects.forEach((rect, index) => {
+  // [区域标注·已完成·道路交叉口打通渲染] 先统一画道路外沿，再统一画道路核心层，避免交汇处出现“一条路盖住另一条路”的压盖感。
+  roadRects.forEach((rect) => {
+    const isVertical = rect.h > rect.w;
+    const cx = rect.x + rect.w / 2;
+    const cy = rect.y + rect.h / 2;
+
+    if (isVertical) {
+      roadsSvg += `<path d="M${round(cx)},0 L${round(cx)},${H}" stroke="${roadBorder}" stroke-width="${round(rect.w)}" stroke-linecap="butt"/>`;
+    } else {
+      roadsSvg += `<path d="M0,${round(cy)} L${W},${round(cy)}" stroke="${roadBorder}" stroke-width="${round(rect.h)}" stroke-linecap="butt"/>`;
+    }
+  });
+
+  roadRects.forEach((rect) => {
     const isVertical = rect.h > rect.w;
     const cx = rect.x + rect.w / 2;
     const cy = rect.y + rect.h / 2;
     const core = Math.max(10, (isVertical ? rect.w : rect.h) - 16);
 
     if (isVertical) {
-      roadsSvg += `<path d="M${round(cx)},0 L${round(cx)},${H}" stroke="${roadBorder}" stroke-width="${round(rect.w)}" stroke-linecap="butt"/>`;
-      roadsSvg += `<path d="M${round(cx)},0 L${round(cx)},${H}" stroke="${index % 2 ? roadFill : avenueFill}" stroke-width="${round(core)}" stroke-linecap="butt"/>`;
+      roadsSvg += `<path d="M${round(cx)},0 L${round(cx)},${H}" stroke="${roadFill}" stroke-width="${round(core)}" stroke-linecap="butt"/>`;
     } else {
-      roadsSvg += `<path d="M0,${round(cy)} L${W},${round(cy)}" stroke="${roadBorder}" stroke-width="${round(rect.h)}" stroke-linecap="butt"/>`;
-      roadsSvg += `<path d="M0,${round(cy)} L${W},${round(cy)}" stroke="${index % 2 ? roadFill : avenueFill}" stroke-width="${round(core)}" stroke-linecap="butt"/>`;
+      roadsSvg += `<path d="M0,${round(cy)} L${W},${round(cy)}" stroke="${roadFill}" stroke-width="${round(core)}" stroke-linecap="butt"/>`;
     }
   });
 
-  // [区域标注·已完成·水域10%占比生成] 河流/湖泊均记录为水域保留区，建筑和绿化不会与其重叠。
+  // [区域标注·已完成·河流5%与湖泊5%严格避让生成] 河流变细；河流可与道路相交，其它元素之间不重叠。
   let waterSvg = '';
   const riverHorizontal = rand() > 0.45;
   const riverBand = riverHorizontal
-    ? addRect({ x: 0, y: between(540, 900), w: W, h: 116 }, waterRects)
-    : addRect({ x: between(820, 1320), y: 0, w: 128, h: H }, waterRects);
+    ? addRect({ x: 0, y: between(560, 920), w: W, h: 90 }, waterRects)
+    : addRect({ x: between(840, 1340), y: 0, w: 90, h: H }, waterRects);
 
   if (riverHorizontal) {
     const y = riverBand.y + riverBand.h / 2;
+    const riverWidth = 58;
+    const riverOuterWidth = 72;
     waterSvg += `
-    <path d="M-120,${round(y)} C${round(W * 0.22)},${round(y - 74)} ${round(W * 0.62)},${round(y + 82)} ${W + 120},${round(y - 18)}" fill="none" stroke="#C9EAF3" stroke-width="${round(riverBand.h + 16)}" stroke-linecap="round"/>
-    <path d="M-120,${round(y)} C${round(W * 0.22)},${round(y - 74)} ${round(W * 0.62)},${round(y + 82)} ${W + 120},${round(y - 18)}" fill="none" stroke="#A9DCEB" stroke-width="${round(riverBand.h)}" stroke-linecap="round"/>`;
+    <path d="M-120,${round(y)} C${round(W * 0.22)},${round(y - 18)} ${round(W * 0.62)},${round(y + 20)} ${W + 120},${round(y - 10)}" fill="none" stroke="#C9EAF3" stroke-width="${riverOuterWidth}" stroke-linecap="round"/>
+    <path d="M-120,${round(y)} C${round(W * 0.22)},${round(y - 18)} ${round(W * 0.62)},${round(y + 20)} ${W + 120},${round(y - 10)}" fill="none" stroke="#A9DCEB" stroke-width="${riverWidth}" stroke-linecap="round"/>`;
   } else {
     const x = riverBand.x + riverBand.w / 2;
+    const riverWidth = 58;
+    const riverOuterWidth = 72;
     waterSvg += `
-    <path d="M${round(x)},-120 C${round(x - 90)},${round(H * 0.24)} ${round(x + 96)},${round(H * 0.62)} ${round(x - 16)},${H + 120}" fill="none" stroke="#C9EAF3" stroke-width="${round(riverBand.w + 16)}" stroke-linecap="round"/>
-    <path d="M${round(x)},-120 C${round(x - 90)},${round(H * 0.24)} ${round(x + 96)},${round(H * 0.62)} ${round(x - 16)},${H + 120}" fill="none" stroke="#A9DCEB" stroke-width="${round(riverBand.w)}" stroke-linecap="round"/>`;
+    <path d="M${round(x)},-120 C${round(x - 18)},${round(H * 0.24)} ${round(x + 20)},${round(H * 0.62)} ${round(x - 10)},${H + 120}" fill="none" stroke="#C9EAF3" stroke-width="${riverOuterWidth}" stroke-linecap="round"/>
+    <path d="M${round(x)},-120 C${round(x - 18)},${round(H * 0.24)} ${round(x + 20)},${round(H * 0.62)} ${round(x - 10)},${H + 120}" fill="none" stroke="#A9DCEB" stroke-width="${riverWidth}" stroke-linecap="round"/>`;
   }
 
-  let waterArea = rectArea(riverBand);
-  const targetWaterArea = TOTAL_AREA * 0.10;
-  for (let attempt = 0; attempt < 180 && waterArea < targetWaterArea; attempt++) {
+  let lakeArea = 0;
+  const targetLakeArea = TOTAL_AREA * 0.05;
+  for (let attempt = 0; attempt < 180 && lakeArea < targetLakeArea; attempt++) {
     const rect = {
       x: between(90, W - 330),
       y: between(90, H - 230),
@@ -177,7 +192,7 @@ export function generateLocalMapCoverData(mapName, category) {
     if (!isFreeForWater(rect, 22)) continue;
 
     const lake = addRect(rect, waterRects);
-    waterArea += rectArea(lake);
+    lakeArea += rectArea(lake);
     const cx = lake.x + lake.w / 2;
     const cy = lake.y + lake.h / 2;
     waterSvg += `
@@ -247,7 +262,7 @@ export function generateLocalMapCoverData(mapName, category) {
   const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <rect width="100%" height="100%" fill="#F4F7F5"/>
-  <g id="map-water-ratio-10">${waterSvg}</g>
+  <g id="map-river-ratio-5-and-lake-ratio-5">${waterSvg}</g>
   <g id="map-parks-ratio-30">${parksSvg}</g>
   <g id="map-roads-ratio-20">${roadsSvg}</g>
   <g id="map-buildings-ratio-40">${buildingsSvg}</g>
@@ -335,8 +350,8 @@ export function normalizeMapData(rawData) {
       points: Array.isArray(m.points) ? m.points.map(point => normalizeMapPoint(point, distanceScale)) : []
     };
 
-    // [区域标注·已完成·旧封面升级到现代都市 v7 占比避让样式]
-    const isOldStyle = m.imagePrompt !== 'urban_svg_map_v7_ratio_avoid' && !String(m.imagePrompt || '').startsWith('placeholder_');
+    // [区域标注·已完成·旧封面升级到现代都市 v8 严格避让样式]
+    const isOldStyle = m.imagePrompt !== 'urban_svg_map_v8_ratio_strict_avoid' && !String(m.imagePrompt || '').startsWith('placeholder_');
 
     if (!m.imageUrl || isOldStyle) {
       const cover = generateLocalMapCoverData(mapName, mapCategory);
