@@ -166,9 +166,11 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
       const viewportWidth = rect.width || 1;
       const viewportHeight = rect.height || 1;
 
-      minScale = Math.min(viewportWidth / naturalWidth, viewportHeight / naturalHeight);
+      // [修改] 让地图无论如何至少完全铺满屏幕（不留上下或者左右黑边/空隙）
+      minScale = Math.max(viewportWidth / naturalWidth, viewportHeight / naturalHeight);
       maxScale = Math.max(minScale * 5, minScale + 0.01);
       currentScale = minScale;
+      // 居中（超出的部分可以通过平移来查看）
       currentX = (viewportWidth - naturalWidth * currentScale) / 2;
       currentY = (viewportHeight - naturalHeight * currentScale) / 2;
 

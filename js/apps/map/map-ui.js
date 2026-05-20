@@ -37,15 +37,26 @@ export function buildMapShell() {
         <div class="map-modal-panel">
           <div class="map-modal-title">创建新地图</div>
           
-          <!-- [区域标注·已修改·创建地图分类选择区] -->
+          <!-- [区域标注·已修改·创建地图折叠分类选择区] -->
           <div class="map-modal-field">
             <label class="map-modal-label">分类</label>
-            <div class="map-category-list" id="map-category-list">
-              <!-- 分类按钮动态渲染 -->
-            </div>
-            <div class="map-category-new is-hidden" id="map-category-new-wrap">
-              <input type="text" class="map-input map-input-small" id="map-category-new-input" placeholder="输入分类名称" />
-              <button class="map-btn map-btn-confirm map-btn-small" id="map-category-new-save">保存</button>
+            <div class="map-dropdown" id="map-category-dropdown">
+              <div class="map-dropdown-head" id="map-dropdown-head">
+                <span class="map-dropdown-val" id="map-dropdown-val">现代都市</span>
+                <svg viewBox="0 0 48 48" fill="none" class="map-dropdown-arrow">
+                  <path d="M36 18L24 30L12 18" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="map-dropdown-body is-hidden" id="map-dropdown-body">
+                <div class="map-dropdown-list" id="map-dropdown-list">
+                  <!-- 分类列表动态渲染 -->
+                </div>
+                <div class="map-dropdown-action" id="map-btn-new-cat">+ 新建分类</div>
+                <div class="map-dropdown-new is-hidden" id="map-category-new-wrap">
+                  <input type="text" class="map-input map-input-small" id="map-category-new-input" placeholder="输入新分类名称" />
+                  <button class="map-btn map-btn-confirm map-btn-small" id="map-category-new-save">添加</button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -131,8 +142,12 @@ export function bindMapEvents(container, state, context) {
   const inputDesc = container.querySelector('#map-input-desc');
   const hintEl = container.querySelector('#map-modal-hint');
 
-  // 分类相关 DOM
-  const catListEl = container.querySelector('#map-category-list');
+  // 分类下拉菜单相关 DOM
+  const dropdownHead = container.querySelector('#map-dropdown-head');
+  const dropdownBody = container.querySelector('#map-dropdown-body');
+  const dropdownVal = container.querySelector('#map-dropdown-val');
+  const dropdownListEl = container.querySelector('#map-dropdown-list');
+  const newCatBtn = container.querySelector('#map-btn-new-cat');
   const catNewWrap = container.querySelector('#map-category-new-wrap');
   const catNewInput = container.querySelector('#map-category-new-input');
   const catNewSave = container.querySelector('#map-category-new-save');
@@ -152,44 +167,58 @@ export function bindMapEvents(container, state, context) {
     });
   }
 
-  // [区域标注·已修改·渲染分类列表]
+  // 展开/收起下拉菜单
+  if (dropdownHead) {
+    dropdownHead.addEventListener('click', () => {
+      dropdownBody.classList.toggle('is-hidden');
+    });
+  }
+
+  // 点击外部收起菜单
+  document.addEventListener('click', (e) => {
+    if (dropdownBody && !dropdownBody.classList.contains('is-hidden')) {
+      const dropdown = container.querySelector('#map-category-dropdown');
+      if (dropdown && !dropdown.contains(e.target)) {
+        dropdownBody.classList.add('is-hidden');
+      }
+    }
+  });
+
+  // [区域标注·已修改·渲染下拉分类列表]
   function renderCategories() {
-    if (!catListEl) return;
+    if (!dropdownListEl) return;
     const cats = Array.isArray(state.categories) ? state.categories : ['现代都市'];
     
-    // 如果选中的分类不在列表中，默认回落
     if (!cats.includes(selectedCategory)) {
       selectedCategory = cats[0] || '现代都市';
     }
+    
+    if (dropdownVal) dropdownVal.textContent = selectedCategory;
 
-    let html = cats.map(c => {
+    dropdownListEl.innerHTML = cats.map(c => {
       const activeClass = c === selectedCategory ? 'is-active' : '';
-      return `<button class="map-cat-btn ${activeClass}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`;
+      return `<div class="map-dropdown-item ${activeClass}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</div>`;
     }).join('');
 
-    // 追加“新建分类”按钮
-    html += `<button class="map-cat-btn map-cat-new-btn" id="map-btn-new-cat">+ 新建分类</button>`;
-    
-    catListEl.innerHTML = html;
-
-    // 绑定分类切换事件
-    const catBtns = catListEl.querySelectorAll('.map-cat-btn:not(.map-cat-new-btn)');
-    catBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        selectedCategory = btn.dataset.cat;
-        renderCategories(); // 重新渲染刷新激活状态
+    // 绑定选项点击事件
+    const items = dropdownListEl.querySelectorAll('.map-dropdown-item');
+    items.forEach(item => {
+      item.addEventListener('click', () => {
+        selectedCategory = item.dataset.cat;
+        dropdownVal.textContent = selectedCategory;
+        dropdownBody.classList.add('is-hidden');
+        renderCategories(); // 更新高亮状态
       });
     });
+  }
 
-    // 绑定新建按钮事件
-    const newCatBtn = catListEl.querySelector('#map-btn-new-cat');
-    if (newCatBtn) {
-      newCatBtn.addEventListener('click', () => {
-        catNewWrap.classList.remove('is-hidden');
-        catNewInput.value = '';
-        catNewInput.focus();
-      });
-    }
+  // 绑定展开新建分类框
+  if (newCatBtn) {
+    newCatBtn.addEventListener('click', () => {
+      catNewWrap.classList.remove('is-hidden');
+      catNewInput.value = '';
+      catNewInput.focus();
+    });
   }
 
   // 保存新建分类
@@ -218,7 +247,8 @@ export function bindMapEvents(container, state, context) {
       inputName.value = '';
       inputDesc.value = '';
       hintEl.textContent = '';
-      catNewWrap.classList.add('is-hidden');
+      if (dropdownBody) dropdownBody.classList.add('is-hidden');
+      if (catNewWrap) catNewWrap.classList.add('is-hidden');
       renderCategories();
       modal.classList.remove('is-hidden');
       setTimeout(() => inputName.focus(), 50);
