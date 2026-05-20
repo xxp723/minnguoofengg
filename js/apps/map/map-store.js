@@ -36,7 +36,7 @@ function generateLocalMapCoverData(mapName, category) {
      ========================================================================== */
   const W = 2400;
   const H = 1600;
-  const SVG_NS_PROMPT = 'urban_svg_map_v5';
+  const SVG_NS_PROMPT = 'urban_svg_map_v6';
 
   let currentSeed = seed;
   const rand = () => {
@@ -245,9 +245,8 @@ function generateLocalMapCoverData(mapName, category) {
     }
   }
 
-  // [区域标注·已完成·街区建筑合理分布] 建筑避开水域/绿地，按街区留白分布，不铺满小区块。
+  // [区域标注·已完成·街区建筑合理分布与长圆棒去除] 建筑避开水域/绿地，按街区留白分布；已去除街区内横向/竖向长圆棒形道路。
   let buildingsSvg = '';
-  let minorRoadsSvg = '';
   const bColors = ['#E8ECF1', '#F0F0ED', '#EAEAF1', '#EBF2F6', '#EFE6DA'];
   const strokeColor = '#D5DADF';
 
@@ -263,20 +262,7 @@ function generateLocalMapCoverData(mapName, category) {
       const cellRect = { x: cellX, y: cellY, w: cellW, h: cellH };
       if (isRectReserved(cellRect, 4) && rand() < 0.55) continue;
 
-      const hasInnerHorizontal = cellH > 240 && rand() > 0.42;
-      const hasInnerVertical = cellW > 260 && rand() > 0.36;
-
-      if (hasInnerHorizontal) {
-        const y = cellY + cellH * between(0.42, 0.58);
-        minorRoadsSvg += `<path d="M${round(cellX + 14)},${round(y)} L${round(cellX + cellW - 14)},${round(y)}" stroke="${roadBorderColor}" stroke-width="${minorRoadWidth}" stroke-linecap="round"/>`;
-        minorRoadsSvg += `<path d="M${round(cellX + 14)},${round(y)} L${round(cellX + cellW - 14)},${round(y)}" stroke="${roadFillColor}" stroke-width="${minorCoreWidth}" stroke-linecap="round"/>`;
-      }
-      if (hasInnerVertical) {
-        const x = cellX + cellW * between(0.42, 0.58);
-        minorRoadsSvg += `<path d="M${round(x)},${round(cellY + 14)} L${round(x)},${round(cellY + cellH - 14)}" stroke="${roadBorderColor}" stroke-width="${minorRoadWidth}" stroke-linecap="round"/>`;
-        minorRoadsSvg += `<path d="M${round(x)},${round(cellY + 14)} L${round(x)},${round(cellY + cellH - 14)}" stroke="${roadFillColor}" stroke-width="${minorCoreWidth}" stroke-linecap="round"/>`;
-      }
-
+      // [区域标注·已完成·去除横竖长圆棒] 不再绘制街区内部横向/竖向圆头短路，避免生成看不出含义的长圆棒形状。
       const margin = between(18, 34);
       const innerX = cellX + margin;
       const innerY = cellY + margin;
@@ -310,17 +296,16 @@ function generateLocalMapCoverData(mapName, category) {
           }
 
           const color = pick(bColors);
-          const rx = bw > 42 && bh > 42 ? 6 : 4;
           const typeRoll = rand();
 
           if (typeRoll > 0.84 && bw > 48 && bh > 48) {
-            buildingsSvg += `<rect x="${round(bx)}" y="${round(by)}" width="${round(bw)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.4" rx="${rx}"/>`;
-            buildingsSvg += `<rect x="${round(bx + bw * 0.18)}" y="${round(by + bh * 0.18)}" width="${round(bw * 0.64)}" height="${round(bh * 0.64)}" fill="#FFFFFF" opacity="0.55" rx="3"/>`;
+            buildingsSvg += `<rect x="${round(bx)}" y="${round(by)}" width="${round(bw)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.4"/>`;
+            buildingsSvg += `<rect x="${round(bx + bw * 0.18)}" y="${round(by + bh * 0.18)}" width="${round(bw * 0.64)}" height="${round(bh * 0.64)}" fill="#FFFFFF" opacity="0.55"/>`;
           } else if (typeRoll > 0.68 && bw > 58) {
-            buildingsSvg += `<rect x="${round(bx)}" y="${round(by)}" width="${round(bw * 0.44)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.3" rx="${rx}"/>`;
-            buildingsSvg += `<rect x="${round(bx + bw * 0.56)}" y="${round(by)}" width="${round(bw * 0.44)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.3" rx="${rx}"/>`;
+            buildingsSvg += `<rect x="${round(bx)}" y="${round(by)}" width="${round(bw * 0.44)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.3"/>`;
+            buildingsSvg += `<rect x="${round(bx + bw * 0.56)}" y="${round(by)}" width="${round(bw * 0.44)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.3"/>`;
           } else {
-            buildingsSvg += `<rect x="${round(bx)}" y="${round(by)}" width="${round(bw)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.3" rx="${rx}"/>`;
+            buildingsSvg += `<rect x="${round(bx)}" y="${round(by)}" width="${round(bw)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.3"/>`;
           }
         }
       }
@@ -333,7 +318,6 @@ function generateLocalMapCoverData(mapName, category) {
   <g id="map-parks">${parksSvg}</g>
   <g id="map-water">${waterSvg}</g>
   <g id="map-buildings">${buildingsSvg}</g>
-  <g id="map-minor-roads">${minorRoadsSvg}</g>
   <g id="map-main-roads">${roadsSvg}</g>
 </svg>`;
 
@@ -416,8 +400,8 @@ export function normalizeMapData(rawData) {
       points: Array.isArray(m.points) ? m.points : []
     };
 
-    // [区域标注·已完成·旧封面升级到现代都市 v5 随机组合样式]
-    const isOldStyle = m.imagePrompt !== 'urban_svg_map_v5' && !String(m.imagePrompt || '').startsWith('placeholder_');
+    // [区域标注·已完成·旧封面升级到现代都市 v6 去长圆棒随机组合样式]
+    const isOldStyle = m.imagePrompt !== 'urban_svg_map_v6' && !String(m.imagePrompt || '').startsWith('placeholder_');
 
     if (!m.imageUrl || isOldStyle) {
       const cover = generateLocalMapCoverData(mapName, mapCategory);
