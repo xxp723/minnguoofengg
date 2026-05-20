@@ -22,9 +22,8 @@ export const MAP_REAL_SCALE = {
 
 /* ==========================================================================
    [区域标注·已完成·本地SVG地图生成器]
-   说明：每次新建“现代都市”地图时，使用随机种子生成不同的现代都市地图。
-         现代都市分支已处理：道路不重叠、无桥梁、细河流、湖泊/绿化/建筑互相避让、
-         建筑不铺满街区；其他分类只生成基础底色占位图。
+   说明：现代都市地图使用占比式避让生成：建筑约40%、道路约20%、绿化约30%、水域约10%。
+         河流/湖泊/绿化不会与建筑重叠；湖泊/绿化不会与道路重叠；其它分类只生成基础底色占位图。
    ========================================================================== */
 export function generateLocalMapCoverData(mapName, category) {
   const seed = Math.floor(Math.random() * 1000000);
@@ -40,16 +39,17 @@ export function generateLocalMapCoverData(mapName, category) {
   }
 
   /* ==========================================================================
-     [区域标注·已完成·现代都市随机组合地图]
-     说明：生成仿现实城市街区的随机 SVG 地图：
-           1. 主/次道路基于坐标去重与最小间距生成，避免道路重叠。
-           2. 不绘制桥梁；道路在河流上方正常穿过但不额外显示桥梁结构。
-           3. 河流保持细窄；湖泊、绿化、建筑通过保留区碰撞检测互相避让。
-           4. 建筑按街区内多个小楼块分布，保留空地，不占满整个小区域块。
+     [区域标注·已完成·现代都市占比式避让地图生成]
+     说明：按近似视觉占比生成：建筑 40%、道路 20%、绿化带 30%、河流/湖泊水域 10%。
+           通过矩形保留区避让，保证：
+           1. 河流、湖泊、绿化带不会和建筑物重叠。
+           2. 湖泊、绿化带不会和道路重叠。
+           3. 允许在周围或附近相邻，但不互相压盖。
      ========================================================================== */
   const W = 2400;
   const H = 1600;
-  const SVG_NS_PROMPT = 'urban_svg_map_v6';
+  const TOTAL_AREA = W * H;
+  const SVG_NS_PROMPT = 'urban_svg_map_v7_ratio_avoid';
 
   let currentSeed = seed;
   const rand = () => {
@@ -58,287 +58,206 @@ export function generateLocalMapCoverData(mapName, category) {
   };
   const between = (min, max) => min + rand() * (max - min);
   const pick = arr => arr[Math.floor(rand() * arr.length)];
-  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const round = value => Math.round(value * 10) / 10;
 
-  const reservedAreas = [];
+  const roadRects = [];
+  const waterRects = [];
+  const parkRects = [];
+  const buildingRects = [];
 
   function rectsOverlap(a, b, gap = 0) {
     return !(
-      a.x + a.w + gap < b.x ||
-      b.x + b.w + gap < a.x ||
-      a.y + a.h + gap < b.y ||
-      b.y + b.h + gap < a.y
+      a.x + a.w + gap <= b.x ||
+      b.x + b.w + gap <= a.x ||
+      a.y + a.h + gap <= b.y ||
+      b.y + b.h + gap <= a.y
     );
   }
 
-  function pointInRect(point, rect, gap = 0) {
-    return (
-      point.x >= rect.x - gap &&
-      point.x <= rect.x + rect.w + gap &&
-      point.y >= rect.y - gap &&
-      point.y <= rect.y + rect.h + gap
-    );
+  function overlapsAny(rect, list, gap = 0) {
+    return list.some(item => rectsOverlap(rect, item, gap));
   }
 
-  function circleRectOverlap(circle, rect, gap = 0) {
-    const nearestX = clamp(circle.x, rect.x, rect.x + rect.w);
-    const nearestY = clamp(circle.y, rect.y, rect.y + rect.h);
-    return Math.hypot(circle.x - nearestX, circle.y - nearestY) <= circle.r + gap;
+  function rectArea(rect) {
+    return Math.max(0, rect.w) * Math.max(0, rect.h);
   }
 
-  function isRectReserved(rect, gap = 0) {
-    return reservedAreas.some(area => {
-      if (area.type === 'rect') return rectsOverlap(rect, area, gap);
-      if (area.type === 'circle') return circleRectOverlap(area, rect, gap);
-      return false;
-    });
+  function addRect(rect, list) {
+    const normalized = {
+      x: round(rect.x),
+      y: round(rect.y),
+      w: round(rect.w),
+      h: round(rect.h)
+    };
+    list.push(normalized);
+    return normalized;
   }
 
-  // [区域标注·已完成·细河流生成] 河流宽度保持细窄，不显示桥梁。
-  const isHorizontalRiver = rand() > 0.45;
-  const riverWidth = Math.round(between(46, 70));
-  const riverPts = isHorizontalRiver
-    ? [
-        { x: -120, y: between(260, H - 260) },
-        { x: between(W * 0.28, W * 0.42), y: between(220, H - 220) },
-        { x: between(W * 0.58, W * 0.72), y: between(220, H - 220) },
-        { x: W + 120, y: between(260, H - 260) }
-      ]
-    : [
-        { x: between(360, W - 360), y: -120 },
-        { x: between(280, W - 280), y: between(H * 0.26, H * 0.42) },
-        { x: between(280, W - 280), y: between(H * 0.58, H * 0.74) },
-        { x: between(360, W - 360), y: H + 120 }
-      ];
-
-  function distToSegment(p, v, w) {
-    const l2 = (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
-    if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
-    let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
-    t = clamp(t, 0, 1);
-    return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
+  function isFreeForWater(rect, gap = 0) {
+    return !overlapsAny(rect, roadRects, gap) && !overlapsAny(rect, parkRects, gap) && !overlapsAny(rect, buildingRects, gap);
   }
 
-  function distToRiver(p) {
-    let d = Infinity;
-    for (let i = 0; i < riverPts.length - 1; i++) {
-      d = Math.min(d, distToSegment(p, riverPts[i], riverPts[i + 1]));
-    }
-    return d;
+  function isFreeForPark(rect, gap = 0) {
+    return !overlapsAny(rect, roadRects, gap) && !overlapsAny(rect, waterRects, gap) && !overlapsAny(rect, buildingRects, gap);
   }
 
-  function rectNearRiver(rect, gap = 0) {
-    const points = [
-      { x: rect.x, y: rect.y },
-      { x: rect.x + rect.w, y: rect.y },
-      { x: rect.x, y: rect.y + rect.h },
-      { x: rect.x + rect.w, y: rect.y + rect.h },
-      { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 }
-    ];
-    return points.some(point => distToRiver(point) < riverWidth / 2 + gap);
+  function isFreeForBuilding(rect, gap = 0) {
+    return !overlapsAny(rect, roadRects, gap) && !overlapsAny(rect, waterRects, gap) && !overlapsAny(rect, parkRects, gap) && !overlapsAny(rect, buildingRects, gap);
   }
 
-  const riverPath = `M${round(riverPts[0].x)},${round(riverPts[0].y)} C${round(riverPts[1].x)},${round(riverPts[1].y)} ${round(riverPts[2].x)},${round(riverPts[2].y)} ${round(riverPts[3].x)},${round(riverPts[3].y)}`;
-  let waterSvg = `
-    <path d="${riverPath}" fill="none" stroke="#C9EAF3" stroke-width="${riverWidth + 10}" stroke-linecap="round"/>
-    <path d="${riverPath}" fill="none" stroke="#A9DCEB" stroke-width="${riverWidth}" stroke-linecap="round"/>`;
-
-  // [区域标注·已完成·湖泊生成避让] 湖泊作为水域保留区，后续绿化和建筑不会压在湖泊下方。
-  const lakeCount = 2 + Math.floor(rand() * 2);
-  for (let i = 0; i < lakeCount; i++) {
-    let placed = false;
-    for (let attempt = 0; attempt < 28 && !placed; attempt++) {
-      const rx = between(95, 180);
-      const ry = between(55, 112);
-      const cx = between(180 + rx, W - 180 - rx);
-      const cy = between(160 + ry, H - 160 - ry);
-      const rect = { x: cx - rx, y: cy - ry, w: rx * 2, h: ry * 2 };
-
-      if (rectNearRiver(rect, 90) || isRectReserved(rect, 80)) continue;
-
-      reservedAreas.push({ type: 'circle', x: cx, y: cy, r: Math.max(rx, ry), role: 'lake' });
-      waterSvg += `
-    <ellipse cx="${round(cx)}" cy="${round(cy)}" rx="${round(rx)}" ry="${round(ry)}" fill="#B8E3EE" opacity="0.92"/>
-    <ellipse cx="${round(cx - rx * 0.15)}" cy="${round(cy - ry * 0.18)}" rx="${round(rx * 0.55)}" ry="${round(ry * 0.38)}" fill="#D9F2F6" opacity="0.45"/>`;
-      placed = true;
-    }
-  }
-
-  // [区域标注·已完成·道路无重叠生成] 同向道路通过最小间距过滤，主路/次路统一分层绘制。
-  function addRoad(roads, value, minGap, min, max) {
-    const clipped = clamp(value, min, max);
-    if (roads.every(existing => Math.abs(existing - clipped) >= minGap)) {
-      roads.push(clipped);
-      return true;
-    }
-    return false;
-  }
-
-  const hRoads = [];
-  const vRoads = [];
-  const hMainCount = 4 + Math.floor(rand() * 2);
-  const vMainCount = 5 + Math.floor(rand() * 3);
-
-  for (let i = 1; i <= hMainCount; i++) {
-    addRoad(hRoads, (H / (hMainCount + 1)) * i + between(-55, 55), 150, 110, H - 110);
-  }
-  for (let i = 1; i <= vMainCount; i++) {
-    addRoad(vRoads, (W / (vMainCount + 1)) * i + between(-70, 70), 160, 120, W - 120);
-  }
-
-  const extraH = 4 + Math.floor(rand() * 4);
-  const extraV = 6 + Math.floor(rand() * 5);
-  for (let i = 0; i < extraH; i++) addRoad(hRoads, between(130, H - 130), 118, 110, H - 110);
-  for (let i = 0; i < extraV; i++) addRoad(vRoads, between(140, W - 140), 122, 120, W - 120);
-
-  hRoads.sort((a, b) => a - b);
-  vRoads.sort((a, b) => a - b);
-
-  const hBounds = [0, ...hRoads, H];
-  const vBounds = [0, ...vRoads, W];
-  const mainRoadWidth = 26;
-  const roadCoreWidth = 18;
-  const minorRoadWidth = 15;
-  const minorCoreWidth = 10;
-
+  // [区域标注·已完成·道路20%占比生成] 道路先生成保留区，湖泊/绿化/建筑均不会压到道路上。
   let roadsSvg = '';
-  const roadBorderColor = '#CFE6CE';
-  const roadFillColor = '#FFFFFF';
-  const avenueFillColor = '#FFF8DF';
+  const roadFill = '#FFFFFF';
+  const roadBorder = '#CFE6CE';
+  const avenueFill = '#FFF8DF';
+  const verticalRoads = [
+    { x: 230, w: 58 },
+    { x: 585, w: 52 },
+    { x: 950, w: 58 },
+    { x: 1325, w: 52 },
+    { x: 1710, w: 58 },
+    { x: 2085, w: 52 }
+  ].map(r => ({ x: r.x + between(-18, 18), y: 0, w: r.w, h: H }));
 
-  hRoads.forEach((y, index) => {
-    const width = index % 3 === 0 ? mainRoadWidth + 5 : mainRoadWidth;
-    roadsSvg += `<path d="M0,${round(y)} L${W},${round(y)}" stroke="${roadBorderColor}" stroke-width="${width}" stroke-linecap="butt"/>`;
-  });
-  vRoads.forEach((x, index) => {
-    const width = index % 3 === 1 ? mainRoadWidth + 5 : mainRoadWidth;
-    roadsSvg += `<path d="M${round(x)},0 L${round(x)},${H}" stroke="${roadBorderColor}" stroke-width="${width}" stroke-linecap="butt"/>`;
-  });
-  hRoads.forEach((y, index) => {
-    roadsSvg += `<path d="M0,${round(y)} L${W},${round(y)}" stroke="${index % 3 === 0 ? avenueFillColor : roadFillColor}" stroke-width="${roadCoreWidth}" stroke-linecap="butt"/>`;
-  });
-  vRoads.forEach((x, index) => {
-    roadsSvg += `<path d="M${round(x)},0 L${round(x)},${H}" stroke="${index % 3 === 1 ? avenueFillColor : roadFillColor}" stroke-width="${roadCoreWidth}" stroke-linecap="butt"/>`;
-  });
+  const horizontalRoads = [
+    { y: 150, h: 52 },
+    { y: 390, h: 58 },
+    { y: 675, h: 52 },
+    { y: 955, h: 58 },
+    { y: 1240, h: 52 },
+    { y: 1460, h: 44 }
+  ].map(r => ({ x: 0, y: r.y + between(-16, 16), w: W, h: r.h }));
 
-  // [区域标注·已完成·绿化生成避让] 绿地先于建筑生成并加入保留区，建筑不会覆盖绿地。
-  let parksSvg = '';
-  const parkColors = ['#CFE8C8', '#D8ECD0', '#C9E3B9'];
-  const parkCount = 7 + Math.floor(rand() * 5);
+  [...verticalRoads, ...horizontalRoads].forEach(rect => addRect(rect, roadRects));
 
-  for (let i = 0; i < parkCount; i++) {
-    let placed = false;
-    for (let attempt = 0; attempt < 36 && !placed; attempt++) {
-      const w = between(145, 340);
-      const h = between(90, 230);
-      const x = between(80, W - w - 80);
-      const y = between(80, H - h - 80);
-      const rect = { x, y, w, h };
+  roadRects.forEach((rect, index) => {
+    const isVertical = rect.h > rect.w;
+    const cx = rect.x + rect.w / 2;
+    const cy = rect.y + rect.h / 2;
+    const core = Math.max(10, (isVertical ? rect.w : rect.h) - 16);
 
-      if (rectNearRiver(rect, 24) || isRectReserved(rect, 56)) continue;
-
-      reservedAreas.push({ type: 'rect', ...rect, role: 'park' });
-      const color = pick(parkColors);
-      parksSvg += `
-    <path d="M${round(x + w * 0.08)},${round(y + h * 0.28)}
-             Q${round(x + w * 0.24)},${round(y - h * 0.04)} ${round(x + w * 0.58)},${round(y + h * 0.08)}
-             Q${round(x + w * 1.02)},${round(y + h * 0.18)} ${round(x + w * 0.9)},${round(y + h * 0.58)}
-             Q${round(x + w * 0.78)},${round(y + h * 1.04)} ${round(x + w * 0.42)},${round(y + h * 0.92)}
-             Q${round(x - w * 0.04)},${round(y + h * 0.82)} ${round(x + w * 0.08)},${round(y + h * 0.28)} Z"
-          fill="${color}" opacity="0.9"/>`;
-
-      const pathCount = 1 + Math.floor(rand() * 3);
-      for (let p = 0; p < pathCount; p++) {
-        const py = y + h * between(0.32, 0.72);
-        parksSvg += `<path d="M${round(x + w * 0.16)},${round(py)} C${round(x + w * 0.38)},${round(py - h * 0.18)} ${round(x + w * 0.58)},${round(py + h * 0.2)} ${round(x + w * 0.84)},${round(py)}" fill="none" stroke="#F8F4E8" stroke-width="6" stroke-linecap="round" opacity="0.72"/>`;
-      }
-
-      placed = true;
+    if (isVertical) {
+      roadsSvg += `<path d="M${round(cx)},0 L${round(cx)},${H}" stroke="${roadBorder}" stroke-width="${round(rect.w)}" stroke-linecap="butt"/>`;
+      roadsSvg += `<path d="M${round(cx)},0 L${round(cx)},${H}" stroke="${index % 2 ? roadFill : avenueFill}" stroke-width="${round(core)}" stroke-linecap="butt"/>`;
+    } else {
+      roadsSvg += `<path d="M0,${round(cy)} L${W},${round(cy)}" stroke="${roadBorder}" stroke-width="${round(rect.h)}" stroke-linecap="butt"/>`;
+      roadsSvg += `<path d="M0,${round(cy)} L${W},${round(cy)}" stroke="${index % 2 ? roadFill : avenueFill}" stroke-width="${round(core)}" stroke-linecap="butt"/>`;
     }
+  });
+
+  // [区域标注·已完成·水域10%占比生成] 河流/湖泊均记录为水域保留区，建筑和绿化不会与其重叠。
+  let waterSvg = '';
+  const riverHorizontal = rand() > 0.45;
+  const riverBand = riverHorizontal
+    ? addRect({ x: 0, y: between(540, 900), w: W, h: 116 }, waterRects)
+    : addRect({ x: between(820, 1320), y: 0, w: 128, h: H }, waterRects);
+
+  if (riverHorizontal) {
+    const y = riverBand.y + riverBand.h / 2;
+    waterSvg += `
+    <path d="M-120,${round(y)} C${round(W * 0.22)},${round(y - 74)} ${round(W * 0.62)},${round(y + 82)} ${W + 120},${round(y - 18)}" fill="none" stroke="#C9EAF3" stroke-width="${round(riverBand.h + 16)}" stroke-linecap="round"/>
+    <path d="M-120,${round(y)} C${round(W * 0.22)},${round(y - 74)} ${round(W * 0.62)},${round(y + 82)} ${W + 120},${round(y - 18)}" fill="none" stroke="#A9DCEB" stroke-width="${round(riverBand.h)}" stroke-linecap="round"/>`;
+  } else {
+    const x = riverBand.x + riverBand.w / 2;
+    waterSvg += `
+    <path d="M${round(x)},-120 C${round(x - 90)},${round(H * 0.24)} ${round(x + 96)},${round(H * 0.62)} ${round(x - 16)},${H + 120}" fill="none" stroke="#C9EAF3" stroke-width="${round(riverBand.w + 16)}" stroke-linecap="round"/>
+    <path d="M${round(x)},-120 C${round(x - 90)},${round(H * 0.24)} ${round(x + 96)},${round(H * 0.62)} ${round(x - 16)},${H + 120}" fill="none" stroke="#A9DCEB" stroke-width="${round(riverBand.w)}" stroke-linecap="round"/>`;
   }
 
-  // [区域标注·已完成·街区建筑合理分布与长圆棒去除] 建筑避开水域/绿地，按街区留白分布；已去除街区内横向/竖向长圆棒形道路。
+  let waterArea = rectArea(riverBand);
+  const targetWaterArea = TOTAL_AREA * 0.10;
+  for (let attempt = 0; attempt < 180 && waterArea < targetWaterArea; attempt++) {
+    const rect = {
+      x: between(90, W - 330),
+      y: between(90, H - 230),
+      w: between(160, 300),
+      h: between(90, 180)
+    };
+
+    if (!isFreeForWater(rect, 22)) continue;
+
+    const lake = addRect(rect, waterRects);
+    waterArea += rectArea(lake);
+    const cx = lake.x + lake.w / 2;
+    const cy = lake.y + lake.h / 2;
+    waterSvg += `
+    <ellipse cx="${round(cx)}" cy="${round(cy)}" rx="${round(lake.w / 2)}" ry="${round(lake.h / 2)}" fill="#B8E3EE" opacity="0.94"/>
+    <ellipse cx="${round(cx - lake.w * 0.08)}" cy="${round(cy - lake.h * 0.12)}" rx="${round(lake.w * 0.25)}" ry="${round(lake.h * 0.18)}" fill="#D9F2F6" opacity="0.48"/>`;
+  }
+
+  // [区域标注·已完成·绿化30%占比生成] 绿化带与道路/湖泊/河流/建筑均不重叠，可相邻分布。
+  let parksSvg = '';
+  const parkColors = ['#CFE8C8', '#D8ECD0', '#C9E3B9', '#BFDDB6'];
+  let parkArea = 0;
+  const targetParkArea = TOTAL_AREA * 0.30;
+
+  for (let attempt = 0; attempt < 760 && parkArea < targetParkArea; attempt++) {
+    const rect = {
+      x: between(50, W - 470),
+      y: between(50, H - 300),
+      w: between(170, 440),
+      h: between(95, 270)
+    };
+
+    if (!isFreeForPark(rect, 14)) continue;
+
+    const park = addRect(rect, parkRects);
+    parkArea += rectArea(park);
+    const color = pick(parkColors);
+    parksSvg += `
+    <path d="M${round(park.x + park.w * 0.08)},${round(park.y + park.h * 0.25)}
+             Q${round(park.x + park.w * 0.25)},${round(park.y - park.h * 0.04)} ${round(park.x + park.w * 0.58)},${round(park.y + park.h * 0.08)}
+             Q${round(park.x + park.w * 1.02)},${round(park.y + park.h * 0.2)} ${round(park.x + park.w * 0.9)},${round(park.y + park.h * 0.62)}
+             Q${round(park.x + park.w * 0.78)},${round(park.y + park.h * 1.05)} ${round(park.x + park.w * 0.38)},${round(park.y + park.h * 0.9)}
+             Q${round(park.x - park.w * 0.03)},${round(park.y + park.h * 0.78)} ${round(park.x + park.w * 0.08)},${round(park.y + park.h * 0.25)} Z"
+          fill="${color}" opacity="0.92"/>`;
+
+    const pathY = park.y + park.h * between(0.38, 0.68);
+    parksSvg += `<path d="M${round(park.x + park.w * 0.16)},${round(pathY)} C${round(park.x + park.w * 0.38)},${round(pathY - park.h * 0.16)} ${round(park.x + park.w * 0.58)},${round(pathY + park.h * 0.18)} ${round(park.x + park.w * 0.86)},${round(pathY)}" fill="none" stroke="#F8F4E8" stroke-width="6" stroke-linecap="round" opacity="0.72"/>`;
+  }
+
+  // [区域标注·已完成·建筑40%占比生成] 建筑只在剩余空地中生成，不与河流/湖泊/绿化/道路重叠。
   let buildingsSvg = '';
-  const bColors = ['#E8ECF1', '#F0F0ED', '#EAEAF1', '#EBF2F6', '#EFE6DA'];
+  const buildingColors = ['#E8ECF1', '#F0F0ED', '#EAEAF1', '#EBF2F6', '#EFE6DA', '#EDE4D8'];
   const strokeColor = '#D5DADF';
+  let buildingArea = 0;
+  const targetBuildingArea = TOTAL_AREA * 0.40;
 
-  for (let row = 0; row < hBounds.length - 1; row++) {
-    for (let col = 0; col < vBounds.length - 1; col++) {
-      const cellX = vBounds[col] + mainRoadWidth / 2;
-      const cellY = hBounds[row] + mainRoadWidth / 2;
-      const cellW = vBounds[col + 1] - vBounds[col] - mainRoadWidth;
-      const cellH = hBounds[row + 1] - hBounds[row] - mainRoadWidth;
+  for (let attempt = 0; attempt < 3800 && buildingArea < targetBuildingArea; attempt++) {
+    const rect = {
+      x: between(28, W - 150),
+      y: between(28, H - 130),
+      w: between(44, 120),
+      h: between(36, 108)
+    };
 
-      if (cellW < 115 || cellH < 105) continue;
+    if (!isFreeForBuilding(rect, 7)) continue;
 
-      const cellRect = { x: cellX, y: cellY, w: cellW, h: cellH };
-      if (isRectReserved(cellRect, 4) && rand() < 0.55) continue;
+    const building = addRect(rect, buildingRects);
+    buildingArea += rectArea(building);
+    const color = pick(buildingColors);
+    const radius = rand() > 0.86 ? 8 : 2;
+    buildingsSvg += `<rect x="${building.x}" y="${building.y}" width="${building.w}" height="${building.h}" rx="${radius}" fill="${color}" stroke="${strokeColor}" stroke-width="1.2"/>`;
 
-      // [区域标注·已完成·去除横竖长圆棒] 不再绘制街区内部横向/竖向圆头短路，避免生成看不出含义的长圆棒形状。
-      const margin = between(18, 34);
-      const innerX = cellX + margin;
-      const innerY = cellY + margin;
-      const innerW = cellW - margin * 2;
-      const innerH = cellH - margin * 2;
-      if (innerW < 70 || innerH < 70) continue;
-
-      const density = between(0.48, 0.68);
-      const cols = Math.max(1, Math.floor(innerW / between(76, 118)));
-      const rows = Math.max(1, Math.floor(innerH / between(72, 108)));
-      const lotW = innerW / cols;
-      const lotH = innerH / rows;
-
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          if (rand() > density) continue;
-
-          const padX = between(9, Math.max(10, lotW * 0.22));
-          const padY = between(9, Math.max(10, lotH * 0.22));
-          const bw = lotW - padX * 2;
-          const bh = lotH - padY * 2;
-          if (bw < 24 || bh < 24) continue;
-
-          const bx = innerX + c * lotW + padX + between(-4, 4);
-          const by = innerY + r * lotH + padY + between(-4, 4);
-          const buildingRect = { x: bx, y: by, w: bw, h: bh };
-          const center = { x: bx + bw / 2, y: by + bh / 2 };
-
-          if (rectNearRiver(buildingRect, 44) || distToRiver(center) < riverWidth / 2 + 50 || isRectReserved(buildingRect, 16)) {
-            continue;
-          }
-
-          const color = pick(bColors);
-          const typeRoll = rand();
-
-          if (typeRoll > 0.84 && bw > 48 && bh > 48) {
-            buildingsSvg += `<rect x="${round(bx)}" y="${round(by)}" width="${round(bw)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.4"/>`;
-            buildingsSvg += `<rect x="${round(bx + bw * 0.18)}" y="${round(by + bh * 0.18)}" width="${round(bw * 0.64)}" height="${round(bh * 0.64)}" fill="#FFFFFF" opacity="0.55"/>`;
-          } else if (typeRoll > 0.68 && bw > 58) {
-            buildingsSvg += `<rect x="${round(bx)}" y="${round(by)}" width="${round(bw * 0.44)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.3"/>`;
-            buildingsSvg += `<rect x="${round(bx + bw * 0.56)}" y="${round(by)}" width="${round(bw * 0.44)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.3"/>`;
-          } else {
-            buildingsSvg += `<rect x="${round(bx)}" y="${round(by)}" width="${round(bw)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.3"/>`;
-          }
-        }
-      }
+    if (rand() > 0.72 && building.w > 70 && building.h > 50) {
+      buildingsSvg += `<rect x="${round(building.x + building.w * 0.18)}" y="${round(building.y + building.h * 0.18)}" width="${round(building.w * 0.64)}" height="${round(building.h * 0.64)}" fill="#FFFFFF" opacity="0.45"/>`;
     }
   }
 
   const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <rect width="100%" height="100%" fill="#F4F7F5"/>
-  <g id="map-parks">${parksSvg}</g>
-  <g id="map-water">${waterSvg}</g>
-  <g id="map-buildings">${buildingsSvg}</g>
-  <g id="map-main-roads">${roadsSvg}</g>
+  <g id="map-water-ratio-10">${waterSvg}</g>
+  <g id="map-parks-ratio-30">${parksSvg}</g>
+  <g id="map-roads-ratio-20">${roadsSvg}</g>
+  <g id="map-buildings-ratio-40">${buildingsSvg}</g>
 </svg>`;
 
   const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   return {
     prompt: SVG_NS_PROMPT,
-    seed: seed,
-    url: url
+    seed,
+    url
   };
 }
 
@@ -405,18 +324,19 @@ export function normalizeMapData(rawData) {
   maps = maps.map(m => {
     const mapName = String(m.name || '未命名地图').trim();
     const mapCategory = String(m.category || '现代都市').trim();
+    const distanceScale = normalizeMapDistanceScale(m.distanceScale);
     const mapObj = {
       id: String(m.id || `map_${Date.now()}_${Math.random().toString(16).slice(2)}`),
       name: mapName,
       category: mapCategory,
       description: String(m.description || '').trim(),
       createdAt: Number(m.createdAt || Date.now()),
-      points: Array.isArray(m.points) ? m.points.map(point => normalizeMapPoint(point)) : [],
-      distanceScale: normalizeMapDistanceScale(m.distanceScale)
+      distanceScale,
+      points: Array.isArray(m.points) ? m.points.map(point => normalizeMapPoint(point, distanceScale)) : []
     };
 
-    // [区域标注·已完成·旧封面升级到现代都市 v6 去长圆棒随机组合样式]
-    const isOldStyle = m.imagePrompt !== 'urban_svg_map_v6' && !String(m.imagePrompt || '').startsWith('placeholder_');
+    // [区域标注·已完成·旧封面升级到现代都市 v7 占比避让样式]
+    const isOldStyle = m.imagePrompt !== 'urban_svg_map_v7_ratio_avoid' && !String(m.imagePrompt || '').startsWith('placeholder_');
 
     if (!m.imageUrl || isOldStyle) {
       const cover = generateLocalMapCoverData(mapName, mapCategory);

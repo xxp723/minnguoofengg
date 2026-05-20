@@ -690,7 +690,84 @@
   }
 }
 
-/* [区域标注·已完成·地点标记图标样式] 地点使用 IconPark 风格定位图标，支持长按拖动。 */
+/* [区域标注·已完成·详情页地图换算比例尺与地点描述卡片样式] 左上固定磨砂比例尺；单击地点后显示应用内描述卡片。 */
+.map-detail-scale-panel {
+  position: absolute;
+  top: 66px;
+  left: 12px;
+  right: 12px;
+  z-index: 23;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+  pointer-events: none;
+}
+
+.map-detail-scale-main {
+  flex: 0 0 auto;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+}
+
+.map-detail-distance-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.92);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+}
+
+.map-point-info-card {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 112px;
+  z-index: 23;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 16px;
+  background: rgba(245, 241, 234, 0.88);
+  color: var(--c-text-espresso, #2C1810);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 10px 24px rgba(44, 24, 16, 0.14);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  pointer-events: none;
+}
+
+.map-point-info-card.is-hidden {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.map-point-info-title {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.map-point-info-desc {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--c-text-cocoa, #5C4B43);
+}
+
+/* [区域标注·已完成·地点标记图标样式] 地点使用放大后的 IconPark 风格定位图标，支持单击描述、连续两点距离与长按拖动。 */
 .map-detail-markers {
   position: absolute;
   top: 0;
@@ -719,18 +796,18 @@
 }
 
 .map-point-icon {
-  width: 24px;
-  height: 30px;
+  width: 32px;
+  height: 40px;
   color: #E94B4B;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.32));
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.34));
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .map-point-icon svg {
-  width: 24px;
-  height: 30px;
+  width: 32px;
+  height: 40px;
   display: block;
 }
 

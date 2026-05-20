@@ -49,6 +49,18 @@ export function buildMapDetailShell(mapData) {
         </button>
       </div>
 
+      <!-- [区域标注·已完成·详情页地图换算比例尺与两点距离] 固定在标题栏下方；点击两个地点后显示真实距离 -->
+      <div class="map-detail-scale-panel" id="map-detail-scale-panel">
+        <span class="map-detail-scale-main" id="map-detail-scale-main">比例尺：1px ≈ 1m</span>
+        <span class="map-detail-distance-text" id="map-detail-distance-text"></span>
+      </div>
+
+      <!-- [区域标注·已完成·详情页地点描述卡片] 单击地点图标后显示地点名称与描述，不使用浏览器原生弹窗 -->
+      <div class="map-point-info-card is-hidden" id="map-point-info-card">
+        <div class="map-point-info-title" id="map-point-info-title"></div>
+        <div class="map-point-info-desc" id="map-point-info-desc"></div>
+      </div>
+
       <!-- [区域标注·已完成·详情页手动重新生成地图按钮] 右下角磨砂透明圆形按钮；不点击则地图保持原样 -->
       <button class="map-detail-regen-btn" id="map-detail-regenerate" type="button" title="重新生成地图" aria-label="重新生成地图">
         <!-- IconPark 风格刷新/重做图标 -->
@@ -86,8 +98,8 @@ export function buildMapDetailShell(mapData) {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·地点标记渲染与真实距离提示]
-   说明：地点以定位图标显示；title 中包含地点描述与米制坐标，AI 可按 realXMeter/realYMeter 计算距离。
+   [区域标注·已完成·地点标记渲染与真实距离/描述展示]
+   说明：地点以定位图标显示；单击地点显示应用内描述卡片，连续点击两个地点显示真实距离。
    ========================================================================== */
 function renderMarkers(container, mapData) {
   const markersEl = container.querySelector('#map-detail-markers');
@@ -98,7 +110,7 @@ function renderMarkers(container, mapData) {
     const realX = Number(p.realXMeter || 0).toFixed(1);
     const realY = Number(p.realYMeter || 0).toFixed(1);
     return `
-      <div class="map-point-marker" data-point-id="${escapeHtml(p.id)}" style="left: ${p.x}%; top: ${p.y}%;" title="${escapeHtml(p.name)}\n${escapeHtml(p.description)}\n坐标：${realX}m, ${realY}m">
+      <div class="map-point-marker" data-point-id="${escapeHtml(p.id)}" style="left: ${p.x}%; top: ${p.y}%;" aria-label="${escapeHtml(p.name)}，坐标 ${realX} 米，${realY} 米">
         <div class="map-point-icon" aria-hidden="true">
           <!-- IconPark 风格定位图标 -->
           <svg viewBox="0 0 48 48" fill="none">
@@ -123,6 +135,11 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
   const viewportEl = container.querySelector('#map-detail-viewport');
   const canvasEl = container.querySelector('#map-detail-canvas');
   const imageEl = container.querySelector('#map-detail-image');
+  const scaleMainEl = container.querySelector('#map-detail-scale-main');
+  const distanceTextEl = container.querySelector('#map-detail-distance-text');
+  const pointInfoCard = container.querySelector('#map-point-info-card');
+  const pointInfoTitle = container.querySelector('#map-point-info-title');
+  const pointInfoDesc = container.querySelector('#map-point-info-desc');
   const modal = container.querySelector('#map-point-modal');
   const cancelBtn = container.querySelector('#map-point-cancel');
   const confirmBtn = container.querySelector('#map-point-confirm');
@@ -131,9 +148,73 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
   const hintEl = container.querySelector('#map-point-hint');
 
   let tempPoint = { x: 50, y: 50 };
+  let selectedPointId = null;
 
   // 渲染初始坐标
   renderMarkers(container, mapData);
+
+  /* ==========================================================================
+     [区域标注·已完成·比例尺与地点单击距离计算]
+     说明：固定显示地图换算方法；单击地点显示描述，连续单击两个地点后显示两点真实距离。
+   ========================================================================== */
+  const getPointDistanceMeters = (a, b) => {
+    if (!a || !b) return 0;
+    const dx = Number(a.realXMeter || 0) - Number(b.realXMeter || 0);
+    const dy = Number(a.realYMeter || 0) - Number(b.realYMeter || 0);
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const formatDistance = (meters) => {
+    if (meters >= 1000) return `${(meters / 1000).toFixed(2)}公里`;
+    return `${meters.toFixed(1)}米`;
+  };
+
+  const updateScaleText = () => {
+    if (!scaleMainEl) return;
+    const metersPerPixel = Number(mapData.distanceScale?.metersPerPixel || 1);
+    scaleMainEl.textContent = `比例尺：1px ≈ ${metersPerPixel >= 1000 ? `${(metersPerPixel / 1000).toFixed(2)}km` : `${metersPerPixel}m`}`;
+  };
+
+  const hidePointInfo = () => {
+    if (pointInfoCard) pointInfoCard.classList.add('is-hidden');
+  };
+
+  const showPointInfo = (point) => {
+    if (!point || !pointInfoCard) return;
+    if (pointInfoTitle) pointInfoTitle.textContent = point.name || '未命名地点';
+    if (pointInfoDesc) {
+      const realX = Number(point.realXMeter || 0).toFixed(1);
+      const realY = Number(point.realYMeter || 0).toFixed(1);
+      pointInfoDesc.textContent = `${point.description || '暂无描述'}｜坐标：${realX}m, ${realY}m`;
+    }
+    pointInfoCard.classList.remove('is-hidden');
+  };
+
+  const handlePointClick = (pointId) => {
+    const point = (mapData.points || []).find(p => p.id === pointId);
+    if (!point) return;
+
+    showPointInfo(point);
+
+    if (selectedPointId && selectedPointId !== pointId) {
+      const previous = (mapData.points || []).find(p => p.id === selectedPointId);
+      if (previous && distanceTextEl) {
+        distanceTextEl.textContent = `${previous.name}距离${point.name}有${formatDistance(getPointDistanceMeters(previous, point))}`;
+      }
+    } else if (distanceTextEl) {
+      distanceTextEl.textContent = '';
+    }
+
+    selectedPointId = pointId;
+  };
+
+  const clearDistanceWhenTapMap = () => {
+    selectedPointId = null;
+    if (distanceTextEl) distanceTextEl.textContent = '';
+    hidePointInfo();
+  };
+
+  updateScaleText();
 
   /* ==========================================================================
      [区域标注·已完成·地图详情页完整适配与缩放边界]
@@ -303,12 +384,21 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
     };
 
     const handleMarkerPointerUp = async (e) => {
+      const marker = e.target.closest?.('.map-point-marker');
+      const pendingPointId = marker?.dataset?.pointId || '';
       clearMarkerPressTimer();
 
       if (draggingPointId) {
         e.preventDefault();
         e.stopPropagation();
         await finishMarkerDrag();
+        return;
+      }
+
+      if (pendingPointId) {
+        e.preventDefault();
+        e.stopPropagation();
+        handlePointClick(pendingPointId);
       }
     };
 
@@ -325,6 +415,11 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
     window.addEventListener('pointermove', handleMarkerPointerMove, { passive: false });
     window.addEventListener('pointerup', handleMarkerPointerUp, { passive: false });
     window.addEventListener('pointercancel', handleMarkerPointerUp, { passive: false });
+
+    viewportEl.addEventListener('pointerdown', (e) => {
+      if (e.target.closest?.('.map-point-marker') || e.target.closest?.('.map-detail-top-bar') || e.target.closest?.('.map-detail-scale-panel') || e.target.closest?.('.map-point-info-card') || e.target.closest?.('.map-detail-regen-btn')) return;
+      clearDistanceWhenTapMap();
+    });
 
     viewportEl.addEventListener('touchstart', (e) => {
       if (!modal.classList.contains('is-hidden') || draggingPointId) return;
@@ -472,6 +567,10 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
       mapData.imagePrompt = nextImage.imagePrompt;
       mapData.imageSeed = nextImage.imageSeed;
       mapData.distanceScale = nextImage.distanceScale;
+      updateScaleText();
+      if (distanceTextEl) distanceTextEl.textContent = '';
+      hidePointInfo();
+      selectedPointId = null;
 
       await persistMapData(context.db, state);
 
