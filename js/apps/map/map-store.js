@@ -344,6 +344,7 @@ export function normalizeMapData(rawData) {
       category: mapCategory,
       description: String(m.description || '').trim(),
       createdAt: Number(m.createdAt || Date.now()),
+      sourceWorldBookId: String(m.sourceWorldBookId || m.worldbookId || '').trim(),
       distanceScale,
       points: Array.isArray(m.points) ? m.points.map(point => normalizeMapPoint(point, distanceScale)) : []
     };
@@ -508,6 +509,7 @@ export function createMapDraft(name, description, category, options = {}) {
     category: mapCategory,
     description: mapDesc,
     createdAt: Date.now(),
+    sourceWorldBookId: String(options.sourceWorldBookId || '').trim(),
     imageUrl: cover.url,
     imagePrompt: cover.prompt,
     imageSeed: cover.seed,

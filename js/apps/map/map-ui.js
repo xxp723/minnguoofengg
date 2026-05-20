@@ -12,14 +12,15 @@ import { buildMapDetailShell, bindMapDetailEvents } from './map-detail.js';
 const MAP_ICONS = {
   add: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 8v32M8 24h32" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
   ai: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 5l4.9 13.1L42 23l-13.1 4.9L24 41l-4.9-13.1L6 23l13.1-4.9L24 5Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M38 6l1.8 4.2L44 12l-4.2 1.8L38 18l-1.8-4.2L32 12l4.2-1.8L38 6Z" fill="currentColor"/></svg>`,
-  arrowDown: `<svg viewBox="0 0 48 48" fill="none" class="map-dropdown-arrow" aria-hidden="true"><path d="M36 18L24 30L12 18" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  arrowDown: `<svg viewBox="0 0 48 48" fill="none" class="map-dropdown-arrow" aria-hidden="true"><path d="M36 18L24 30L12 18" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  trash: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M9 12H39" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M19 5H29" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M34 12L32 39C31.8 41.2 29.9 43 27.7 43H20.3C18.1 43 16.2 41.2 16 39L14 12" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 19V34M28 19V34" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`
 };
 
 const DEFAULT_MAP_CATEGORIES = ['现代都市', '西方魔幻', '古代宫廷', '古代仙侠', '未来科幻'];
 
 /* ==========================================================================
    [区域标注·已完成·地图骨架与渲染]
-   说明：包含主页列表、手动创建弹窗、AI 自动生成地图弹窗、编辑弹窗。
+   说明：包含主页列表、手动创建弹窗、AI 自动生成地图弹窗、长按封面编辑弹窗、删除确认弹窗。
    ========================================================================== */
 export function buildMapShell() {
   return `
@@ -89,7 +90,7 @@ export function buildMapShell() {
         </div>
       </div>
 
-      <!-- [区域标注·已完成·AI自动生成地图弹窗与解析加速]
+      <!-- [区域标注·已完成·AI自动生成地图弹窗与来源世界书绑定]
            说明：
            1. 读取世情应用里的局部世界书，只从 DB.js / IndexedDB 的 worldbook::all-books 读取。
            2. 点击“确认解析”后只调用设置应用副 API；不回退主 API，不写双份存储兜底。
@@ -97,7 +98,7 @@ export function buildMapShell() {
            4. AI 只负责解析分类、地图名、短描述和少量核心地点；地点坐标由前端自动分布避让，减少输出长度和 JSON 失败率。
            5. AI 请求带前端超时中断和 JSON 输出约束，避免副 API 长时间无响应导致一直等待。
            6. AI 解析结果以输入框形式展示：分类、地图名称、描述地图；用户可继续手动修改。
-           7. 点击“创建地图”后写入地图应用 IndexedDB，并带入已自动避让过的地点图标坐标。 -->
+           7. 点击“创建地图”后写入地图应用 IndexedDB，并记录本张地图的 sourceWorldBookId，供详情页“AI自动生成新地点”默认回填。 -->
       <div class="map-modal-mask is-hidden" id="map-ai-modal">
         <div class="map-modal-panel map-ai-modal-panel">
           <div class="map-modal-title">AI自动生成地图</div>
@@ -177,7 +178,8 @@ export function buildMapShell() {
         </div>
       </div>
 
-      <!-- [区域标注·已完成·地图卡片编辑信息弹窗] -->
+      <!-- [区域标注·已完成·地图主页长按封面编辑弹窗]
+           说明：仅长按地图封面进入编辑，弹窗内可修改地图名称、描述，并进入删除确认流程。 -->
       <div class="map-modal-mask is-hidden" id="map-edit-modal">
         <div class="map-modal-panel">
           <div class="map-modal-title">编辑地图信息</div>
@@ -194,9 +196,25 @@ export function buildMapShell() {
           
           <div class="map-modal-hint" id="map-edit-hint"></div>
           
+          <div class="map-modal-actions map-modal-actions--triple">
+            <button class="map-btn map-btn-cancel" id="map-edit-cancel" type="button">取消</button>
+            <button class="map-btn map-btn-danger" id="map-edit-delete" type="button">删除地图</button>
+            <button class="map-btn map-btn-confirm" id="map-edit-confirm" type="button">保存</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- [区域标注·已完成·地图主页删除地图确认弹窗] 长按封面后的删除地图操作使用应用内确认弹窗，不使用浏览器原生弹窗。 -->
+      <div class="map-modal-mask is-hidden" id="map-delete-map-modal">
+        <div class="map-modal-panel map-delete-category-panel">
+          <div class="map-modal-title">删除地图</div>
+          <div class="map-delete-category-text">
+            确认删除地图「<span id="map-delete-map-name"></span>」吗？
+          </div>
+          <div class="map-delete-category-tip">删除后将同时移除该地图下的所有地点图标。</div>
           <div class="map-modal-actions">
-            <button class="map-btn map-btn-cancel" id="map-edit-cancel">取消</button>
-            <button class="map-btn map-btn-confirm" id="map-edit-confirm">确认</button>
+            <button class="map-btn map-btn-cancel" id="map-delete-map-cancel" type="button">取消</button>
+            <button class="map-btn map-btn-danger" id="map-delete-map-confirm" type="button">确认删除</button>
           </div>
         </div>
       </div>
@@ -759,7 +777,10 @@ function bindAiMapGenerator(container, state, context, helpers) {
     }
 
     const basePoints = parsedPayload?.points || [];
-    const nextMap = createMapDraft(name, desc, selectedCategory, { points: basePoints });
+    const nextMap = createMapDraft(name, desc, selectedCategory, {
+      points: basePoints,
+      sourceWorldBookId: selectedBookId
+    });
     state.maps.push(nextMap);
     if (!state.categories) state.categories = [];
     if (!state.categories.includes(selectedCategory)) state.categories.push(selectedCategory);
@@ -769,7 +790,7 @@ function bindAiMapGenerator(container, state, context, helpers) {
     bindGridEvents(container, state, context);
     closeAiModal();
 
-    // [区域标注·已完成·AI地图创建后后台地点已生成] 地图主页创建完成后，详情页可直接看到所有地点图标。
+    // [区域标注·已完成·AI地图创建后后台地点已生成] 地图主页创建完成后，详情页可直接看到所有地点图标，且默认绑定来源世界书。
   }
 }
 
@@ -1128,7 +1149,7 @@ function clamp(value, min, max) {
 
 /* ==========================================================================
    [区域标注·已完成·地图卡片事件]
-   说明：单击进入详情页，长按编辑地图信息。
+   说明：单击进入详情页，仅长按地图封面弹出编辑地图信息与删除确认。
    ========================================================================== */
 function bindGridEvents(container, state, context) {
   const cards = container.querySelectorAll('.map-card');
@@ -1136,85 +1157,143 @@ function bindGridEvents(container, state, context) {
   const editName = container.querySelector('#map-edit-name');
   const editDesc = container.querySelector('#map-edit-desc');
   const editHint = container.querySelector('#map-edit-hint');
-  const editCancel = container.querySelector('#map-edit-cancel');
-  const editConfirm = container.querySelector('#map-edit-confirm');
+  let editCancel = container.querySelector('#map-edit-cancel');
+  let editConfirm = container.querySelector('#map-edit-confirm');
+  let editDelete = container.querySelector('#map-edit-delete');
+
+  const deleteMapModal = container.querySelector('#map-delete-map-modal');
+  const deleteMapName = container.querySelector('#map-delete-map-name');
+  let deleteMapCancel = container.querySelector('#map-delete-map-cancel');
+  let deleteMapConfirm = container.querySelector('#map-delete-map-confirm');
 
   let currentEditMapId = null;
+  let pendingDeleteMapId = null;
+
+  const replaceButton = (button) => {
+    if (!button?.parentNode) return button;
+    const clone = button.cloneNode(true);
+    button.parentNode.replaceChild(clone, button);
+    return clone;
+  };
+
+  editCancel = replaceButton(editCancel);
+  editConfirm = replaceButton(editConfirm);
+  editDelete = replaceButton(editDelete);
+  deleteMapCancel = replaceButton(deleteMapCancel);
+  deleteMapConfirm = replaceButton(deleteMapConfirm);
 
   const closeEditModal = () => {
     editModal?.classList.add('is-hidden');
     currentEditMapId = null;
   };
 
+  const closeDeleteMapModal = () => {
+    deleteMapModal?.classList.add('is-hidden');
+    pendingDeleteMapId = null;
+  };
+
+  const openEditModal = (mapId) => {
+    const mapObj = state.maps.find(m => m.id === mapId);
+    if (!mapObj || !editModal) return;
+    currentEditMapId = mapId;
+    editName.value = mapObj.name || '';
+    editDesc.value = mapObj.description || '';
+    editHint.textContent = '';
+    editModal.classList.remove('is-hidden');
+    requestAnimationFrame(() => editName.focus());
+  };
+
+  const openDeleteMapModal = (mapId) => {
+    const mapObj = state.maps.find(m => m.id === mapId);
+    if (!mapObj || !deleteMapModal) return;
+    pendingDeleteMapId = mapId;
+    if (deleteMapName) deleteMapName.textContent = mapObj.name || '未命名地图';
+    deleteMapModal.classList.remove('is-hidden');
+  };
+
   editCancel?.addEventListener('click', closeEditModal);
-  editModal?.addEventListener('click', e => {
+  editModal?.addEventListener('click', (e) => {
     if (e.target === editModal) closeEditModal();
   });
 
-  if (editConfirm) {
-    const newConfirm = editConfirm.cloneNode(true);
-    editConfirm.parentNode.replaceChild(newConfirm, editConfirm);
-    newConfirm.addEventListener('click', async () => {
-      if (!currentEditMapId) return;
-      const name = editName.value.trim();
-      const desc = editDesc.value.trim();
-      if (!name) {
-        editHint.textContent = '地图名称不能为空';
-        return;
-      }
-      editHint.textContent = '';
+  editDelete?.addEventListener('click', () => {
+    if (!currentEditMapId) return;
+    openDeleteMapModal(currentEditMapId);
+  });
 
-      const mapObj = state.maps.find(m => m.id === currentEditMapId);
-      if (mapObj) {
-        mapObj.name = name;
-        mapObj.description = desc;
-        await persistMapData(context.db, state);
-        renderMapGrid(container, state);
-        bindGridEvents(container, state, context);
-      }
-      closeEditModal();
-    });
-  }
+  deleteMapCancel?.addEventListener('click', closeDeleteMapModal);
+  deleteMapModal?.addEventListener('click', (e) => {
+    if (e.target === deleteMapModal) closeDeleteMapModal();
+  });
+
+  deleteMapConfirm?.addEventListener('click', async () => {
+    if (!pendingDeleteMapId) return;
+    state.maps = (Array.isArray(state.maps) ? state.maps : []).filter(mapItem => mapItem.id !== pendingDeleteMapId);
+    await persistMapData(context.db, state);
+    renderMapGrid(container, state);
+    bindGridEvents(container, state, context);
+    closeDeleteMapModal();
+    closeEditModal();
+  });
+
+  editConfirm?.addEventListener('click', async () => {
+    if (!currentEditMapId) return;
+    const name = editName.value.trim();
+    const desc = editDesc.value.trim();
+
+    if (!name) {
+      editHint.textContent = '地图名称不能为空';
+      return;
+    }
+
+    editHint.textContent = '';
+    const mapObj = state.maps.find(m => m.id === currentEditMapId);
+    if (!mapObj) return;
+
+    mapObj.name = name;
+    mapObj.description = desc;
+    await persistMapData(context.db, state);
+    renderMapGrid(container, state);
+    bindGridEvents(container, state, context);
+    closeEditModal();
+  });
 
   cards.forEach(card => {
     const mapId = card.dataset.mapId;
+    const cover = card.querySelector('.map-card-cover');
     let pressTimer = null;
-    let isLongPress = false;
+    let suppressClick = false;
 
-    const startPress = () => {
-      isLongPress = false;
-      pressTimer = setTimeout(() => {
-        isLongPress = true;
-        currentEditMapId = mapId;
-        const mapObj = state.maps.find(m => m.id === mapId);
-        if (mapObj && editModal) {
-          editName.value = mapObj.name || '';
-          editDesc.value = mapObj.description || '';
-          editHint.textContent = '';
-          editModal.classList.remove('is-hidden');
-        }
-      }, 500);
-    };
-
-    const cancelPress = () => {
+    const clearPress = () => {
       if (pressTimer) {
         clearTimeout(pressTimer);
         pressTimer = null;
       }
     };
 
-    card.addEventListener('mousedown', startPress);
-    card.addEventListener('touchstart', startPress, { passive: true });
-    card.addEventListener('mousemove', cancelPress);
-    card.addEventListener('touchmove', cancelPress, { passive: true });
-
-    card.addEventListener('mouseup', () => {
-      cancelPress();
-      if (!isLongPress) enterMapDetail(container, state, context, mapId);
+    cover?.addEventListener('pointerdown', (e) => {
+      if (typeof e.button === 'number' && e.button !== 0) return;
+      suppressClick = false;
+      clearPress();
+      pressTimer = setTimeout(() => {
+        suppressClick = true;
+        openEditModal(mapId);
+      }, 520);
     });
-    card.addEventListener('touchend', () => {
-      cancelPress();
-      if (!isLongPress) enterMapDetail(container, state, context, mapId);
+
+    cover?.addEventListener('pointerup', clearPress);
+    cover?.addEventListener('pointercancel', clearPress);
+    cover?.addEventListener('pointerleave', clearPress);
+
+    card.addEventListener('click', (e) => {
+      clearPress();
+      if (suppressClick) {
+        e.preventDefault();
+        e.stopPropagation();
+        suppressClick = false;
+        return;
+      }
+      enterMapDetail(container, state, context, mapId);
     });
   });
 }
@@ -1250,12 +1329,18 @@ function enterMapDetail(container, state, context, mapId) {
 function escapeHtml(text) {
   return String(text ?? '').replace(/[&<>"']/g, (char) => {
     switch (char) {
-      case '&': return '&' + 'amp;';
-      case '<': return '&' + 'lt;';
-      case '>': return '&' + 'gt;';
-      case '"': return '&' + 'quot;';
-      case "'": return '&' + '#39;';
-      default: return char;
+      case '&':
+        return '&' + '#38;';
+      case '<':
+        return '&' + '#60;';
+      case '>':
+        return '&' + '#62;';
+      case '"':
+        return '&' + '#34;';
+      case "'":
+        return '&' + '#39;';
+      default:
+        return char;
     }
   });
 }
