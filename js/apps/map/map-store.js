@@ -3,6 +3,8 @@
  * 用途: 地图应用的数据层。封装 IndexedDB 读写，仅使用项目 DB 模块持久化。
  */
 
+import { generateMapCoverData } from '../../core/services/PollinationsImage.js';
+
 export const APP_ID = 'map';
 export const STORE_NAME = 'appsData';
 export const DATA_KEY_MAPS = 'map_global_data';
@@ -21,21 +23,17 @@ export const MAP_REAL_SCALE = {
 };
 
 /* ==========================================================================
-   [区域标注·已完成·本地SVG地图生成器]
+   [区域标注·已完成·现代都市本地SVG地图生成器]
    说明：现代都市地图使用占比式避让生成：建筑约40%、道路约20%、绿化约30%、河流约5%、湖泊约5%。
-         除“河流与道路可相交”这个例外外，河流/湖泊/建筑/绿化/道路互不重叠；其它分类只生成基础底色占位图。
+         除“河流与道路可相交”这个例外外，河流/湖泊/建筑/绿化/道路互不重叠。
+         非现代都市地图不再走本地占位图，创建/补图/重生成时统一调用 Pollinations 提示词 URL。
    ========================================================================== */
 export function generateLocalMapCoverData(mapName, category) {
   const seed = Math.floor(Math.random() * 1000000);
 
   if (category !== '现代都市') {
-    // 其他分类不予使用现代都市地图，使用分类底色占位
-    const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1600" viewBox="0 0 2400 1600">
-  <rect width="100%" height="100%" fill="#D7C9B8"/>
-</svg>`;
-    const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-    return { prompt: `placeholder_${category}`, seed, url };
+    // [区域标注·已完成·非现代都市禁用本地占位图] 非现代都市地图由 createMapImageData 调用 Pollinations，不在这里生成占位底色。
+    return generateMapCoverData(mapName, '', category);
   }
 
   /* ==========================================================================
@@ -350,11 +348,14 @@ export function normalizeMapData(rawData) {
       points: Array.isArray(m.points) ? m.points.map(point => normalizeMapPoint(point, distanceScale)) : []
     };
 
-    // [区域标注·已完成·旧封面升级到现代都市 v8 严格避让样式]
-    const isOldStyle = m.imagePrompt !== 'urban_svg_map_v8_ratio_strict_avoid' && !String(m.imagePrompt || '').startsWith('placeholder_');
+    // [区域标注·已完成·旧封面升级与非现代都市 Pollinations 补图]
+    const promptText = String(m.imagePrompt || '');
+    const isOldStyle = mapCategory === '现代都市'
+      ? m.imagePrompt !== 'urban_svg_map_v8_ratio_strict_avoid'
+      : !m.imageUrl || promptText.startsWith('placeholder_') || m.imagePrompt === 'urban_svg_map_v8_ratio_strict_avoid';
 
     if (!m.imageUrl || isOldStyle) {
-      const cover = generateLocalMapCoverData(mapName, mapCategory);
+      const cover = createMapImageData(mapName, mapObj.description, mapCategory);
       mapObj.imageUrl = cover.url;
       mapObj.imagePrompt = cover.prompt;
       mapObj.imageSeed = cover.seed;
@@ -467,8 +468,20 @@ export function updateMapPointPosition(point, x, y, scale = MAP_REAL_SCALE) {
   return point;
 }
 
+/* ==========================================================================
+   [区域标注·已完成·地图封面生成路由]
+   说明：现代都市使用本地 SVG 严格避让生成；其它分类使用 Pollinations.ai，并把分类、名称、描述写入提示词。
+   ========================================================================== */
+export function createMapImageData(mapName, mapDesc, category) {
+  const safeCategory = String(category || '现代都市').trim();
+  if (safeCategory === '现代都市') {
+    return generateLocalMapCoverData(mapName, safeCategory);
+  }
+  return generateMapCoverData(mapName, mapDesc, safeCategory);
+}
+
 export function regenerateMapImage(mapObj) {
-  const cover = generateLocalMapCoverData(mapObj?.name || '未命名地图', mapObj?.category || '现代都市');
+  const cover = createMapImageData(mapObj?.name || '未命名地图', mapObj?.description || '', mapObj?.category || '现代都市');
   return {
     imageUrl: cover.url,
     imagePrompt: cover.prompt,
@@ -483,11 +496,11 @@ export async function persistMapData(db, state) {
   return data;
 }
 
-export function createMapDraft(name, description, category) {
+export function createMapDraft(name, description, category, options = {}) {
   const mapName = String(name || '').trim();
   const mapDesc = String(description || '').trim();
   const mapCategory = String(category || '现代都市').trim();
-  const cover = generateLocalMapCoverData(mapName, mapCategory);
+  const cover = createMapImageData(mapName, mapDesc, mapCategory);
 
   return {
     id: `map_custom_${Date.now()}_${Math.random().toString(16).slice(2)}`,
@@ -498,7 +511,7 @@ export function createMapDraft(name, description, category) {
     imageUrl: cover.url,
     imagePrompt: cover.prompt,
     imageSeed: cover.seed,
-    distanceScale: normalizeMapDistanceScale(),
-    points: []
+    distanceScale: normalizeMapDistanceScale(options.distanceScale),
+    points: Array.isArray(options.points) ? options.points.map(point => normalizeMapPoint(point, normalizeMapDistanceScale(options.distanceScale))) : []
   };
 }

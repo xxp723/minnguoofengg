@@ -119,8 +119,40 @@
   height: 14px;
 }
 
+/* [区域标注·已完成·AI自动生成地图入口按钮样式] 标题栏左侧 IconPark 风格 AI 图标按钮，与右侧新增按钮统一尺寸和 Linen 主题。 */
+.map-ai-generate-btn {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(74, 52, 42, 0.08);
+  color: #4A342A;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  flex-shrink: 0;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.map-ai-generate-btn:active {
+  background: rgba(74, 52, 42, 0.18);
+  transform: translateY(-50%) scale(0.92);
+}
+
+.map-ai-generate-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
 /* ==========================================================================
-   [区域标注·已修改·卡片网格封面局部预览]
+   [区域标注·已完成·卡片网格封面局部预览]
    说明：地图封面只展示完整地图的一部分，进入详情页后再看完整地图。
    ========================================================================== */
 .map-content-scroll {
@@ -530,6 +562,128 @@
 
 .map-btn:active {
   opacity: 0.8;
+}
+
+/* ==========================================================================
+   [区域标注·已完成·AI自动生成地图弹窗样式]
+   说明：AI弹窗使用应用内自定义下拉、状态提示、可编辑输入区和地点预览；
+         不使用浏览器原生弹窗/选择器，整体风格与 Linen 主题统一。
+   ========================================================================== */
+.map-ai-modal-panel {
+  width: 304px;
+  max-height: calc(100% - 48px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.map-ai-modal-panel::-webkit-scrollbar {
+  display: none;
+}
+
+.map-ai-status {
+  margin: -6px 0 14px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(44, 24, 16, 0.06);
+  color: var(--c-text-cocoa, #5C4B43);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.map-ai-result.is-hidden {
+  display: none;
+}
+
+.map-ai-desc {
+  height: 92px;
+}
+
+.map-ai-worldbook-list .map-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.map-ai-worldbook-list .map-dropdown-item span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.map-ai-worldbook-list .map-dropdown-item small {
+  flex-shrink: 0;
+  font-size: 11px;
+  opacity: 0.68;
+}
+
+.map-ai-empty,
+.map-ai-location-empty {
+  padding: 10px;
+  border-radius: 10px;
+  color: var(--c-text-cocoa, #5C4B43);
+  font-size: 12px;
+  text-align: center;
+  background: rgba(44, 24, 16, 0.04);
+}
+
+.map-ai-locations-preview {
+  margin-top: 2px;
+  padding: 10px;
+  border: 1px solid rgba(44, 24, 16, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.map-ai-location-title {
+  margin-bottom: 8px;
+  color: var(--c-text-espresso, #2C1810);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.map-ai-location-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 118px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.map-ai-location-list::-webkit-scrollbar {
+  display: none;
+}
+
+.map-ai-location-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  background: rgba(245, 241, 234, 0.72);
+  color: var(--c-text-cocoa, #5C4B43);
+  font-size: 12px;
+}
+
+.map-ai-location-item span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.map-ai-location-item small {
+  flex-shrink: 0;
+  font-size: 11px;
+  opacity: 0.72;
+}
+
+.map-btn.is-loading {
+  opacity: 0.76;
+  cursor: default;
 }
 
 /* ==========================================================================
