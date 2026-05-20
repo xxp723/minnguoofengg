@@ -37,6 +37,18 @@ export function buildMapShell() {
         <div class="map-modal-panel">
           <div class="map-modal-title">创建新地图</div>
           
+          <!-- [区域标注·已修改·创建地图分类选择区] -->
+          <div class="map-modal-field">
+            <label class="map-modal-label">分类</label>
+            <div class="map-category-list" id="map-category-list">
+              <!-- 分类按钮动态渲染 -->
+            </div>
+            <div class="map-category-new is-hidden" id="map-category-new-wrap">
+              <input type="text" class="map-input map-input-small" id="map-category-new-input" placeholder="输入分类名称" />
+              <button class="map-btn map-btn-confirm map-btn-small" id="map-category-new-save">保存</button>
+            </div>
+          </div>
+
           <div class="map-modal-field">
             <label class="map-modal-label">地图名称</label>
             <input type="text" class="map-input" id="map-input-name" placeholder="请输入地图名称" />
@@ -91,12 +103,14 @@ export function renderMapGrid(container, state) {
   
   grid.innerHTML = maps.map(m => {
     const bg = m.imageUrl ? `style="background-image: url('${escapeHtml(m.imageUrl)}');"` : '';
+    // [区域标注·已修改·卡片封面信息展示] 仅显示名称与分类，不显示描述
+    const categoryText = String(m.category || '现代都市');
     return `
       <div class="map-card" data-map-id="${m.id}">
         <div class="map-card-cover" ${bg}></div>
         <div class="map-card-info">
           <div class="map-card-title">${escapeHtml(m.name)}</div>
-          <div class="map-card-desc">${escapeHtml(m.description || '暂无描述')}</div>
+          <div class="map-card-desc map-card-category">${escapeHtml(categoryText)}</div>
         </div>
       </div>
     `;
@@ -117,6 +131,14 @@ export function bindMapEvents(container, state, context) {
   const inputDesc = container.querySelector('#map-input-desc');
   const hintEl = container.querySelector('#map-modal-hint');
 
+  // 分类相关 DOM
+  const catListEl = container.querySelector('#map-category-list');
+  const catNewWrap = container.querySelector('#map-category-new-wrap');
+  const catNewInput = container.querySelector('#map-category-new-input');
+  const catNewSave = container.querySelector('#map-category-new-save');
+  
+  let selectedCategory = '现代都市';
+
   // 辅助函数：转义 HTML 实体
   function escapeHtml(text) {
     const map = { '&': '&', '<': '<', '>': '>', '"': '"', "'": '&#39;' };
@@ -130,12 +152,74 @@ export function bindMapEvents(container, state, context) {
     });
   }
 
+  // [区域标注·已修改·渲染分类列表]
+  function renderCategories() {
+    if (!catListEl) return;
+    const cats = Array.isArray(state.categories) ? state.categories : ['现代都市'];
+    
+    // 如果选中的分类不在列表中，默认回落
+    if (!cats.includes(selectedCategory)) {
+      selectedCategory = cats[0] || '现代都市';
+    }
+
+    let html = cats.map(c => {
+      const activeClass = c === selectedCategory ? 'is-active' : '';
+      return `<button class="map-cat-btn ${activeClass}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`;
+    }).join('');
+
+    // 追加“新建分类”按钮
+    html += `<button class="map-cat-btn map-cat-new-btn" id="map-btn-new-cat">+ 新建分类</button>`;
+    
+    catListEl.innerHTML = html;
+
+    // 绑定分类切换事件
+    const catBtns = catListEl.querySelectorAll('.map-cat-btn:not(.map-cat-new-btn)');
+    catBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedCategory = btn.dataset.cat;
+        renderCategories(); // 重新渲染刷新激活状态
+      });
+    });
+
+    // 绑定新建按钮事件
+    const newCatBtn = catListEl.querySelector('#map-btn-new-cat');
+    if (newCatBtn) {
+      newCatBtn.addEventListener('click', () => {
+        catNewWrap.classList.remove('is-hidden');
+        catNewInput.value = '';
+        catNewInput.focus();
+      });
+    }
+  }
+
+  // 保存新建分类
+  if (catNewSave) {
+    catNewSave.addEventListener('click', async () => {
+      const newCat = catNewInput.value.trim();
+      if (!newCat) {
+        hintEl.textContent = '分类名称不能为空';
+        return;
+      }
+      if (!state.categories) state.categories = [];
+      if (!state.categories.includes(newCat)) {
+        state.categories.push(newCat);
+        await persistMapData(context.db, state);
+      }
+      selectedCategory = newCat;
+      catNewWrap.classList.add('is-hidden');
+      renderCategories();
+      hintEl.textContent = '';
+    });
+  }
+
   // 打开弹窗
   if (addBtn && modal) {
     addBtn.addEventListener('click', () => {
       inputName.value = '';
       inputDesc.value = '';
       hintEl.textContent = '';
+      catNewWrap.classList.add('is-hidden');
+      renderCategories();
       modal.classList.remove('is-hidden');
       setTimeout(() => inputName.focus(), 50);
     });
@@ -168,8 +252,8 @@ export function bindMapEvents(container, state, context) {
       
       hintEl.textContent = '';
       
-      // 生成新地图对象
-      const newMap = createMapDraft(name, desc);
+      // [区域标注·已修改·带分类创建地图对象]
+      const newMap = createMapDraft(name, desc, selectedCategory);
       state.maps.push(newMap);
       
       // 更新持久化与视图
