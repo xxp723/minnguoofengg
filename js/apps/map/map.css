@@ -1,37 +1,35 @@
 /* ==========================================================================
-   [区域标注·已修改·地图详情页完整显示修复]
-   说明：详情页背景改为完整展示，避免从封面进入后只看到局部内容。
-   ==========================================================================
- */
-.map-detail-wrapper {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 10; /* 盖住应用主页 */
-  display: none;
+   [区域标注·已完成·地图独立 CSS] 
+   用途: 地图应用独立样式。预加载引入，仅作用于 .app-window[data-app-id="map"] 
+         或 .map-app 内部，不污染全局。
+   ========================================================================== */
+
+/* 隐藏系统默认标题栏及内容区 padding 清零 */
+.app-window[data-app-id="map"] .app-window__header {
+  display: none !important;
 }
 
-.map-detail-page {
-  position: relative;
-  width: 100%;
+.app-window[data-app-id="map"] .app-window__content {
+  padding: 0 !important;
+  background-color: var(--c-bg-linen, #F5F1EA); /* 统一 Linen 背景 */
+  display: flex;
+  flex-direction: column;
   height: 100%;
-  background: var(--c-bg-linen, #F5F1EA);
   overflow: hidden;
 }
 
-.map-detail-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
+/* 根容器 */
+.map-app {
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
-  background-size: contain;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-color: #eef2f5;
-  transition: opacity 0.3s ease;
+  background-color: var(--c-bg-linen, #F5F1EA);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--c-text-espresso, #2C1810);
+  box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
 }
 
 .map-app * {
@@ -331,8 +329,11 @@
 }
 
 /* ==========================================================================
-   [区域标注·已完成·地图详情页样式]
-   ========================================================================== */
+   [区域标注·已修改·地图详情页完整显示与缩放边界修复]
+   说明：详情页使用真实图片画布完整适配地图，默认居中显示整张地图；
+         放大后可平移查看，缩小时不会小于完整适配比例，避免只显示局部。
+   ==========================================================================
+ */
 .map-detail-wrapper {
   position: absolute;
   top: 0;
@@ -351,16 +352,33 @@
   overflow: hidden;
 }
 
-.map-detail-bg {
+.map-detail-viewport {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #eef2f5;
+  touch-action: none;
+}
+
+.map-detail-canvas {
   position: absolute;
   top: 0;
   left: 0;
+  transform-origin: top left;
+  will-change: transform;
+}
+
+.map-detail-image {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  transition: opacity 0.3s ease;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
 }
 
 .map-detail-top-bar {
@@ -465,6 +483,6 @@
 }
 
 /* 添加模式下鼠标指针变化 */
-.map-detail-page.is-add-mode .map-detail-bg {
+.map-detail-page.is-add-mode .map-detail-canvas {
   cursor: crosshair;
 }

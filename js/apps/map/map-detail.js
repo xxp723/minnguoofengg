@@ -1,13 +1,13 @@
 /**
  * 文件名: js/apps/map/map-detail.js
- * 用途: 独立的地图详情页面。支持铺满整页的地图渲染，并在任意位置点击添加地点标记。
+ * 用途: 独立的地图详情页面。支持完整地图适配、双指缩放平移，并在地图图片内添加地点标记。
  */
 
 import { persistMapData } from './map-store.js';
 
 /* ==========================================================================
-   [区域标注·已完成·独立地图详情页]
-   说明：全屏地图展示，长按不冲突，点击添加地点。
+   [区域标注·已修改·独立地图详情页]
+   说明：详情页使用真实图片画布承载地图，默认完整居中显示，缩放后可受边界约束地查看完整地图。
    ========================================================================== */
 
 /**
@@ -17,13 +17,14 @@ export function buildMapDetailShell(mapData) {
   const bgUrl = mapData.imageUrl || '';
   return `
     <div class="map-detail-page" id="map-detail-page">
-      <!-- 增加缩放平移视口层 -->
-      <div class="map-detail-viewport" id="map-detail-viewport" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform-origin: top left; transform: translate(0px, 0px) scale(1); will-change: transform;">
-        <!-- 铺满整个页面的地图背景 -->
-        <div class="map-detail-bg" id="map-detail-bg" style="background-image: url('${escapeHtml(bgUrl)}');"></div>
-        
-        <!-- 坐标标记渲染层 -->
-        <div class="map-detail-markers" id="map-detail-markers"></div>
+      <!-- [区域标注·已修改·地图详情页图片画布] 使用真实图片画布，避免背景图缩放导致只显示局部 -->
+      <div class="map-detail-viewport" id="map-detail-viewport">
+        <div class="map-detail-canvas" id="map-detail-canvas">
+          <img class="map-detail-image" id="map-detail-image" src="${escapeHtml(bgUrl)}" alt="${escapeHtml(mapData.name)}" draggable="false" />
+          
+          <!-- 坐标标记渲染层：与地图图片同尺寸同缩放 -->
+          <div class="map-detail-markers" id="map-detail-markers"></div>
+        </div>
       </div>
 
       <!-- 透明悬浮标题栏 -->
@@ -92,8 +93,10 @@ function renderMarkers(container, mapData) {
 export function bindMapDetailEvents(container, mapData, state, context, onBack) {
   const backBtn = container.querySelector('#map-detail-back');
   const addModeBtn = container.querySelector('#map-detail-add-point');
+  const pageEl = container.querySelector('#map-detail-page');
   const viewportEl = container.querySelector('#map-detail-viewport');
-  const bgEl = container.querySelector('#map-detail-bg');
+  const canvasEl = container.querySelector('#map-detail-canvas');
+  const imageEl = container.querySelector('#map-detail-image');
   const modal = container.querySelector('#map-point-modal');
   const cancelBtn = container.querySelector('#map-point-cancel');
   const confirmBtn = container.querySelector('#map-point-confirm');
@@ -107,8 +110,15 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
   // 渲染初始坐标
   renderMarkers(container, mapData);
 
-  // [区域标注·已修改·两指缩放与拖拽功能]
-  if (viewportEl) {
+  /* ==========================================================================
+     [区域标注·已修改·地图详情页完整适配与缩放边界]
+     说明：以图片真实宽高计算完整适配比例，默认完整显示；双指缩放和单指平移后始终约束在可查看完整地图的范围内。
+     ========================================================================== */
+  if (viewportEl && canvasEl && imageEl) {
+    let naturalWidth = 800;
+    let naturalHeight = 800;
+    let minScale = 1;
+    let maxScale = 5;
     let currentScale = 1;
     let currentX = 0;
     let currentY = 0;
@@ -119,22 +129,80 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
     let pinchCenterX = 0;
     let pinchCenterY = 0;
 
-    const updateTransform = () => {
-      // 限制缩放比例在 0.5 到 5 之间
-      currentScale = Math.max(0.5, Math.min(currentScale, 5));
-      viewportEl.style.transform = `translate(${currentX}px, ${currentY}px) scale(${currentScale})`;
+    const applyTransform = () => {
+      canvasEl.style.transform = `translate(${currentX}px, ${currentY}px) scale(${currentScale})`;
     };
 
+    const constrainTransform = () => {
+      const rect = viewportEl.getBoundingClientRect();
+      const viewportWidth = rect.width || 1;
+      const viewportHeight = rect.height || 1;
+      const scaledWidth = naturalWidth * currentScale;
+      const scaledHeight = naturalHeight * currentScale;
+
+      if (scaledWidth <= viewportWidth) {
+        currentX = (viewportWidth - scaledWidth) / 2;
+      } else {
+        currentX = Math.min(0, Math.max(viewportWidth - scaledWidth, currentX));
+      }
+
+      if (scaledHeight <= viewportHeight) {
+        currentY = (viewportHeight - scaledHeight) / 2;
+      } else {
+        currentY = Math.min(0, Math.max(viewportHeight - scaledHeight, currentY));
+      }
+    };
+
+    const updateTransform = () => {
+      currentScale = Math.max(minScale, Math.min(currentScale, maxScale));
+      constrainTransform();
+      applyTransform();
+    };
+
+    const fitMapToViewport = () => {
+      const rect = viewportEl.getBoundingClientRect();
+      const viewportWidth = rect.width || 1;
+      const viewportHeight = rect.height || 1;
+
+      minScale = Math.min(viewportWidth / naturalWidth, viewportHeight / naturalHeight);
+      maxScale = Math.max(minScale * 5, minScale + 0.01);
+      currentScale = minScale;
+      currentX = (viewportWidth - naturalWidth * currentScale) / 2;
+      currentY = (viewportHeight - naturalHeight * currentScale) / 2;
+
+      canvasEl.style.width = `${naturalWidth}px`;
+      canvasEl.style.height = `${naturalHeight}px`;
+      applyTransform();
+    };
+
+    const initImageCanvas = () => {
+      naturalWidth = imageEl.naturalWidth || 800;
+      naturalHeight = imageEl.naturalHeight || 800;
+      fitMapToViewport();
+    };
+
+    if (imageEl.complete) {
+      initImageCanvas();
+    } else {
+      imageEl.addEventListener('load', initImageCanvas, { once: true });
+      imageEl.addEventListener('error', initImageCanvas, { once: true });
+    }
+
+    window.addEventListener('resize', fitMapToViewport);
+
     viewportEl.addEventListener('touchstart', (e) => {
+      if (!modal.classList.contains('is-hidden')) return;
+
       if (e.touches.length === 2) {
+        e.preventDefault();
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
         initialScale = currentScale;
         
-        // 记录双指中心点位置，用作缩放基准点（视口坐标系）
-        pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        pinchCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const viewportRect = viewportEl.getBoundingClientRect();
+        pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - viewportRect.left;
+        pinchCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - viewportRect.top;
       } else if (e.touches.length === 1) {
         lastTouchX = e.touches[0].clientX;
         lastTouchY = e.touches[0].clientY;
@@ -150,19 +218,16 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        const scaleChange = distance / initialPinchDistance;
-        const newScale = initialScale * scaleChange;
-        
-        // 计算缩放补偿偏移，以保持双指中心点不动
-        const ratio = newScale / currentScale;
+        const previousScale = currentScale;
+        const nextScale = Math.max(minScale, Math.min(initialScale * (distance / initialPinchDistance), maxScale));
+        const ratio = nextScale / previousScale;
+
         currentX = pinchCenterX - (pinchCenterX - currentX) * ratio;
         currentY = pinchCenterY - (pinchCenterY - currentY) * ratio;
-        
-        currentScale = newScale;
+        currentScale = nextScale;
+
         updateTransform();
       } else if (e.touches.length === 1) {
-        // 为了防止与系统的上下滑动或添加坐标的 click 冲突太大，我们可以判断如果是单指的话进行平移
         e.preventDefault();
         const touchX = e.touches[0].clientX;
         const touchY = e.touches[0].clientY;
@@ -185,6 +250,7 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
         lastTouchX = e.touches[0].clientX;
         lastTouchY = e.touches[0].clientY;
       }
+      updateTransform();
     });
   }
 
@@ -201,22 +267,24 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
       isAddMode = !isAddMode;
       if (isAddMode) {
         addModeBtn.classList.add('is-active');
-        container.querySelector('#map-detail-page').classList.add('is-add-mode');
+        pageEl.classList.add('is-add-mode');
       } else {
         addModeBtn.classList.remove('is-active');
-        container.querySelector('#map-detail-page').classList.remove('is-add-mode');
+        pageEl.classList.remove('is-add-mode');
       }
     });
   }
 
-  // 点击地图背景获取坐标
-  if (bgEl) {
-    bgEl.addEventListener('click', (e) => {
+  // 点击地图图片画布获取坐标
+  if (canvasEl) {
+    canvasEl.addEventListener('click', (e) => {
       if (!isAddMode) return;
       
-      const rect = bgEl.getBoundingClientRect();
+      const rect = canvasEl.getBoundingClientRect();
       const x = ((e.clientX - rect.left) / rect.width) * 100;
       const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+      if (x < 0 || x > 100 || y < 0 || y > 100) return;
       
       tempPoint = { x, y };
       
@@ -235,7 +303,7 @@ export function bindMapDetailEvents(container, mapData, state, context, onBack) 
     tempPoint = null;
     isAddMode = false;
     addModeBtn.classList.remove('is-active');
-    container.querySelector('#map-detail-page').classList.remove('is-add-mode');
+    pageEl.classList.remove('is-add-mode');
   };
 
   if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
