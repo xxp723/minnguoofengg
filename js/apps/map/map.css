@@ -202,7 +202,9 @@
 }
 
 /* ==========================================================================
-   [区域标注·已完成·创建弹窗]
+   [区域标注·已完成·创建弹窗与分类选择区域]
+   说明：创建地图弹窗使用应用内自定义分类选择器和新建分类输入区；
+         不使用浏览器原生选择器或原生弹窗，风格与 Linen 主题统一。
    ========================================================================== */
 .map-modal-mask {
   position: absolute;
@@ -261,6 +263,175 @@
   font-weight: 500;
   color: var(--c-text-cocoa, #5C4B43);
   margin-bottom: 6px;
+}
+
+/* [区域标注·已完成·创建地图分类控件样式] 分类选择器和右侧新建“+”按钮均为应用内自定义 UI。 */
+.map-category-field {
+  position: relative;
+}
+
+.map-category-control {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+
+.map-dropdown {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.map-dropdown-head {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid rgba(44, 24, 16, 0.1);
+  border-radius: 10px;
+  padding: 9px 10px 9px 12px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--c-text-espresso, #2C1810);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.map-dropdown-head:active {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(44, 24, 16, 0.24);
+  box-shadow: 0 2px 10px rgba(44, 24, 16, 0.06) inset;
+}
+
+.map-dropdown-val {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.map-dropdown-arrow {
+  width: 16px;
+  height: 16px;
+  color: #6D574C;
+  flex-shrink: 0;
+}
+
+.map-category-add-btn {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(44, 24, 16, 0.08);
+  color: var(--c-text-espresso, #2C1810);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  cursor: pointer;
+  transition: background-color 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease;
+}
+
+.map-category-add-btn:active {
+  background: rgba(44, 24, 16, 0.16);
+  transform: scale(0.94);
+  box-shadow: 0 2px 8px rgba(44, 24, 16, 0.08) inset;
+}
+
+.map-category-add-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.map-dropdown-body {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 120;
+  padding: 6px;
+  border: 1px solid rgba(44, 24, 16, 0.1);
+  border-radius: 14px;
+  background: rgba(250, 247, 241, 0.96);
+  box-shadow: 0 12px 24px rgba(44, 24, 16, 0.12);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.map-dropdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 178px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.map-dropdown-list::-webkit-scrollbar {
+  display: none;
+}
+
+.map-dropdown-item {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: transparent;
+  color: var(--c-text-cocoa, #5C4B43);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  outline: none;
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease, transform 0.1s ease;
+}
+
+.map-dropdown-item.is-active {
+  background: rgba(44, 24, 16, 0.1);
+  color: var(--c-text-espresso, #2C1810);
+  font-weight: 600;
+}
+
+.map-dropdown-item:active {
+  transform: scale(0.985);
+  background: rgba(44, 24, 16, 0.14);
+}
+
+.map-dropdown-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid rgba(44, 24, 16, 0.08);
+}
+
+.map-dropdown-new.is-hidden {
+  display: none;
+}
+
+.map-input-small {
+  min-height: 36px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.map-btn-small {
+  flex: 0 0 auto;
+  min-width: 56px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
 }
 
 .map-input,

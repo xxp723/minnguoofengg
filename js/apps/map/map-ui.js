@@ -37,26 +37,34 @@ export function buildMapShell() {
         <div class="map-modal-panel">
           <div class="map-modal-title">创建新地图</div>
           
-          <!-- [区域标注·已修改·创建地图折叠分类选择区] -->
-          <div class="map-modal-field">
+          <!-- [区域标注·已完成·创建地图分类选择与新建分类区域] -->
+          <div class="map-modal-field map-category-field">
             <label class="map-modal-label">分类</label>
-            <div class="map-dropdown" id="map-category-dropdown">
-              <div class="map-dropdown-head" id="map-dropdown-head">
-                <span class="map-dropdown-val" id="map-dropdown-val">现代都市</span>
-                <svg viewBox="0 0 48 48" fill="none" class="map-dropdown-arrow">
-                  <path d="M36 18L24 30L12 18" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <div class="map-category-control">
+              <div class="map-dropdown" id="map-category-dropdown">
+                <button class="map-dropdown-head" id="map-dropdown-head" type="button">
+                  <span class="map-dropdown-val" id="map-dropdown-val">现代都市</span>
+                  <!-- IconPark 风格下拉箭头 -->
+                  <svg viewBox="0 0 48 48" fill="none" class="map-dropdown-arrow" aria-hidden="true">
+                    <path d="M36 18L24 30L12 18" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <div class="map-dropdown-body is-hidden" id="map-dropdown-body">
+                  <div class="map-dropdown-list" id="map-dropdown-list">
+                    <!-- 分类列表动态渲染 -->
+                  </div>
+                </div>
+              </div>
+              <button class="map-category-add-btn" id="map-btn-new-cat" type="button" title="新建分类" aria-label="新建分类">
+                <!-- IconPark 风格加号 -->
+                <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                  <path d="M24 5V43M5 24H43" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-              </div>
-              <div class="map-dropdown-body is-hidden" id="map-dropdown-body">
-                <div class="map-dropdown-list" id="map-dropdown-list">
-                  <!-- 分类列表动态渲染 -->
-                </div>
-                <div class="map-dropdown-action" id="map-btn-new-cat">+ 新建分类</div>
-                <div class="map-dropdown-new is-hidden" id="map-category-new-wrap">
-                  <input type="text" class="map-input map-input-small" id="map-category-new-input" placeholder="输入新分类名称" />
-                  <button class="map-btn map-btn-confirm map-btn-small" id="map-category-new-save">添加</button>
-                </div>
-              </div>
+              </button>
+            </div>
+            <div class="map-dropdown-new is-hidden" id="map-category-new-wrap">
+              <input type="text" class="map-input map-input-small" id="map-category-new-input" placeholder="输入新分类名称" />
+              <button class="map-btn map-btn-confirm map-btn-small" id="map-category-new-save" type="button">保存</button>
             </div>
           </div>
 
@@ -111,7 +119,7 @@ export function renderMapGrid(container, state) {
   if (!grid) return;
 
   const maps = Array.isArray(state.maps) ? state.maps : [];
-  
+
   grid.innerHTML = maps.map(m => {
     const bg = m.imageUrl ? `style="background-image: url('${escapeHtml(m.imageUrl)}');"` : '';
     // [区域标注·已修改·卡片封面信息展示] 仅显示名称与分类，不显示描述
@@ -142,7 +150,7 @@ export function bindMapEvents(container, state, context) {
   const inputDesc = container.querySelector('#map-input-desc');
   const hintEl = container.querySelector('#map-modal-hint');
 
-  // 分类下拉菜单相关 DOM
+  // [区域标注·已完成·创建地图分类 DOM] 自定义分类选择器与新建分类按钮，不使用浏览器原生选择器。
   const dropdownHead = container.querySelector('#map-dropdown-head');
   const dropdownBody = container.querySelector('#map-dropdown-body');
   const dropdownVal = container.querySelector('#map-dropdown-val');
@@ -151,7 +159,7 @@ export function bindMapEvents(container, state, context) {
   const catNewWrap = container.querySelector('#map-category-new-wrap');
   const catNewInput = container.querySelector('#map-category-new-input');
   const catNewSave = container.querySelector('#map-category-new-save');
-  
+
   let selectedCategory = '现代都市';
 
   // 辅助函数：转义 HTML 实体
@@ -167,9 +175,11 @@ export function bindMapEvents(container, state, context) {
     });
   }
 
-  // 展开/收起下拉菜单
+  // [区域标注·已完成·创建地图分类下拉交互]
   if (dropdownHead) {
-    dropdownHead.addEventListener('click', () => {
+    dropdownHead.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (catNewWrap) catNewWrap.classList.add('is-hidden');
       dropdownBody.classList.toggle('is-hidden');
     });
   }
@@ -184,64 +194,84 @@ export function bindMapEvents(container, state, context) {
     }
   });
 
-  // [区域标注·已修改·渲染下拉分类列表]
+  // [区域标注·已完成·渲染创建地图分类列表]
   function renderCategories() {
     if (!dropdownListEl) return;
-    const cats = Array.isArray(state.categories) ? state.categories : ['现代都市'];
-    
+    const cats = Array.isArray(state.categories) && state.categories.length > 0
+      ? state.categories
+      : ['现代都市', '西方魔幻', '古代宫廷', '古代仙侠', '未来科幻'];
+
     if (!cats.includes(selectedCategory)) {
       selectedCategory = cats[0] || '现代都市';
     }
-    
+
     if (dropdownVal) dropdownVal.textContent = selectedCategory;
 
     dropdownListEl.innerHTML = cats.map(c => {
       const activeClass = c === selectedCategory ? 'is-active' : '';
-      return `<div class="map-dropdown-item ${activeClass}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</div>`;
+      return `<button class="map-dropdown-item ${activeClass}" data-cat="${escapeHtml(c)}" type="button">${escapeHtml(c)}</button>`;
     }).join('');
 
-    // 绑定选项点击事件
     const items = dropdownListEl.querySelectorAll('.map-dropdown-item');
     items.forEach(item => {
       item.addEventListener('click', (e) => {
-        e.stopPropagation(); // 阻止冒泡，避免触发 document.click 把菜单关了还没选上
+        e.stopPropagation();
         selectedCategory = item.dataset.cat;
         if (dropdownVal) dropdownVal.textContent = selectedCategory;
         if (dropdownBody) dropdownBody.classList.add('is-hidden');
-        renderCategories(); // 更新高亮状态
+        if (catNewWrap) catNewWrap.classList.add('is-hidden');
+        renderCategories();
       });
     });
   }
 
-  // 绑定展开新建分类框
+  // [区域标注·已完成·新建分类展开交互] 使用应用内输入区域，不使用 prompt。
   if (newCatBtn) {
     newCatBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      catNewWrap.classList.remove('is-hidden');
-      catNewInput.value = '';
-      catNewInput.focus();
+      if (dropdownBody) dropdownBody.classList.add('is-hidden');
+      if (catNewWrap) catNewWrap.classList.toggle('is-hidden');
+      if (catNewInput && catNewWrap && !catNewWrap.classList.contains('is-hidden')) {
+        catNewInput.value = '';
+        window.requestAnimationFrame(() => catNewInput.focus());
+      }
     });
   }
 
-  // 保存新建分类
+  // [区域标注·已完成·新建分类 IndexedDB 保存] 新分类保存到地图应用数据，方便下次直接选择。
+  async function saveNewCategory() {
+    const newCat = String(catNewInput?.value || '').trim();
+    if (!newCat) {
+      hintEl.textContent = '分类名称不能为空';
+      return;
+    }
+
+    if (!state.categories) state.categories = [];
+    if (!state.categories.includes(newCat)) {
+      state.categories.push(newCat);
+      await persistMapData(context.db, state);
+    }
+
+    selectedCategory = newCat;
+    if (catNewWrap) catNewWrap.classList.add('is-hidden');
+    if (dropdownBody) dropdownBody.classList.add('is-hidden');
+    renderCategories();
+    hintEl.textContent = '';
+  }
+
   if (catNewSave) {
     catNewSave.addEventListener('click', async (e) => {
       e.stopPropagation();
-      const newCat = catNewInput.value.trim();
-      if (!newCat) {
-        hintEl.textContent = '分类名称不能为空';
-        return;
+      await saveNewCategory();
+    });
+  }
+
+  if (catNewInput) {
+    catNewInput.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        await saveNewCategory();
       }
-      if (!state.categories) state.categories = [];
-      if (!state.categories.includes(newCat)) {
-        state.categories.push(newCat);
-        await persistMapData(context.db, state);
-      }
-      selectedCategory = newCat;
-      catNewWrap.classList.add('is-hidden');
-      if (dropdownBody) dropdownBody.classList.add('is-hidden');
-      renderCategories();
-      hintEl.textContent = '';
     });
   }
 
@@ -253,6 +283,9 @@ export function bindMapEvents(container, state, context) {
       hintEl.textContent = '';
       if (dropdownBody) dropdownBody.classList.add('is-hidden');
       if (catNewWrap) catNewWrap.classList.add('is-hidden');
+      selectedCategory = Array.isArray(state.categories) && state.categories.includes(selectedCategory)
+        ? selectedCategory
+        : '现代都市';
       renderCategories();
       modal.classList.remove('is-hidden');
       setTimeout(() => inputName.focus(), 50);
@@ -278,23 +311,23 @@ export function bindMapEvents(container, state, context) {
     confirmBtn.addEventListener('click', async () => {
       const name = inputName.value.trim();
       const desc = inputDesc.value.trim();
-      
+
       if (!name) {
         hintEl.textContent = '地图名称不能为空';
         return;
       }
-      
+
       hintEl.textContent = '';
-      
-      // [区域标注·已修改·带分类创建地图对象]
+
+      // [区域标注·已完成·带分类创建地图对象]
       const newMap = createMapDraft(name, desc, selectedCategory);
       state.maps.push(newMap);
-      
+
       // 更新持久化与视图
       await persistMapData(context.db, state);
       renderMapGrid(container, state);
       bindGridEvents(container, state, context);
-      
+
       closeModal();
     });
   }
@@ -315,7 +348,7 @@ function bindGridEvents(container, state, context) {
   const editHint = container.querySelector('#map-edit-hint');
   const editCancel = container.querySelector('#map-edit-cancel');
   const editConfirm = container.querySelector('#map-edit-confirm');
-  
+
   let currentEditMapId = null;
 
   const closeEditModal = () => {
@@ -341,7 +374,7 @@ function bindGridEvents(container, state, context) {
         return;
       }
       editHint.textContent = '';
-      
+
       const mapObj = state.maps.find(m => m.id === currentEditMapId);
       if (mapObj) {
         mapObj.name = name;
@@ -386,10 +419,10 @@ function bindGridEvents(container, state, context) {
 
     card.addEventListener('mousedown', startPress);
     card.addEventListener('touchstart', startPress, { passive: true });
-    
+
     card.addEventListener('mousemove', cancelPress);
     card.addEventListener('touchmove', cancelPress, { passive: true });
-    
+
     card.addEventListener('mouseup', (e) => {
       cancelPress();
       if (!isLongPress) {

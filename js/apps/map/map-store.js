@@ -8,16 +8,16 @@ export const STORE_NAME = 'appsData';
 export const DATA_KEY_MAPS = 'map_global_data';
 
 /* ==========================================================================
-   [区域标注·已修改·本地SVG地图生成器]
-   说明：每次新建“现代都市”地图时，随机生成道路、水系、建筑和绿地的排布。
-         生成横向大地图 (2400x1600)，符合真实路网排布与色彩。
-         如果选择其他分类，则不使用这套封面地图，生成一张基础底色占位图。
+   [区域标注·已完成·本地SVG地图生成器]
+   说明：每次新建“现代都市”地图时，使用随机种子生成不同的现代都市地图。
+         现代都市分支已处理：道路不重叠、无桥梁、细河流、湖泊/绿化/建筑互相避让、
+         建筑不铺满街区；其他分类只生成基础底色占位图。
    ========================================================================== */
 function generateLocalMapCoverData(mapName, category) {
   const seed = Math.floor(Math.random() * 1000000);
-  
+
   if (category !== '现代都市') {
-    // 其他分类不予使用现代都市地图，使用分类底色+文字占位
+    // 其他分类不予使用现代都市地图，使用分类底色占位
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1600" viewBox="0 0 2400 1600">
   <rect width="100%" height="100%" fill="#D7C9B8"/>
@@ -26,162 +26,320 @@ function generateLocalMapCoverData(mapName, category) {
     return { prompt: `placeholder_${category}`, seed, url };
   }
 
-  // [区域标注·已修改·现代都市：仿高德地图风格排布，清新浅色调，无桥梁，道路无重叠，建筑避水]
+  /* ==========================================================================
+     [区域标注·已完成·现代都市随机组合地图]
+     说明：生成仿现实城市街区的随机 SVG 地图：
+           1. 主/次道路基于坐标去重与最小间距生成，避免道路重叠。
+           2. 不绘制桥梁；道路在河流上方正常穿过但不额外显示桥梁结构。
+           3. 河流保持细窄；湖泊、绿化、建筑通过保留区碰撞检测互相避让。
+           4. 建筑按街区内多个小楼块分布，保留空地，不占满整个小区域块。
+     ========================================================================== */
   const W = 2400;
   const H = 1600;
+  const SVG_NS_PROMPT = 'urban_svg_map_v5';
 
   let currentSeed = seed;
   const rand = () => {
     currentSeed = (currentSeed * 9301 + 49297) % 233280;
     return currentSeed / 233280;
   };
+  const between = (min, max) => min + rand() * (max - min);
+  const pick = arr => arr[Math.floor(rand() * arr.length)];
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+  const round = value => Math.round(value * 10) / 10;
 
-  // 生成河流骨架 (两段平滑贝塞尔曲线或折线)
-  const isHorizontalRiver = rand() > 0.5;
-  let riverPts = [];
-  if (isHorizontalRiver) {
-    riverPts = [
-      {x: -100, y: rand() * H},
-      {x: W/2 + (rand()-0.5)*400, y: rand() * H},
-      {x: W + 100, y: rand() * H}
-    ];
-  } else {
-    riverPts = [
-      {x: rand() * W, y: -100},
-      {x: rand() * W + (rand()-0.5)*400, y: H/2},
-      {x: rand() * W, y: H + 100}
-    ];
+  const reservedAreas = [];
+
+  function rectsOverlap(a, b, gap = 0) {
+    return !(
+      a.x + a.w + gap < b.x ||
+      b.x + b.w + gap < a.x ||
+      a.y + a.h + gap < b.y ||
+      b.y + b.h + gap < a.y
+    );
   }
-  const riverWidth = 140;
 
-  // 河流 SVG (浅蓝色)
-  let riversSvg = `<path d="M${riverPts[0].x},${riverPts[0].y} Q${riverPts[1].x},${riverPts[1].y} ${riverPts[2].x},${riverPts[2].y}" fill="none" stroke="#B0E0E6" stroke-width="${riverWidth}" stroke-linecap="round"/>`;
+  function pointInRect(point, rect, gap = 0) {
+    return (
+      point.x >= rect.x - gap &&
+      point.x <= rect.x + rect.w + gap &&
+      point.y >= rect.y - gap &&
+      point.y <= rect.y + rect.h + gap
+    );
+  }
 
-  // 辅助函数：点到贝塞尔曲线(近似为两段线段)的距离估算，用于避水
+  function circleRectOverlap(circle, rect, gap = 0) {
+    const nearestX = clamp(circle.x, rect.x, rect.x + rect.w);
+    const nearestY = clamp(circle.y, rect.y, rect.y + rect.h);
+    return Math.hypot(circle.x - nearestX, circle.y - nearestY) <= circle.r + gap;
+  }
+
+  function isRectReserved(rect, gap = 0) {
+    return reservedAreas.some(area => {
+      if (area.type === 'rect') return rectsOverlap(rect, area, gap);
+      if (area.type === 'circle') return circleRectOverlap(area, rect, gap);
+      return false;
+    });
+  }
+
+  // [区域标注·已完成·细河流生成] 河流宽度保持细窄，不显示桥梁。
+  const isHorizontalRiver = rand() > 0.45;
+  const riverWidth = Math.round(between(46, 70));
+  const riverPts = isHorizontalRiver
+    ? [
+        { x: -120, y: between(260, H - 260) },
+        { x: between(W * 0.28, W * 0.42), y: between(220, H - 220) },
+        { x: between(W * 0.58, W * 0.72), y: between(220, H - 220) },
+        { x: W + 120, y: between(260, H - 260) }
+      ]
+    : [
+        { x: between(360, W - 360), y: -120 },
+        { x: between(280, W - 280), y: between(H * 0.26, H * 0.42) },
+        { x: between(280, W - 280), y: between(H * 0.58, H * 0.74) },
+        { x: between(360, W - 360), y: H + 120 }
+      ];
+
   function distToSegment(p, v, w) {
-    const l2 = (v.x - w.x)**2 + (v.y - w.y)**2;
+    const l2 = (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
     if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
-    let t = ((p.x - v.x)*(w.x - v.x) + (p.y - v.y)*(w.y - v.y)) / l2;
-    t = Math.max(0, Math.min(1, t));
-    return Math.hypot(p.x - (v.x + t*(w.x - v.x)), p.y - (v.y + t*(w.y - v.y)));
+    let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+    t = clamp(t, 0, 1);
+    return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
   }
+
   function distToRiver(p) {
-    // 因为使用 Q 曲线，用控制点构成的两段线段做近似距离
-    const d1 = distToSegment(p, riverPts[0], riverPts[1]);
-    const d2 = distToSegment(p, riverPts[1], riverPts[2]);
-    return Math.min(d1, d2);
+    let d = Infinity;
+    for (let i = 0; i < riverPts.length - 1; i++) {
+      d = Math.min(d, distToSegment(p, riverPts[i], riverPts[i + 1]));
+    }
+    return d;
   }
 
-  // 绿地 (公园) - 清新浅绿色
-  let parksSvg = '';
-  for (let i = 0; i < 8; i++) {
-    const cx = rand()*W, cy = rand()*H, r = 120 + rand()*250;
-    // 增加一点不规则形状
-    parksSvg += `<path d="M${cx},${cy-r} Q${cx+r},${cy-r/2} ${cx+r},${cy} Q${cx+r/2},${cy+r} ${cx},${cy+r} Q${cx-r},${cy+r/2} ${cx-r},${cy} Q${cx-r/2},${cy-r} ${cx},${cy-r} Z" fill="#D3E9D3" opacity="0.8"/>`;
+  function rectNearRiver(rect, gap = 0) {
+    const points = [
+      { x: rect.x, y: rect.y },
+      { x: rect.x + rect.w, y: rect.y },
+      { x: rect.x, y: rect.y + rect.h },
+      { x: rect.x + rect.w, y: rect.y + rect.h },
+      { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 }
+    ];
+    return points.some(point => distToRiver(point) < riverWidth / 2 + gap);
   }
 
-  // 道路生成，防重叠逻辑：保证道路间距至少 > minGap
+  const riverPath = `M${round(riverPts[0].x)},${round(riverPts[0].y)} C${round(riverPts[1].x)},${round(riverPts[1].y)} ${round(riverPts[2].x)},${round(riverPts[2].y)} ${round(riverPts[3].x)},${round(riverPts[3].y)}`;
+  let waterSvg = `
+    <path d="${riverPath}" fill="none" stroke="#C9EAF3" stroke-width="${riverWidth + 10}" stroke-linecap="round"/>
+    <path d="${riverPath}" fill="none" stroke="#A9DCEB" stroke-width="${riverWidth}" stroke-linecap="round"/>`;
+
+  // [区域标注·已完成·湖泊生成避让] 湖泊作为水域保留区，后续绿化和建筑不会压在湖泊下方。
+  const lakeCount = 2 + Math.floor(rand() * 2);
+  for (let i = 0; i < lakeCount; i++) {
+    let placed = false;
+    for (let attempt = 0; attempt < 28 && !placed; attempt++) {
+      const rx = between(95, 180);
+      const ry = between(55, 112);
+      const cx = between(180 + rx, W - 180 - rx);
+      const cy = between(160 + ry, H - 160 - ry);
+      const rect = { x: cx - rx, y: cy - ry, w: rx * 2, h: ry * 2 };
+
+      if (rectNearRiver(rect, 90) || isRectReserved(rect, 80)) continue;
+
+      reservedAreas.push({ type: 'circle', x: cx, y: cy, r: Math.max(rx, ry), role: 'lake' });
+      waterSvg += `
+    <ellipse cx="${round(cx)}" cy="${round(cy)}" rx="${round(rx)}" ry="${round(ry)}" fill="#B8E3EE" opacity="0.92"/>
+    <ellipse cx="${round(cx - rx * 0.15)}" cy="${round(cy - ry * 0.18)}" rx="${round(rx * 0.55)}" ry="${round(ry * 0.38)}" fill="#D9F2F6" opacity="0.45"/>`;
+      placed = true;
+    }
+  }
+
+  // [区域标注·已完成·道路无重叠生成] 同向道路通过最小间距过滤，主路/次路统一分层绘制。
+  function addRoad(roads, value, minGap, min, max) {
+    const clipped = clamp(value, min, max);
+    if (roads.every(existing => Math.abs(existing - clipped) >= minGap)) {
+      roads.push(clipped);
+      return true;
+    }
+    return false;
+  }
+
   const hRoads = [];
   const vRoads = [];
-  const minGap = 120;
-  
-  // 生成横向道路
-  for(let i=0; i<8 + Math.floor(rand()*4); i++) {
-    let candidate = rand() * H;
-    if (hRoads.every(y => Math.abs(y - candidate) > minGap)) {
-      hRoads.push(candidate);
-    }
+  const hMainCount = 4 + Math.floor(rand() * 2);
+  const vMainCount = 5 + Math.floor(rand() * 3);
+
+  for (let i = 1; i <= hMainCount; i++) {
+    addRoad(hRoads, (H / (hMainCount + 1)) * i + between(-55, 55), 150, 110, H - 110);
   }
-  // 生成纵向道路
-  for(let i=0; i<12 + Math.floor(rand()*6); i++) {
-    let candidate = rand() * W;
-    if (vRoads.every(x => Math.abs(x - candidate) > minGap)) {
-      vRoads.push(candidate);
-    }
+  for (let i = 1; i <= vMainCount; i++) {
+    addRoad(vRoads, (W / (vMainCount + 1)) * i + between(-70, 70), 160, 120, W - 120);
   }
 
-  hRoads.push(0, H);
-  vRoads.push(0, W);
-  hRoads.sort((a,b)=>a-b);
-  vRoads.sort((a,b)=>a-b);
+  const extraH = 4 + Math.floor(rand() * 4);
+  const extraV = 6 + Math.floor(rand() * 5);
+  for (let i = 0; i < extraH; i++) addRoad(hRoads, between(130, H - 130), 118, 110, H - 110);
+  for (let i = 0; i < extraV; i++) addRoad(vRoads, between(140, W - 140), 122, 120, W - 120);
 
-  const mainRoadWidth = 24;
-  const innerRoadWidth = 16;
-  // 道路颜色：仿高德，浅绿色边框，白色/浅黄色内芯
-  const roadBorderColor = "#B4E1C6"; // 浅绿色描边
-  const roadFillColor = "#FFFFFF";
+  hRoads.sort((a, b) => a - b);
+  vRoads.sort((a, b) => a - b);
+
+  const hBounds = [0, ...hRoads, H];
+  const vBounds = [0, ...vRoads, W];
+  const mainRoadWidth = 26;
+  const roadCoreWidth = 18;
+  const minorRoadWidth = 15;
+  const minorCoreWidth = 10;
 
   let roadsSvg = '';
-  // 先画所有底边 (形成统一的边框效果)
-  hRoads.forEach(y => { if(y>0 && y<H) roadsSvg += `<path d="M0,${y} L${W},${y}" stroke="${roadBorderColor}" stroke-width="${mainRoadWidth}"/>`; });
-  vRoads.forEach(x => { if(x>0 && x<W) roadsSvg += `<path d="M${x},0 L${x},${H}" stroke="${roadBorderColor}" stroke-width="${mainRoadWidth}"/>`; });
-  
-  // 再画所有内层 (形成道路交叉口无缝连接)
-  hRoads.forEach(y => { if(y>0 && y<H) roadsSvg += `<path d="M0,${y} L${W},${y}" stroke="${roadFillColor}" stroke-width="${innerRoadWidth}"/>`; });
-  vRoads.forEach(x => { if(x>0 && x<W) roadsSvg += `<path d="M${x},0 L${x},${H}" stroke="${roadFillColor}" stroke-width="${innerRoadWidth}"/>`; });
+  const roadBorderColor = '#CFE6CE';
+  const roadFillColor = '#FFFFFF';
+  const avenueFillColor = '#FFF8DF';
 
-  // 建筑区块生成
+  hRoads.forEach((y, index) => {
+    const width = index % 3 === 0 ? mainRoadWidth + 5 : mainRoadWidth;
+    roadsSvg += `<path d="M0,${round(y)} L${W},${round(y)}" stroke="${roadBorderColor}" stroke-width="${width}" stroke-linecap="butt"/>`;
+  });
+  vRoads.forEach((x, index) => {
+    const width = index % 3 === 1 ? mainRoadWidth + 5 : mainRoadWidth;
+    roadsSvg += `<path d="M${round(x)},0 L${round(x)},${H}" stroke="${roadBorderColor}" stroke-width="${width}" stroke-linecap="butt"/>`;
+  });
+  hRoads.forEach((y, index) => {
+    roadsSvg += `<path d="M0,${round(y)} L${W},${round(y)}" stroke="${index % 3 === 0 ? avenueFillColor : roadFillColor}" stroke-width="${roadCoreWidth}" stroke-linecap="butt"/>`;
+  });
+  vRoads.forEach((x, index) => {
+    roadsSvg += `<path d="M${round(x)},0 L${round(x)},${H}" stroke="${index % 3 === 1 ? avenueFillColor : roadFillColor}" stroke-width="${roadCoreWidth}" stroke-linecap="butt"/>`;
+  });
+
+  // [区域标注·已完成·绿化生成避让] 绿地先于建筑生成并加入保留区，建筑不会覆盖绿地。
+  let parksSvg = '';
+  const parkColors = ['#CFE8C8', '#D8ECD0', '#C9E3B9'];
+  const parkCount = 7 + Math.floor(rand() * 5);
+
+  for (let i = 0; i < parkCount; i++) {
+    let placed = false;
+    for (let attempt = 0; attempt < 36 && !placed; attempt++) {
+      const w = between(145, 340);
+      const h = between(90, 230);
+      const x = between(80, W - w - 80);
+      const y = between(80, H - h - 80);
+      const rect = { x, y, w, h };
+
+      if (rectNearRiver(rect, 24) || isRectReserved(rect, 56)) continue;
+
+      reservedAreas.push({ type: 'rect', ...rect, role: 'park' });
+      const color = pick(parkColors);
+      parksSvg += `
+    <path d="M${round(x + w * 0.08)},${round(y + h * 0.28)}
+             Q${round(x + w * 0.24)},${round(y - h * 0.04)} ${round(x + w * 0.58)},${round(y + h * 0.08)}
+             Q${round(x + w * 1.02)},${round(y + h * 0.18)} ${round(x + w * 0.9)},${round(y + h * 0.58)}
+             Q${round(x + w * 0.78)},${round(y + h * 1.04)} ${round(x + w * 0.42)},${round(y + h * 0.92)}
+             Q${round(x - w * 0.04)},${round(y + h * 0.82)} ${round(x + w * 0.08)},${round(y + h * 0.28)} Z"
+          fill="${color}" opacity="0.9"/>`;
+
+      const pathCount = 1 + Math.floor(rand() * 3);
+      for (let p = 0; p < pathCount; p++) {
+        const py = y + h * between(0.32, 0.72);
+        parksSvg += `<path d="M${round(x + w * 0.16)},${round(py)} C${round(x + w * 0.38)},${round(py - h * 0.18)} ${round(x + w * 0.58)},${round(py + h * 0.2)} ${round(x + w * 0.84)},${round(py)}" fill="none" stroke="#F8F4E8" stroke-width="6" stroke-linecap="round" opacity="0.72"/>`;
+      }
+
+      placed = true;
+    }
+  }
+
+  // [区域标注·已完成·街区建筑合理分布] 建筑避开水域/绿地，按街区留白分布，不铺满小区块。
   let buildingsSvg = '';
-  // 建筑颜色，极浅灰、浅米色、浅蓝色
-  const bColors = ['#E8ECF1', '#F0F0ED', '#EAEAF1', '#EBF2F6'];
-  
-  for (let i=0; i<hRoads.length-1; i++) {
-    for (let j=0; j<vRoads.length-1; j++) {
-      let cellX = vRoads[j] + mainRoadWidth/2;
-      let cellY = hRoads[i] + mainRoadWidth/2;
-      let cellW = vRoads[j+1] - vRoads[j] - mainRoadWidth;
-      let cellH = hRoads[i+1] - hRoads[i] - mainRoadWidth;
+  let minorRoadsSvg = '';
+  const bColors = ['#E8ECF1', '#F0F0ED', '#EAEAF1', '#EBF2F6', '#EFE6DA'];
+  const strokeColor = '#D5DADF';
 
-      if (cellW > 60 && cellH > 60) {
-        let cols = Math.max(1, Math.floor(cellW / (50 + rand()*30)));
-        let rows = Math.max(1, Math.floor(cellH / (50 + rand()*30)));
-        let bW = cellW / cols;
-        let bH = cellH / rows;
+  for (let row = 0; row < hBounds.length - 1; row++) {
+    for (let col = 0; col < vBounds.length - 1; col++) {
+      const cellX = vBounds[col] + mainRoadWidth / 2;
+      const cellY = hBounds[row] + mainRoadWidth / 2;
+      const cellW = vBounds[col + 1] - vBounds[col] - mainRoadWidth;
+      const cellH = hBounds[row + 1] - hBounds[row] - mainRoadWidth;
 
-        for (let r=0; r<rows; r++) {
-          for (let c=0; c<cols; c++) {
-            if (rand() > 0.3) { // 70% 概率生成建筑
-              let bx = cellX + c*bW + 8;
-              let by = cellY + r*bH + 8;
-              let bw = bW - 16;
-              let bh = bH - 16;
-              
-              if (bw > 20 && bh > 20) {
-                let center = {x: bx + bw/2, y: by + bh/2};
-                // 确保不建在河里，留出一定河岸距离
-                if (distToRiver(center) > riverWidth/2 + 20) {
-                  let bColor = bColors[Math.floor(rand() * bColors.length)];
-                  let strokeColor = "#D4DAE0"; // 极浅的灰色建筑描边
-                  
-                  let typeRoll = rand();
-                  if (typeRoll > 0.8 && bw > 40 && bh > 40) {
-                    buildingsSvg += `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="${bColor}" stroke="${strokeColor}" stroke-width="1.5" rx="6"/>`;
-                    buildingsSvg += `<rect x="${bx+8}" y="${by+8}" width="${bw-16}" height="${bh-16}" fill="#FFFFFF" opacity="0.6" rx="3"/>`;
-                  } else {
-                    buildingsSvg += `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="${bColor}" stroke="${strokeColor}" stroke-width="1.5" rx="4"/>`;
-                  }
-                }
-              }
-            }
+      if (cellW < 115 || cellH < 105) continue;
+
+      const cellRect = { x: cellX, y: cellY, w: cellW, h: cellH };
+      if (isRectReserved(cellRect, 4) && rand() < 0.55) continue;
+
+      const hasInnerHorizontal = cellH > 240 && rand() > 0.42;
+      const hasInnerVertical = cellW > 260 && rand() > 0.36;
+
+      if (hasInnerHorizontal) {
+        const y = cellY + cellH * between(0.42, 0.58);
+        minorRoadsSvg += `<path d="M${round(cellX + 14)},${round(y)} L${round(cellX + cellW - 14)},${round(y)}" stroke="${roadBorderColor}" stroke-width="${minorRoadWidth}" stroke-linecap="round"/>`;
+        minorRoadsSvg += `<path d="M${round(cellX + 14)},${round(y)} L${round(cellX + cellW - 14)},${round(y)}" stroke="${roadFillColor}" stroke-width="${minorCoreWidth}" stroke-linecap="round"/>`;
+      }
+      if (hasInnerVertical) {
+        const x = cellX + cellW * between(0.42, 0.58);
+        minorRoadsSvg += `<path d="M${round(x)},${round(cellY + 14)} L${round(x)},${round(cellY + cellH - 14)}" stroke="${roadBorderColor}" stroke-width="${minorRoadWidth}" stroke-linecap="round"/>`;
+        minorRoadsSvg += `<path d="M${round(x)},${round(cellY + 14)} L${round(x)},${round(cellY + cellH - 14)}" stroke="${roadFillColor}" stroke-width="${minorCoreWidth}" stroke-linecap="round"/>`;
+      }
+
+      const margin = between(18, 34);
+      const innerX = cellX + margin;
+      const innerY = cellY + margin;
+      const innerW = cellW - margin * 2;
+      const innerH = cellH - margin * 2;
+      if (innerW < 70 || innerH < 70) continue;
+
+      const density = between(0.48, 0.68);
+      const cols = Math.max(1, Math.floor(innerW / between(76, 118)));
+      const rows = Math.max(1, Math.floor(innerH / between(72, 108)));
+      const lotW = innerW / cols;
+      const lotH = innerH / rows;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (rand() > density) continue;
+
+          const padX = between(9, Math.max(10, lotW * 0.22));
+          const padY = between(9, Math.max(10, lotH * 0.22));
+          const bw = lotW - padX * 2;
+          const bh = lotH - padY * 2;
+          if (bw < 24 || bh < 24) continue;
+
+          const bx = innerX + c * lotW + padX + between(-4, 4);
+          const by = innerY + r * lotH + padY + between(-4, 4);
+          const buildingRect = { x: bx, y: by, w: bw, h: bh };
+          const center = { x: bx + bw / 2, y: by + bh / 2 };
+
+          if (rectNearRiver(buildingRect, 44) || distToRiver(center) < riverWidth / 2 + 50 || isRectReserved(buildingRect, 16)) {
+            continue;
+          }
+
+          const color = pick(bColors);
+          const rx = bw > 42 && bh > 42 ? 6 : 4;
+          const typeRoll = rand();
+
+          if (typeRoll > 0.84 && bw > 48 && bh > 48) {
+            buildingsSvg += `<rect x="${round(bx)}" y="${round(by)}" width="${round(bw)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.4" rx="${rx}"/>`;
+            buildingsSvg += `<rect x="${round(bx + bw * 0.18)}" y="${round(by + bh * 0.18)}" width="${round(bw * 0.64)}" height="${round(bh * 0.64)}" fill="#FFFFFF" opacity="0.55" rx="3"/>`;
+          } else if (typeRoll > 0.68 && bw > 58) {
+            buildingsSvg += `<rect x="${round(bx)}" y="${round(by)}" width="${round(bw * 0.44)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.3" rx="${rx}"/>`;
+            buildingsSvg += `<rect x="${round(bx + bw * 0.56)}" y="${round(by)}" width="${round(bw * 0.44)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.3" rx="${rx}"/>`;
+          } else {
+            buildingsSvg += `<rect x="${round(bx)}" y="${round(by)}" width="${round(bw)}" height="${round(bh)}" fill="${color}" stroke="${strokeColor}" stroke-width="1.3" rx="${rx}"/>`;
           }
         }
       }
     }
   }
 
-  // 底色为极浅的蓝灰白，仿高德地图默认底色
   const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <rect width="100%" height="100%" fill="#F1F4F6"/>
-  ${parksSvg}
-  ${riversSvg}
-  <g>${buildingsSvg}</g>
-  <g>${roadsSvg}</g>
+  <rect width="100%" height="100%" fill="#F4F7F5"/>
+  <g id="map-parks">${parksSvg}</g>
+  <g id="map-water">${waterSvg}</g>
+  <g id="map-buildings">${buildingsSvg}</g>
+  <g id="map-minor-roads">${minorRoadsSvg}</g>
+  <g id="map-main-roads">${roadsSvg}</g>
 </svg>`;
 
   const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   return {
-    prompt: 'urban_svg_map_v4',
+    prompt: SVG_NS_PROMPT,
     seed: seed,
     url: url
   };
@@ -216,14 +374,14 @@ export async function dbPut(db, key, data) {
 }
 
 /* ==========================================================================
-   [区域标注·已修改·地图数据结构规范化]
+   [区域标注·已完成·地图数据结构规范化]
    说明：只读写 IndexedDB，包含默认的分类和地图封面方块
    ========================================================================== */
 export function normalizeMapData(rawData) {
   const source = rawData && typeof rawData === 'object' ? rawData : {};
   let maps = Array.isArray(source.maps) ? source.maps : [];
-  let categories = Array.isArray(source.categories) && source.categories.length > 0 
-    ? source.categories 
+  let categories = Array.isArray(source.categories) && source.categories.length > 0
+    ? source.categories
     : ['现代都市', '西方魔幻', '古代宫廷', '古代仙侠', '未来科幻'];
 
   // 如果 maps 完全为空，添加默认方块
@@ -258,8 +416,8 @@ export function normalizeMapData(rawData) {
       points: Array.isArray(m.points) ? m.points : []
     };
 
-    // [区域标注·已修改·强制更新旧地图数据到新的本地随机生成排布样式]
-    const isOldStyle = m.imagePrompt !== 'urban_svg_map_v4' && !String(m.imagePrompt || '').startsWith('placeholder_');
+    // [区域标注·已完成·旧封面升级到现代都市 v5 随机组合样式]
+    const isOldStyle = m.imagePrompt !== 'urban_svg_map_v5' && !String(m.imagePrompt || '').startsWith('placeholder_');
 
     if (!m.imageUrl || isOldStyle) {
       const cover = generateLocalMapCoverData(mapName, mapCategory);
@@ -298,14 +456,14 @@ export function normalizeMapData(rawData) {
 export async function loadMapData(db) {
   const raw = await dbGet(db, DATA_KEY_MAPS);
   const data = normalizeMapData(raw);
-  
+
   if (data._needsSave) {
     delete data._needsSave;
     await dbPut(db, DATA_KEY_MAPS, data);
   } else {
     delete data._needsSave;
   }
-  
+
   return data;
 }
 
@@ -320,7 +478,7 @@ export function createMapDraft(name, description, category) {
   const mapDesc = String(description || '').trim();
   const mapCategory = String(category || '现代都市').trim();
   const cover = generateLocalMapCoverData(mapName, mapCategory);
-  
+
   return {
     id: `map_custom_${Date.now()}_${Math.random().toString(16).slice(2)}`,
     name: mapName,
