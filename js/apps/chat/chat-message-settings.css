@@ -1436,3 +1436,292 @@
     max-height: 280px;
   }
 }
+
+/* ==========================================================================
+   [区域标注·已完成·本次新增：聊天美化聊天背景样式]
+   说明：
+   1. 仅服务聊天设置页“双语模式”下方新增的“聊天美化 → 聊天背景”板块。
+   2. 视觉结构参照“功能玩法”板块：左上标题 + 暖色卡片 + 抽屉式展开。
+   3. 弹窗沿用闲谈应用内 chat-modal 风格，不使用浏览器原生弹窗或原生选择器。
+   4. 样式层不涉及持久化存储；确认保存由 JS 通过 DB.js / IndexedDB 完成。
+   ========================================================================== */
+.msg-settings-chat-beauty-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.msg-settings-card.msg-settings-chat-beauty-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  background: rgba(255, 252, 247, 0.94);
+  border: 1px solid rgba(74, 52, 42, 0.07);
+  box-shadow: 0 12px 28px rgba(74, 52, 42, 0.06);
+}
+
+.msg-settings-chat-beauty-background {
+  display: flex;
+  flex-direction: column;
+}
+
+.msg-settings-chat-beauty-toggle {
+  width: 100%;
+  min-height: 44px;
+  padding: 14px 0;
+  border: none;
+  background: transparent;
+  color: #4A342A;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.msg-settings-chat-beauty-toggle .msg-settings-card__title {
+  margin-bottom: 0;
+}
+
+.msg-settings-chat-beauty-toggle:active {
+  opacity: 0.72;
+}
+
+.msg-settings-chat-beauty-arrow {
+  width: 22px;
+  height: 22px;
+  color: rgba(74, 52, 42, 0.72);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.18s ease, color 0.15s ease;
+}
+
+.msg-settings-chat-beauty-arrow svg {
+  width: 15px;
+  height: 15px;
+}
+
+.msg-settings-chat-beauty-background.is-open .msg-settings-chat-beauty-arrow {
+  transform: rotate(90deg);
+  color: #4A342A;
+}
+
+.msg-settings-chat-beauty-drawer {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(-4px);
+  transition: max-height 0.22s ease, opacity 0.18s ease, transform 0.18s ease;
+  will-change: max-height, opacity, transform;
+}
+
+.msg-settings-chat-beauty-background.is-open .msg-settings-chat-beauty-drawer {
+  max-height: 210px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.msg-settings-chat-beauty-drawer__inner {
+  padding: 0 0 14px;
+}
+
+.msg-chat-background-setting-row {
+  min-height: 128px;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.msg-chat-background-setting-row__actions {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.msg-chat-background-change-btn,
+.msg-chat-background-local-btn,
+.msg-chat-background-source-tab {
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.msg-chat-background-change-btn {
+  min-height: 34px;
+  border-radius: 999px;
+  background: #4A342A;
+  color: #fffaf4;
+  padding: 8px 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(74, 52, 42, 0.16);
+  transition: transform 0.1s ease, opacity 0.15s ease;
+}
+
+.msg-chat-background-change-btn svg,
+.msg-chat-background-local-btn svg,
+.msg-chat-background-source-tab svg {
+  width: 16px;
+  height: 16px;
+}
+
+.msg-chat-background-change-btn:active,
+.msg-chat-background-local-btn:active,
+.msg-chat-background-source-tab:active {
+  transform: scale(0.96);
+  opacity: 0.86;
+}
+
+.msg-chat-beauty-preview {
+  width: 76px;
+  height: 124px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: linear-gradient(160deg, rgba(232, 221, 210, 0.88), rgba(248, 244, 239, 0.96));
+  border: 1px solid rgba(74, 52, 42, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 252, 247, 0.66), 0 10px 24px rgba(74, 52, 42, 0.08);
+  color: rgba(74, 52, 42, 0.48);
+  flex-shrink: 0;
+}
+
+.msg-chat-beauty-preview img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.msg-chat-beauty-preview__empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.msg-chat-beauty-preview__empty svg {
+  width: 22px;
+  height: 22px;
+}
+
+.chat-background-modal-panel {
+  max-width: 330px;
+}
+
+.msg-chat-background-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.msg-chat-background-source-tabs {
+  min-height: 40px;
+  padding: 3px;
+  border-radius: 17px;
+  background: rgba(74, 52, 42, 0.08);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.msg-chat-background-source-tab {
+  min-width: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: rgba(74, 52, 42, 0.58);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.msg-chat-background-source-tab.is-active {
+  background: rgba(255, 252, 247, 0.96);
+  color: #4A342A;
+  box-shadow: 0 5px 12px rgba(74, 52, 42, 0.12);
+}
+
+.msg-chat-background-modal__content {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.msg-chat-beauty-preview--modal {
+  width: 88px;
+  height: 144px;
+  border-radius: 22px;
+}
+
+.msg-chat-background-modal__fields {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.msg-chat-background-local-btn {
+  min-height: 36px;
+  border-radius: 999px;
+  background: #4A342A;
+  color: #fffaf4;
+  padding: 9px 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(74, 52, 42, 0.16);
+  transition: transform 0.1s ease, opacity 0.15s ease;
+}
+
+.msg-chat-background-url-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: rgba(74, 52, 42, 0.62);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.msg-chat-background-url-field .chat-modal-search {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 360px) {
+  .msg-chat-background-setting-row,
+  .msg-chat-background-modal__content {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .msg-chat-background-setting-row__actions,
+  .msg-chat-background-modal__fields {
+    width: 100%;
+    align-items: center;
+  }
+
+  .msg-settings-chat-beauty-background.is-open .msg-settings-chat-beauty-drawer {
+    max-height: 260px;
+  }
+}

@@ -11,6 +11,7 @@ import { renderTranslationSettingsHtml } from './chat-translation.js';
 import { renderAutonomousActivitySettingsSection } from './chat-autonomous-activity-settings.js';
 import { renderChatMemorySettingsSection } from './chat-memory-settings.js';
 import { renderUserPatSettingsSection } from './chat-user-pat.js';
+import { renderChatBeautySettingsSection } from './chat-beauty-settings.js';
 
 /* ==========================================================================
    [区域标注·已完成·本次拆分] 独立聊天设置页面
@@ -325,6 +326,8 @@ export function renderChatMessageSettingsPage({
              4. 翻译设置仍独立存储于 IndexedDB，键名 chat_translation_settings::*；不新增 localStorage/sessionStorage 逻辑。
              ========================================================================== -->
         ${renderTranslationSettingsHtml(options.translationSettings, session, options.userProfile?.avatar, options.userProfile?.nickname)}
+
+        ${renderChatBeautySettingsSection(chatSettings)}
 
         <!-- ==================================================================
              [区域标注·已完成·聊天消息合并板块]

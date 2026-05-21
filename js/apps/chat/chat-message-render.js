@@ -40,6 +40,7 @@ import { renderTranslationBubbleHtml } from './chat-translation.js';
 import { renderQuotePreview } from './chat-message-quote.js';
 import { renderChatMessageSearchPanelHtml } from './chat-message-search.js';
 import { isUserPatSystemMessage } from './chat-user-pat.js';
+import { getChatBackgroundListAreaAttrs } from './chat-beauty-settings.js';
 
 const CHAT_MESSAGE_INITIAL_VISIBLE_COUNT = 100;
 const CHAT_MESSAGE_LOAD_MORE_STEP = 100;
@@ -785,7 +786,11 @@ export function renderChatMessage(chatSession, messages, options = {}) {
   ` : '';
 
   const conversationClassName = multiSelectMode ? 'msg-conversation is-multi-select-mode' : 'msg-conversation';
-  const listAreaClassName = multiSelectMode ? 'msg-list-area is-multi-select-mode' : 'msg-list-area';
+  const chatBackgroundAttrs = getChatBackgroundListAreaAttrs(chatSettings);
+  const listAreaClassName = [
+    multiSelectMode ? 'msg-list-area is-multi-select-mode' : 'msg-list-area',
+    chatBackgroundAttrs.className
+  ].filter(Boolean).join(' ');
 
   const inputBarHtml = `
     <div class="msg-input-shell ${pendingQuoteHtml ? 'has-pending-quote' : ''}">
@@ -835,7 +840,14 @@ export function renderChatMessage(chatSession, messages, options = {}) {
       <div class="${conversationClassName}" data-role="msg-conversation">
         ${topBarHtml}
         ${searchPanelHtml}
-        <div class="${listAreaClassName}" data-role="msg-list">${messagesHtml}</div>
+        <!-- ==================================================================
+             [区域标注·已完成·本次新增：聊天背景应用到当前聊天窗口]
+             说明：
+             1. 背景来源读取当前 chatPromptSettings.chatBackgroundSrc，随当前会话设置持久化。
+             2. 首屏渲染时直接写入 class/style，减少进入聊天窗口时的背景闪屏。
+             3. 不在本区域读写 localStorage/sessionStorage，不做双份兜底。
+             ================================================================== -->
+        <div class="${listAreaClassName}" data-role="msg-list"${chatBackgroundAttrs.styleAttr}>${messagesHtml}</div>
         ${multiSelectBarHtml}
         ${multiSelectMode ? '' : inputBarHtml}
       </div>

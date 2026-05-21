@@ -412,6 +412,24 @@
   display: none;
 }
 
+/* ==========================================================================
+   [区域标注·已完成·本次新增：聊天窗口背景显示]
+   说明：
+   1. 仅服务聊天设置页“聊天美化 → 聊天背景”确认后的当前聊天窗口背景展示。
+   2. 背景图来源由 chat-beauty-settings.js 写入 CSS 变量 --msg-chat-background-image。
+   3. 样式层不涉及持久化存储；持久化统一由 JS 通过 DB.js / IndexedDB 完成。
+   4. 使用伪元素承载背景，避免重建消息列表造成闪屏，并保留暖色遮罩保证气泡可读性。
+   ========================================================================== */
+.msg-list-area.has-chat-background {
+  background-color: #f8f4ef;
+  background-image:
+    linear-gradient(rgba(248, 244, 239, 0.36), rgba(248, 244, 239, 0.36)),
+    var(--msg-chat-background-image);
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+}
+
 /* ========================================================================
    [区域标注·已完成·本次聊天记录分段加载] “加载更多消息”按钮
    说明：

@@ -149,6 +149,12 @@ import {
   publishUserMomentAiInteraction
 } from './chat-autonomous-activity-settings.js';
 import {
+  confirmChatBackgroundSelection,
+  openChatBackgroundLocalPicker,
+  setChatBackgroundSource,
+  showChatBackgroundModal
+} from './chat-beauty-settings.js';
+import {
   openInnerVoicePanel,
   findInnerVoiceForMessage,
   findLatestInnerVoice,
@@ -2544,13 +2550,37 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
        4. 不使用 localStorage/sessionStorage，不使用原生弹窗或原生选择器。
        ======================================================================== */
     case 'toggle-settings-sticker-drawer': {
-      const drawerBlock = target.closest('.msg-settings-chat-control-item, .msg-settings-feature-play-pat, .msg-settings-feature-play-sticker');
+      const drawerBlock = target.closest('.msg-settings-chat-control-item, .msg-settings-feature-play-pat, .msg-settings-feature-play-sticker, .msg-settings-chat-beauty-background');
       if (!drawerBlock) break;
       const nextOpen = !drawerBlock.classList.contains('is-open');
       drawerBlock.classList.toggle('is-open', nextOpen);
       target.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
       break;
     }
+
+    /* ========================================================================
+       [区域标注·已完成·本次新增：聊天美化聊天背景点击接线]
+       说明：
+       1. 仅接线“聊天美化 → 聊天背景”的更换弹窗、来源切换、本地图片入口与确认保存。
+       2. 本地图片/URL 在确认前只保存在运行时草稿；点击“确认”后才写入当前 chatPromptSettings。
+       3. 持久化统一走 DB.js / IndexedDB；不使用 localStorage/sessionStorage，不写双份兜底，不做长文本过滤。
+       4. 弹窗为应用内 chat-modal 样式，不使用原生浏览器弹窗。
+       ======================================================================== */
+    case 'open-chat-background-modal':
+      showChatBackgroundModal(container, state);
+      break;
+
+    case 'set-chat-background-source':
+      setChatBackgroundSource(container, state, target.dataset.source);
+      break;
+
+    case 'open-chat-background-local-picker':
+      openChatBackgroundLocalPicker(container);
+      break;
+
+    case 'confirm-chat-background':
+      await confirmChatBackgroundSelection(container, state, db);
+      break;
 
     /* ========================================================================
        [区域标注·已完成·自主活动设置点击接线]

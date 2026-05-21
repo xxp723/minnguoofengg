@@ -50,6 +50,7 @@ import {
   readAndValidateChatImportJsonFile,
   showChatExportImportNoticeModal
 } from './chat-export-import.js';
+import { handleChatBackgroundFileInputChange } from './chat-beauty-settings.js';
 import {
   CHAT_MESSAGE_INITIAL_VISIBLE_COUNT
 } from './chat-state.js';
@@ -60,6 +61,20 @@ import {
    ========================================================================== */
 export async function handleChange(e, state, container, db) {
   const target = e.target;
+
+  /* ==========================================================================
+     [区域标注·已完成·本次新增：聊天背景本地图片 change 接线]
+     说明：
+     1. 仅处理“聊天美化 → 聊天背景”弹窗中的隐藏 file input。
+     2. 图片读取后只暂存到 state.pendingChatBackgroundDraft；点击“确认”前不写入 IndexedDB。
+     3. 不使用 localStorage/sessionStorage，不写双份兜底，不做长文本过滤。
+     ========================================================================== */
+  if (target?.matches?.('[data-role="chat-background-file-input"]')) {
+    const file = target.files?.[0];
+    if (file) handleChatBackgroundFileInputChange(file, state, container);
+    target.value = '';
+    return;
+  }
 
   if (target?.matches?.('[data-role="chat-import-json-file-input"]')) {
     const file = target.files?.[0];
