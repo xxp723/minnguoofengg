@@ -160,6 +160,7 @@ import {
   createGiftPayRequestMessage,
   parseGiftDraftFromModal,
   sendGiftMessage,
+  showGiftActionModal,
   showMessageGiftModal
 } from './chat-gift.js';
 import {
@@ -1376,6 +1377,140 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
         canAccept: canOperate,
         canReturn: canOperate
       });
+      break;
+    }
+
+    /* ========================================================================
+       [区域标注·已完成·本次需求2·礼物卡片接取点击处理]
+       说明：
+       1. 礼物卡片点击后打开应用内弹窗，支持像转账一样“收取 / 退回”。
+       2. 只允许处理对方/AI 发来的 pending 礼物；用户自己发出的礼物或代付请求只展示当前状态。
+       3. 礼物状态和系统小字统一写入当前聊天消息，再通过 DB.js / IndexedDB 持久化；不使用 localStorage/sessionStorage。
+       ======================================================================== */
+    case 'msg-gift-open-actions': {
+      const messageId = String(target.dataset.messageId || '').trim();
+      const giftMessage = (state.currentMessages || []).find(item => String(item.id) === messageId);
+      if (!giftMessage || String(giftMessage.type || '') !== 'gift') break;
+
+      const giftStatus = String(giftMessage.giftStatus || 'pending').trim();
+      const giftDirection = String(giftMessage.giftDirection || '').trim() || (giftMessage.role === 'assistant' ? 'incoming' : 'outgoing');
+      const statusLabel = giftStatus === 'accepted' ? '已收取' : (giftStatus === 'returned' ? '已退回' : '等待操作');
+      const canOperate = giftStatus === 'pending' && giftDirection === 'incoming';
+
+      showGiftActionModal(container, {
+        messageId,
+        title: String(giftMessage.giftTitle || giftMessage.content || '礼物'),
+        priceLabel: String(giftMessage.giftDisplayPrice || ''),
+        note: String(giftMessage.giftNote || ''),
+        statusLabel,
+        actionHint: canOperate ? '请选择收取或退回' : `当前礼物状态：${statusLabel}`,
+        canAccept: canOperate,
+        canReturn: canOperate
+      });
+      break;
+    }
+
+    case 'msg-gift-accept': {
+      const messageId = String(target.dataset.messageId || '').trim();
+      if (!messageId) break;
+
+      const messageIndex = (state.currentMessages || []).findIndex(item => String(item.id) === messageId);
+      if (messageIndex < 0) break;
+
+      const giftMessage = state.currentMessages[messageIndex];
+      if (String(giftMessage.type || '') !== 'gift') break;
+      if (String(giftMessage.giftStatus || 'pending') !== 'pending') {
+        closeModal(container);
+        break;
+      }
+
+      const giftDirection = String(giftMessage.giftDirection || '').trim() || (giftMessage.role === 'assistant' ? 'incoming' : 'outgoing');
+      if (giftDirection !== 'incoming') {
+        closeModal(container);
+        break;
+      }
+
+      const now = Date.now();
+      state.currentMessages[messageIndex] = {
+        ...giftMessage,
+        giftDirection,
+        giftStatus: 'accepted',
+        giftHandledAt: now
+      };
+
+      state.currentMessages.push({
+        id: `gift_system_${now}_${Math.random().toString(16).slice(2)}`,
+        role: 'user',
+        type: 'transfer_system',
+        content: '你已收取礼物',
+        timestamp: now + 1
+      });
+
+      const session = state.sessions.find(s => s.id === state.currentChatId);
+      if (session) {
+        session.lastMessage = '[礼物] 已收取';
+        session.lastTime = now;
+      }
+
+      await Promise.all([
+        persistCurrentMessages(state, db),
+        dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions)
+      ]);
+
+      closeModal(container);
+      renderCurrentChatMessage(container, state);
+      break;
+    }
+
+    case 'msg-gift-return': {
+      const messageId = String(target.dataset.messageId || '').trim();
+      if (!messageId) break;
+
+      const messageIndex = (state.currentMessages || []).findIndex(item => String(item.id) === messageId);
+      if (messageIndex < 0) break;
+
+      const giftMessage = state.currentMessages[messageIndex];
+      if (String(giftMessage.type || '') !== 'gift') break;
+      if (String(giftMessage.giftStatus || 'pending') !== 'pending') {
+        closeModal(container);
+        break;
+      }
+
+      const giftDirection = String(giftMessage.giftDirection || '').trim() || (giftMessage.role === 'assistant' ? 'incoming' : 'outgoing');
+      if (giftDirection !== 'incoming') {
+        closeModal(container);
+        break;
+      }
+
+      const now = Date.now();
+      state.currentMessages[messageIndex] = {
+        ...giftMessage,
+        giftDirection,
+        giftStatus: 'returned',
+        giftHandledAt: now
+      };
+
+      state.currentMessages.push({
+        id: `gift_system_${now}_${Math.random().toString(16).slice(2)}`,
+        role: 'user',
+        type: 'transfer_system',
+        content: '你已退回礼物',
+        timestamp: now + 1
+      });
+
+      const session = state.sessions.find(s => s.id === state.currentChatId);
+      if (session) {
+        session.lastMessage = '[礼物] 已退回';
+        session.lastTime = now;
+      }
+
+      await Promise.all([
+        persistCurrentMessages(state, db),
+        dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions)
+      ]);
+
+      closeModal(container);
+      renderCurrentChatMessage(container, state);
       break;
     }
 

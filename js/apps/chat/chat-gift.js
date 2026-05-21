@@ -23,7 +23,9 @@ import {
 export const GIFT_ICONS = {
   gift: `<svg viewBox="0 0 48 48" fill="none"><path d="M8 20h32v22H8V20Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M6 12h36v8H6v-8Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M24 12v30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M24 12c-2-5-7-8-11-6c-4 2-3 8 2 8h9Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M24 12c2-5 7-8 11-6c4 2 3 8-2 8h-9Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`,
   wallet: `<svg viewBox="0 0 48 48" fill="none"><path d="M6 14h36v28H6V14Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M10 14V8h26v6" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M32 28h10v8H32a4 4 0 0 1 0-8Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`,
-  sparkle: `<svg viewBox="0 0 48 48" fill="none"><path d="M24 5l4.5 12.5L41 22l-12.5 4.5L24 39l-4.5-12.5L7 22l12.5-4.5L24 5Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M39 34l1.5 4l4 1.5l-4 1.5l-1.5 4l-1.5-4l-4-1.5l4-1.5l1.5-4Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`
+  sparkle: `<svg viewBox="0 0 48 48" fill="none"><path d="M24 5l4.5 12.5L41 22l-12.5 4.5L24 39l-4.5-12.5L7 22l12.5-4.5L24 5Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M39 34l1.5 4l4 1.5l-4 1.5l-1.5 4l-1.5-4l-4-1.5l4-1.5l1.5-4Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`,
+  check: `<svg viewBox="0 0 48 48" fill="none"><path d="M40 12L18 34L8 24" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  undo: `<svg viewBox="0 0 48 48" fill="none"><path d="M18 14L8 24L18 34" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 24h22a9 9 0 0 1 0 18h-7" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 };
 
 /* ==========================================================================
@@ -109,22 +111,29 @@ export function createAiGiftMessageFromProtocol(block = {}) {
     giftTitle: payload.giftTitle,
     giftNote: payload.giftNote,
     giftPayer: `${roleName}送给你`,
-    giftSource: 'ai_protocol'
+    giftSource: 'ai_protocol',
+    giftDirection: 'incoming',
+    giftStatus: 'pending'
   };
 }
 
 /* ==========================================================================
-   [区域标注·已完成·北欧 ins 风礼物消息卡片]
-   说明：只负责礼物气泡内部 HTML，外层左右气泡仍沿用聊天消息页统一结构。
+   [区域标注·已更新·本次需求2·礼物卡片可接取状态展示]
+   说明：
+   1. 礼物气泡内部 HTML 保持北欧 ins 风；外层点击入口由 chat-message-render.js 挂到应用内操作弹窗。
+   2. AI 主动送礼默认 giftStatus=pending，点击后可像转账一样“收取 / 退回”。
+   3. 本区域只渲染状态，不读写存储；状态持久化由 chat-event-click.js 通过 DB.js / IndexedDB 完成。
    ========================================================================== */
 export function renderGiftBubble(message = {}) {
   const title = String(message?.giftTitle || '礼物').trim();
   const price = String(message?.giftDisplayPrice || '').trim();
   const note = String(message?.giftNote || '').trim() || 'A soft little present for you';
   const payer = String(message?.giftPayer || '').trim();
+  const status = String(message?.giftStatus || 'pending').trim();
+  const statusLabel = status === 'accepted' ? '已收取' : (status === 'returned' ? '已退回' : '');
 
   return `
-    <article class="msg-gift-card" title="${escapeHtml(title)}">
+    <article class="msg-gift-card msg-gift-card--${escapeHtml(status)}" title="${escapeHtml(title)}">
       <div class="msg-gift-card__topline">
         <span class="msg-gift-card__icon">${GIFT_ICONS.gift}</span>
         <span class="msg-gift-card__eyebrow">Nordic Gift</span>
@@ -135,8 +144,64 @@ export function renderGiftBubble(message = {}) {
         ${payer ? `<span class="msg-gift-card__payer">${escapeHtml(payer)}</span>` : ''}
       </div>
       <p class="msg-gift-card__note">${escapeHtml(note)}</p>
+      ${statusLabel ? `<span class="msg-gift-card__status">${escapeHtml(statusLabel)}</span>` : ''}
     </article>
   `;
+}
+
+/* ==========================================================================
+   [区域标注·已完成·本次需求2·礼物操作应用内弹窗]
+   说明：
+   1. 点击礼物卡片后使用本弹窗进行“收取 / 退回”，不使用原生浏览器弹窗。
+   2. 弹窗沿用闲谈 chat-modal 主题；按钮图标使用本模块 IconPark 风格 SVG。
+   3. 本区只负责 UI；礼物状态、系统小字和聊天记录持久化由 chat-event-click.js 写入 DB.js / IndexedDB。
+   ========================================================================== */
+export function showGiftActionModal(container, options = {}) {
+  const mask = container.querySelector('[data-role="modal-mask"]');
+  const panel = container.querySelector('[data-role="modal-panel"]');
+  if (!mask || !panel) return;
+
+  const messageId = String(options.messageId || '').trim();
+  const title = String(options.title || '礼物').trim();
+  const priceLabel = String(options.priceLabel || '').trim();
+  const note = String(options.note || '').trim();
+  const statusLabel = String(options.statusLabel || '').trim() || '待处理';
+  const actionHint = String(options.actionHint || '').trim() || '请选择处理方式';
+  const canAccept = Boolean(options.canAccept);
+  const canReturn = Boolean(options.canReturn);
+
+  panel.innerHTML = `
+    <div class="chat-modal-header">
+      <span>礼物操作</span>
+      <button class="chat-modal-close" data-action="close-modal" type="button">${TAB_ICONS.close}</button>
+    </div>
+    <div class="chat-modal-body msg-transfer-action-modal-body">
+      <div class="msg-transfer-action-card">
+        <div class="msg-transfer-action-card__row">
+          <span class="msg-transfer-action-card__label">礼物</span>
+          <strong class="msg-transfer-action-card__amount">${escapeHtml(title)}</strong>
+        </div>
+        ${priceLabel ? `
+          <div class="msg-transfer-action-card__row">
+            <span class="msg-transfer-action-card__label">价格</span>
+            <span class="msg-transfer-action-card__status">${escapeHtml(priceLabel)}</span>
+          </div>
+        ` : ''}
+        <div class="msg-transfer-action-card__row">
+          <span class="msg-transfer-action-card__label">状态</span>
+          <span class="msg-transfer-action-card__status">${escapeHtml(statusLabel)}</span>
+        </div>
+        ${note ? `<div class="msg-transfer-action-card__note">${escapeHtml(note)}</div>` : ''}
+      </div>
+      <div class="chat-modal-notice">${escapeHtml(actionHint)}</div>
+    </div>
+    <div class="chat-modal-footer">
+      ${canReturn ? `<button class="chat-modal-btn chat-modal-btn--secondary" data-action="msg-gift-return" data-message-id="${escapeHtml(messageId)}" type="button">${GIFT_ICONS.undo}<span>退回</span></button>` : ''}
+      ${canAccept ? `<button class="chat-modal-btn chat-modal-btn--primary" data-action="msg-gift-accept" data-message-id="${escapeHtml(messageId)}" type="button">${GIFT_ICONS.check}<span>收取</span></button>` : ''}
+    </div>
+  `;
+
+  mask.classList.remove('is-hidden');
 }
 
 /* ==========================================================================
@@ -276,6 +341,8 @@ export async function sendGiftMessage(container, state, db, draft = {}, helpers 
     giftBaseCny: Number(giftBaseCny.toFixed(2)),
     giftNote: 'for you, with a little everyday tenderness',
     giftPayer: '我已购买',
+    giftDirection: 'outgoing',
+    giftStatus: 'accepted',
     timestamp: now
   };
 
@@ -332,6 +399,8 @@ export function createGiftPayRequestMessage(draft = {}) {
     giftPayer: '请求你代付',
     giftRequestType: 'pay_request',
     giftAiPromptText: aiPromptText,
+    giftDirection: 'outgoing',
+    giftStatus: 'pending',
     timestamp: now
   };
 }

@@ -501,10 +501,23 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
     `;
   }
 
+  /* ======================================================================
+     [区域标注·已完成·本次需求2·礼物卡片点击接取入口]
+     说明：
+     1. 礼物气泡外层点击改为 msg-gift-open-actions，像转账一样进入应用内操作弹窗。
+     2. 本区域只决定点击 action，不做任何持久化；收取/退回由 chat-event-click.js 写入 DB.js / IndexedDB。
+     3. 多选模式仍保持原有 msg-multi-toggle，避免影响消息多选。
+     ====================================================================== */
+  const bubbleRowAction = multiSelectMode
+    ? 'msg-multi-toggle'
+    : (isTransferMessage
+        ? 'msg-transfer-open-actions'
+        : (isGiftBubbleMessage ? 'msg-gift-open-actions' : 'msg-bubble-select'));
+
   return `
     <div class="msg-bubble-row ${isUser ? 'msg-bubble-row--right' : 'msg-bubble-row--left'} ${multiSelectMode ? 'is-multi-selecting' : ''} ${isSelected ? 'is-selected' : ''}"
          data-message-id="${escapeHtml(messageId)}"
-         data-action="${multiSelectMode ? 'msg-multi-toggle' : (isTransferMessage ? 'msg-transfer-open-actions' : 'msg-bubble-select')}">
+         data-action="${bubbleRowAction}">
       ${!isUser && !hideAvatars ? `<div class="msg-bubble__avatar">${roleAvatarMarkup}</div>` : ''}
       <div class="msg-bubble-content">
         ${isToolbarOpen ? `

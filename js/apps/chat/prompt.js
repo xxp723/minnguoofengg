@@ -1739,8 +1739,9 @@ function getCurrentRealDate() {
   return new Date();
 }
 
-function formatDateForTimeAwareness(date = getCurrentRealDate()) {
-  return new Intl.DateTimeFormat('zh-CN', {
+function getBeijingDateTimeParts(date = getCurrentRealDate()) {
+  const parts = new Intl.DateTimeFormat('zh-CN', {
+    /* IANA 标准中中国标准时间常用 Asia/Shanghai；这里只用于计算北京时间，不把“上海”写入提示词。 */
     timeZone: 'Asia/Shanghai',
     year: 'numeric',
     month: '2-digit',
@@ -1750,7 +1751,45 @@ function formatDateForTimeAwareness(date = getCurrentRealDate()) {
     minute: '2-digit',
     second: '2-digit',
     hour12: false
-  }).format(date);
+  }).formatToParts(date);
+
+  const getPart = type => parts.find(part => part.type === type)?.value || '';
+  const hour = getPart('hour') === '24' ? '00' : getPart('hour');
+
+  return {
+    year: getPart('year'),
+    month: getPart('month'),
+    day: getPart('day'),
+    weekday: getPart('weekday'),
+    hour,
+    minute: getPart('minute'),
+    second: getPart('second')
+  };
+}
+
+function getTimePeriodLabelForPrompt(hourText = '00', minuteText = '00') {
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const totalMinutes = (Number.isFinite(hour) ? hour : 0) * 60 + (Number.isFinite(minute) ? minute : 0);
+
+  if (totalMinutes < 6 * 60) return '凌晨';
+  if (totalMinutes < 9 * 60) return '早上';
+  if (totalMinutes < 11 * 60 + 30) return '上午';
+  if (totalMinutes < 13 * 60 + 30) return '中午';
+  if (totalMinutes < 18 * 60) return '下午';
+  if (totalMinutes < 23 * 60) return '晚上';
+  return '深夜';
+}
+
+function formatCurrentTimeCompactForPrompt(date = getCurrentRealDate()) {
+  const parts = getBeijingDateTimeParts(date);
+  const period = getTimePeriodLabelForPrompt(parts.hour, parts.minute);
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.weekday} ${parts.hour}:${parts.minute}（${period}）`;
+}
+
+function formatDateForTimeAwareness(date = getCurrentRealDate()) {
+  const parts = getBeijingDateTimeParts(date);
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.weekday} ${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
 function formatRelativeDurationForPrompt(ms) {
@@ -1778,17 +1817,12 @@ function getMessageTimestamp(item) {
 }
 
 function getShanghaiDateParts(date = getCurrentRealDate()) {
-  const parts = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).formatToParts(date);
+  const parts = getBeijingDateTimeParts(date);
 
   return {
-    year: parts.find(part => part.type === 'year')?.value || '',
-    month: parts.find(part => part.type === 'month')?.value || '',
-    day: parts.find(part => part.type === 'day')?.value || ''
+    year: parts.year,
+    month: parts.month,
+    day: parts.day
   };
 }
 
@@ -1796,6 +1830,79 @@ function isDifferentShanghaiDate(leftDate, rightDate) {
   const left = getShanghaiDateParts(leftDate);
   const right = getShanghaiDateParts(rightDate);
   return left.year !== right.year || left.month !== right.month || left.day !== right.day;
+}
+
+/* ========================================================================
+   [区域标注·已完成·本次需求1·时间感知自然日差修复]
+   说明：
+   1. 计算上海时区下的“自然日差”，避免只按小时差粗略判断，导致好几天前被误当成昨天。
+   2. 该计算只在本轮 API 请求时运行，不写入持久化存储，不使用 localStorage/sessionStorage。
+   3. 结果会进入精简时间感知提示词，供 AI 明确区分“今天/昨天/N天前”。
+   ======================================================================== */
+function getShanghaiDayIndex(date = getCurrentRealDate()) {
+  const parts = getShanghaiDateParts(date);
+  const year = Number(parts.year);
+  const month = Number(parts.month);
+  const day = Number(parts.day);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return 0;
+  return Math.floor(Date.UTC(year, month - 1, day) / (24 * 60 * 60 * 1000));
+}
+
+function formatShanghaiDayDistanceForPrompt(timestamp = 0, now = getCurrentRealDate()) {
+  const value = Number(timestamp || 0) || 0;
+  if (!value) return '无日期';
+  const dayDistance = getShanghaiDayIndex(now) - getShanghaiDayIndex(new Date(value));
+  if (dayDistance <= 0) return '今天';
+  if (dayDistance === 1) return '昨天';
+  if (dayDistance === 2) return '前天';
+  return `${dayDistance}天前`;
+}
+
+/* ========================================================================
+   [区域标注·已完成·时间感知节日首轮注入]
+   说明：
+   1. 仅按北京时间运行时判断固定公历节日与少量星期规则节日，不新增持久化存储。
+   2. 只有“今天命中节日 + 当前会话今天还没有历史聊天”时，才给 AI 注入节日提醒。
+   3. 非节日或当天后续聊天不注入任何节日提示，避免浪费 token 或诱导 AI 硬聊节日。
+   4. 本区不使用 localStorage/sessionStorage，不写双份存储兜底。
+   ======================================================================== */
+function getKnownFestivalNamesForDate(date = getCurrentRealDate()) {
+  const parts = getBeijingDateTimeParts(date);
+  const month = Number(parts.month);
+  const day = Number(parts.day);
+  const monthDay = `${parts.month}-${parts.day}`;
+  const fixedFestivals = {
+    '01-01': '元旦',
+    '02-14': '情人节',
+    '03-08': '妇女节',
+    '05-01': '劳动节',
+    '06-01': '儿童节',
+    '10-01': '国庆节',
+    '12-24': '平安夜',
+    '12-25': '圣诞节'
+  };
+  const names = fixedFestivals[monthDay] ? [fixedFestivals[monthDay]] : [];
+  const weekdayIndex = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'].indexOf(parts.weekday);
+  const weekOfMonth = Math.ceil(day / 7);
+
+  if (month === 5 && weekdayIndex === 0 && weekOfMonth === 2) names.push('母亲节');
+  if (month === 6 && weekdayIndex === 0 && weekOfMonth === 3) names.push('父亲节');
+
+  return names;
+}
+
+function hasHistoryMessageOnCurrentBeijingDate(history = [], now = getCurrentRealDate()) {
+  const todayIndex = getShanghaiDayIndex(now);
+  return Array.isArray(history) && history.some(item => {
+    const timestamp = getMessageTimestamp(item);
+    return timestamp && getShanghaiDayIndex(new Date(timestamp)) === todayIndex;
+  });
+}
+
+function buildTodayFestivalPrompt(history = [], now = getCurrentRealDate()) {
+  const festivalNames = getKnownFestivalNamesForDate(now);
+  if (!festivalNames.length || hasHistoryMessageOnCurrentBeijingDate(history, now)) return '';
+  return `今日节日：${festivalNames.join('、')}。若语境自然，可送一句简短祝福；之后不要反复提。`;
 }
 
 /* ==========================================================================
@@ -2019,51 +2126,51 @@ function buildConversationTimeContext({ history = [], userInput = '', now = getC
   const currentUserRoundFirstTimestamp = Number(conversationTimeContext.currentUserRoundFirstTimestamp || 0) || latestUserTimestamp;
   const currentUserRoundLastTimestamp = Number(conversationTimeContext.currentUserRoundLastTimestamp || 0) || latestUserTimestamp;
   const previousLatestAnyTimestamp = Number(conversationTimeContext.previousLatestAnyTimestamp || 0) || 0;
-  const previousLatestUserTimestamp = Number(conversationTimeContext.previousLatestUserTimestamp || 0) || 0;
   const previousLatestAssistantTimestamp = Number(conversationTimeContext.previousLatestAssistantTimestamp || 0) || 0;
-  const roundTimeline = buildConversationRoundTimeline(normalizedHistory, 10, now);
+  const roundTimeline = buildConversationRoundTimeline(normalizedHistory, 6, now);
+  const todayFestivalPrompt = buildTodayFestivalPrompt(normalizedHistory, now);
 
-  const formatTimeDistanceLine = (label, timestamp) => {
+  const formatTimeAnchorLine = (label, timestamp) => {
     const value = Number(timestamp || 0) || 0;
-    if (!value) return `${label}：无可用时间戳。`;
+    if (!value) return `${label}：无时间戳`;
     const date = new Date(value);
-    const crossedDay = isDifferentShanghaiDate(date, now) ? '是' : '否';
-    return `${label}：${formatDateForTimeAwareness(date)}；距本轮 API 实际请求：${formatRelativeDurationForPrompt(nowMs - value)}；是否跨自然日：${crossedDay}。`;
+    return `${label}：${formatDateForTimeAwareness(date)}；距现在${formatRelativeDurationForPrompt(nowMs - value)}；自然日=${formatShanghaiDayDistanceForPrompt(value, now)}`;
   };
 
   const lines = [
-    `本轮 API 实际请求时间：${formatDateForTimeAwareness(now)}。`,
-    `本轮用户最新一轮消息内容：${normalizePlainText(userInput) || '（无额外文字，可能是点按重新回复/纸飞机触发）'}。`,
-    formatTimeDistanceLine('本轮用户实际回复开始时间', currentUserRoundFirstTimestamp),
-    formatTimeDistanceLine('本轮用户实际回复最后一条时间', currentUserRoundLastTimestamp),
-    formatTimeDistanceLine('上一条 AI 回复时间（排除本轮用户消息）', previousLatestAssistantTimestamp),
-    formatTimeDistanceLine('上一条历史聊天记录时间（排除本轮用户消息）', previousLatestAnyTimestamp),
-    formatTimeDistanceLine('上一条历史用户消息时间（排除本轮用户消息）', previousLatestUserTimestamp)
+    /* ======================================================================
+       [区域标注·已完成·本次需求1·时间感知精简上下文]
+       说明：
+       1. 只发送当前时间、关键消息时间锚点、自然日差和最近轮次摘要，减少 token。
+       2. 自然日差使用上海时区计算，明确“今天/昨天/前天/N天前”，避免多日前内容被误判为昨天。
+       3. 这里只做运行时提示词组装，不写 DB.js / IndexedDB，不使用 localStorage/sessionStorage。
+       ====================================================================== */
+    `当前时间：${formatCurrentTimeCompactForPrompt(now)}`,
+    todayFestivalPrompt,
+    formatTimeAnchorLine('本轮用户回复开始', currentUserRoundFirstTimestamp),
+    formatTimeAnchorLine('本轮用户最后消息', currentUserRoundLastTimestamp),
+    formatTimeAnchorLine('上一条AI回复', previousLatestAssistantTimestamp),
+    formatTimeAnchorLine('上一条历史记录', previousLatestAnyTimestamp)
   ];
 
+  if (currentUserRoundLastTimestamp && previousLatestAssistantTimestamp) {
+    lines.push(`上一条AI到本轮用户：${formatRelativeDurationForPrompt(currentUserRoundLastTimestamp - previousLatestAssistantTimestamp)}；自然日跨越=${formatShanghaiDayDistanceForPrompt(previousLatestAssistantTimestamp, new Date(currentUserRoundLastTimestamp))}`);
+  }
+
   if (latestUserTimestamp) {
-    lines.push(`最近一条已记录的用户消息发送时间：${formatDateForTimeAwareness(new Date(latestUserTimestamp))}。`);
-    lines.push(`从最近一条用户消息到本轮实际请求已经过去：${formatRelativeDurationForPrompt(nowMs - latestUserTimestamp)}。`);
-  } else {
-    lines.push('最近一条已记录的用户消息发送时间：无可用时间戳。');
+    lines.push(`最近用户消息距现在：${formatRelativeDurationForPrompt(nowMs - latestUserTimestamp)}；自然日=${formatShanghaiDayDistanceForPrompt(latestUserTimestamp, now)}`);
   }
 
   if (latestAnyTimestamp) {
-    lines.push(`最近一条聊天记录时间：${formatDateForTimeAwareness(new Date(latestAnyTimestamp))}。`);
-    lines.push(`距上次聊天记录已经过去：${formatRelativeDurationForPrompt(nowMs - latestAnyTimestamp)}。`);
-  } else {
-    lines.push('最近一条聊天记录时间：无可用时间戳。');
-  }
-
-  if (currentUserRoundLastTimestamp && previousLatestAssistantTimestamp) {
-    const previousAssistantDate = new Date(previousLatestAssistantTimestamp);
-    const currentUserDate = new Date(currentUserRoundLastTimestamp);
-    lines.push(`上一条 AI 回复到本轮用户回复的真实间隔：${formatRelativeDurationForPrompt(currentUserRoundLastTimestamp - previousLatestAssistantTimestamp)}；是否跨自然日：${isDifferentShanghaiDate(previousAssistantDate, currentUserDate) ? '是' : '否'}。`);
+    lines.push(`最近聊天记录距现在：${formatRelativeDurationForPrompt(nowMs - latestAnyTimestamp)}；自然日=${formatShanghaiDayDistanceForPrompt(latestAnyTimestamp, now)}`);
   }
 
   if (roundTimeline) {
-    lines.push(`最近对话轮次时间轴（按轮摘要，不是逐条消息时间戳；“距本轮请求/是否跨自然日”用于防止把旧事误判成刚才）：\n${roundTimeline}`);
+    lines.push(`最近轮次时间轴：\n${roundTimeline}`);
   }
+
+  const currentText = summarizeTextForPrompt(userInput, 96);
+  if (currentText) lines.push(`本轮用户消息摘要：${currentText}`);
 
   return lines.join('\n');
 }
@@ -2080,20 +2187,14 @@ export function getTimeAwarenessPrompt({ enabled = false, context = {} } = {}) {
     conversationTimeContext: context.conversationTimeContext
   })}
 
-# 时间感知聊天规则
-1. 唯一当前时间：只以“本轮 API 实际请求时间”为现在；上一条用户消息、上一轮 AI 回复和历史正文都只是当时记录，不能被当作正在发生。
-2. 本轮优先级：用户说“我之前忘记回你了/刚看到/忘回了/隔了一会儿才回”等延迟回复表达时，必须优先读取“本轮用户实际回复时间”和“上一条 AI 回复时间”，自行计算跨度与是否跨自然日；不能因为用户没说“昨天晚上”就停留在上一条 AI 回复的旧时段。
-3. 相对日期换算：历史里的“昨天/今天/明天/后天/过几小时/过几天/今晚/明早”等，必须先锚定到该消息发送时间，再换算到本轮请求时间；跨零点后必须随真实日期推进重算，禁止停留在旧锚点。
-4. 跨日纠偏：零点一过就是新的一天；用户零点前说“明天早点起/明天要上班上学”，本轮跨到 00:00 后必须按“今天”理解；“后天出差回家”等计划也要随当前真实日期改称“明天/今天/已经过去”等。
-5. “刚才”硬阈值：判断“刚才/刚刚/刚发生/刚说完”前必须先查对应消息时间；超过 30 分钟，或已经跨自然日，禁止使用这些说法。凌晨两点的回复，到早上七点多只能称“凌晨那会儿/之前/昨晚到今早这段”，不能称“刚才”，也不能继续按凌晨气氛劝睡。
-6. 回复延迟与事件时间分离：可以自然表达“我才看到/隔了会儿才回/好久没聊”，但这只表示回复延迟，绝不能把历史事件说成刚发生；久别感也不要每轮强行提。
-7. 现实耗时判断：结合“距上次聊天多久”、轮次时间轴和历史时间戳判断事情是否来得及完成；点外卖/等外卖/吃饭、买菜购物、做饭、洗澡、通勤、排队、取快递、办事、跨城区/跨城市移动等必须符合常识，禁止把几分钟内不可能完成的事直接写成已完成，也禁止在已过去数小时后仍机械停留在“刚点外卖/外卖还没到/刚准备吃饭”等不合理状态。
-8. 过程状态判断：如果历史只说“准备出门/在路上/准备做饭/准备处理某事”，而本轮只过了几分钟，只能推断“刚开始、还在路上、还没那么快”等；若历史明确完成，或间隔确实足够长，可以承认完成，但要自然衔接。若历史是点外卖、吃饭、洗澡、短途通勤等日常事件，间隔超过通常所需时间后，应默认事件已经推进到完成或后续状态，除非用户/历史明确说明异常延误。
-9. 真实时段敏感：早上 06:00-08:59，上午 09:00-11:59，中午 12:00-13:59，下午 14:00-17:59，晚上 18:00-23:59，凌晨 00:00-05:59；不同时间段应匹配生活语境，避免把早上说成凌晨/晚上、把下午说成中午。
-10. 睡眠语境纠偏：关心睡觉、晚安、早点睡只能基于本轮真实时段，或用户本轮明确说要睡；当前是早上/上午/下午/白天时，禁止因为历史夜晚内容、昨晚聊天或旧的“晚安/早点睡”语境劝用户现在早点睡。
-11. 自然表达：把当前真实时间内化成角色生活感；只有用户询问时间、情景适合，或当前时刻明显影响角色反应时才自然提及，平时不要机械报时，也不要说自己被注入真实时间。
-12. 回答时间：用户问“现在几点了/什么时间了”等时，必须按本轮实际请求时间，用真人聊天口吻回答，可自然带关心、调侃或场景感，但必须符合角色人设与关系。
-13. 后台校准：回复前先在后台核对当前时间、历史事件时间、上一条 AI 回复到本轮用户回复的间隔、是否跨日和现实耗时；校准只用于理解，最终回复绝对禁止输出 \`[消息发送时间：...]\`、\`本轮 API 实际请求时间\`、\`最近一条聊天记录时间\`、时间轴字段或任何后台标注。`);
+# 时间感知规则
+1. 当前时间格式为“日期 星期 时间（时段）”；时段：凌晨00:00-05:59，早上06:00-08:59，上午09:00-11:29，中午11:30-13:29，下午13:30-17:59，晚上18:00-22:59，深夜23:00-23:59。
+2. “现在”只按当前真实时间；历史消息必须按各自时间锚点理解，不能当作刚发生；判断今天/昨天/前天/N天前优先看“自然日=...”，相差2天以上绝不能说成昨天。
+3. 按当前星期和时段理解生活节奏：凌晨/深夜多为睡眠休息；早上多为起床、早饭、通勤、上学上班；上午多为学习工作；中午多为午饭午休；下午多为学习工作办事；晚上多为晚饭、休息、娱乐、聊天。工作日更偏上学/上班/通勤，周末更偏休息/娱乐；仍以用户设定和聊天内容为准。
+4. 用户说忘回、刚看到或者隔了会儿才发消息等，先看“上一条AI到本轮用户”的真实间隔和自然日跨越；超过30分钟或跨自然日，禁止说刚才/刚刚。
+5. 历史里的昨天/明天/今晚/明早/过几天，先锚定到那条消息的发送日，再换算到现在；白天不要沿用昨晚/凌晨的劝睡语境。
+6. 外卖、吃饭、洗澡、通勤、办事等要按真实耗时推进状态；仅当上下文明确给出今日节日或用户主动提到时才送节日祝福，禁止编造节日。
+7. 若用户设定明确显示今天是用户生日，可自然送一句生日祝福；不要反复机械祝福。最终回复不要输出任何时间字段、时间轴或后台标注。`);
 }
 
 /* ==========================================================================
