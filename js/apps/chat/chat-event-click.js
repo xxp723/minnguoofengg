@@ -150,6 +150,7 @@ import {
 } from './chat-autonomous-activity-settings.js';
 import {
   confirmChatBackgroundSelection,
+  deleteChatBackgroundSelection,
   openChatBackgroundLocalPicker,
   setChatBackgroundSource,
   showChatBackgroundModal
@@ -2559,15 +2560,20 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
     }
 
     /* ========================================================================
-       [区域标注·已完成·本次新增：聊天美化聊天背景点击接线]
+       [区域标注·已完成·聊天美化聊天背景点击接线：预览修复与删除按钮]
        说明：
-       1. 仅接线“聊天美化 → 聊天背景”的更换弹窗、来源切换、本地图片入口与确认保存。
+       1. 仅接线“聊天美化 → 聊天背景”的更换弹窗、删除当前背景、来源切换、本地图片入口与确认保存。
        2. 本地图片/URL 在确认前只保存在运行时草稿；点击“确认”后才写入当前 chatPromptSettings。
-       3. 持久化统一走 DB.js / IndexedDB；不使用 localStorage/sessionStorage，不写双份兜底，不做长文本过滤。
-       4. 弹窗为应用内 chat-modal 样式，不使用原生浏览器弹窗。
+       3. 点击“删除”会清空当前 chatBackgroundSrc，并通过 DB.js / IndexedDB 保存后恢复默认聊天背景。
+       4. 持久化统一走 DB.js / IndexedDB；不使用 localStorage/sessionStorage，不写双份兜底，不做长文本过滤。
+       5. 弹窗为应用内 chat-modal 样式，不使用原生浏览器弹窗。
        ======================================================================== */
     case 'open-chat-background-modal':
       showChatBackgroundModal(container, state);
+      break;
+
+    case 'delete-chat-background':
+      await deleteChatBackgroundSelection(container, state, db);
       break;
 
     case 'set-chat-background-source':

@@ -5,10 +5,11 @@
  * 架构层: 应用层（闲谈子模块）
  *
  * 说明：
- * 1. 本模块只服务用户本次要求新增的“聊天美化 → 聊天背景”区域。
+ * 1. 本模块只服务“聊天美化 → 聊天背景”区域。
  * 2. 聊天背景随当前聊天对象写入 chatPromptSettings，并通过 DB.js / IndexedDB 持久化。
  * 3. 禁止 localStorage/sessionStorage；不写双份存储兜底；不做长文本字段过滤。
  * 4. 所有弹窗均复用闲谈应用内 chat-modal 样式，不使用浏览器原生弹窗或原生选择器。
+ * 5. 已完成本地图片上传预览/应用修复，并新增“删除”按钮恢复默认聊天背景。
  */
 
 import { escapeHtml, dbPut, getCurrentChatPromptSettingsKey, renderModalNotice, closeModal } from './chat-utils.js';
@@ -95,21 +96,23 @@ function renderChatBackgroundPreviewHtml(src = '', extraClass = '') {
    说明：
    1. 本区域插入在“双语模式”板块下方，结构参考“功能玩法”板块。
    2. “聊天背景”使用右侧 IconPark 风格箭头折叠，展开后抽屉式显示“更换聊天背景”设置栏。
-   3. 左侧竖长方框显示当前聊天背景；右侧“更换”按钮打开应用内选择弹窗。
+   3. 左侧竖长方框显示当前聊天背景；右侧“更换 / 删除”按钮分别负责应用内选择与恢复默认背景。
    4. 隐藏 file input 只负责触发系统文件选择；图片确认前仅保存在运行时草稿，不写入 IndexedDB。
+   5. 删除按钮直接清空当前会话 chatBackgroundSrc，并通过 DB.js / IndexedDB 保存。
    ========================================================================== */
 export function renderChatBeautySettingsSection(chatSettings = {}) {
   const { chatBackgroundSrc } = normalizeChatBeautySettings(chatSettings);
 
   return `
         <!-- ==================================================================
-             [区域标注·已完成·本次新增：聊天美化聊天背景板块]
+             [区域标注·已完成·聊天美化聊天背景板块：预览修复与删除按钮]
              说明：
              1. 本板块位于“双语模式”板块下方，样式参照“功能玩法”板块。
              2. 点击“聊天背景”折叠栏后，向下抽屉式展开“更换聊天背景”设置栏。
-             3. 左侧竖长方框预览当前聊天背景，右侧“更换”按钮打开应用内弹窗。
-             4. 弹窗支持本地图片 / URL 图片；只有点击“确认”后才写入 chatPromptSettings 并同步当前聊天窗口背景。
-             5. 持久化统一走 DB.js / IndexedDB；不使用 localStorage/sessionStorage，不写双份兜底，不做长文本过滤。
+             3. 左侧竖长方框预览当前聊天背景，右侧“更换 / 删除”按钮分别打开应用内弹窗与恢复默认背景。
+             4. 弹窗支持本地图片 / URL 图片；本地图片预览只读取当前本地草稿，避免被旧 URL 抢占显示。
+             5. “确认 / 删除”均通过 DB.js / IndexedDB 写入当前 chatPromptSettings，并同步当前聊天窗口背景。
+             6. 本区域仅保留 IndexedDB 单一路径，不写双份兜底，不做长文本过滤。
              ================================================================== -->
         <section class="msg-settings-chat-beauty-section">
           <div class="msg-settings-section-title">聊天美化</div>
@@ -134,9 +137,14 @@ export function renderChatBeautySettingsSection(chatSettings = {}) {
                     ${renderChatBackgroundPreviewHtml(chatBackgroundSrc, 'msg-chat-beauty-preview--setting')}
                     <div class="msg-chat-background-setting-row__actions">
                       <div class="msg-settings-card__title">更换聊天背景</div>
-                      <button class="msg-chat-background-change-btn" data-action="open-chat-background-modal" type="button">
-                        ${MSG_ICONS.image}<span>更换</span>
-                      </button>
+                      <div class="msg-chat-background-setting-row__buttons">
+                        <button class="msg-chat-background-change-btn" data-action="open-chat-background-modal" type="button">
+                          ${MSG_ICONS.image}<span>更换</span>
+                        </button>
+                        <button class="msg-chat-background-delete-btn" data-action="delete-chat-background" type="button">
+                          ${MSG_ICONS.delete}<span>删除</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -162,8 +170,8 @@ function getPendingChatBackgroundDraft(state = {}) {
 
 function renderChatBackgroundModalBody(state = {}) {
   const draft = getPendingChatBackgroundDraft(state);
-  const selectedSrc = String(draft.src || draft.url || '').trim();
   const source = String(draft.source || 'local') === 'url' ? 'url' : 'local';
+  const selectedSrc = String(source === 'local' ? draft.src : draft.url).trim();
 
   return `
     <div class="msg-chat-background-modal" data-role="chat-background-modal">
@@ -198,17 +206,19 @@ function renderChatBackgroundModalBody(state = {}) {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·聊天背景应用内弹窗]
+   [区域标注·已完成·聊天背景应用内弹窗：本地预览修复]
    说明：
    1. 弹窗只包含右上角“关闭”和右下角“确认”按钮，沿用 chat-modal 暖色主题。
    2. 来源切换、本地图片读取、URL 输入都只更新运行时草稿；确认前不保存。
-   3. 不使用浏览器原生 alert/confirm/prompt，不使用原生选择器控件。
+   3. 本地来源预览只读取 draft.src，URL 来源预览只读取 draft.url，避免旧背景覆盖新上传预览。
+   4. 不使用浏览器原生 alert/confirm/prompt，不使用原生选择器控件。
    ========================================================================== */
 export function showChatBackgroundModal(container, state = {}) {
+  const currentSrc = normalizeChatBeautySettings(state.chatPromptSettings || {}).chatBackgroundSrc || '';
   state.pendingChatBackgroundDraft = {
-    source: 'local',
+    source: currentSrc ? 'url' : 'local',
     src: '',
-    url: normalizeChatBeautySettings(state.chatPromptSettings || {}).chatBackgroundSrc || ''
+    url: currentSrc
   };
 
   const mask = container.querySelector('[data-role="modal-mask"]');
@@ -318,6 +328,25 @@ export async function confirmChatBackgroundSelection(container, state = {}, db) 
   syncChatBackgroundSettingsPreview(container, state);
   state.pendingChatBackgroundDraft = null;
   closeModal(container);
+}
+
+/* ==========================================================================
+   [区域标注·已完成·聊天背景删除恢复默认]
+   说明：
+   1. 仅清空当前聊天对象 chatPromptSettings.chatBackgroundSrc，恢复默认聊天背景。
+   2. 删除动作统一通过 DB.js / IndexedDB 保存，不使用 localStorage/sessionStorage，不写双份兜底。
+   3. 保存后只同步当前聊天窗口背景和设置页预览，不重渲染整页，避免闪屏。
+   ========================================================================== */
+export async function deleteChatBackgroundSelection(container, state = {}, db) {
+  state.chatPromptSettings = {
+    ...(state.chatPromptSettings || {}),
+    chatBackgroundSrc: ''
+  };
+
+  await dbPut(db, getCurrentChatPromptSettingsKey(state), state.chatPromptSettings);
+  applyChatBackgroundToCurrentWindow(container, state);
+  syncChatBackgroundSettingsPreview(container, state);
+  state.pendingChatBackgroundDraft = null;
 }
 
 export function syncChatBackgroundSettingsPreview(container, state = {}) {

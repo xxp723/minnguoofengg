@@ -1438,12 +1438,13 @@
 }
 
 /* ==========================================================================
-   [区域标注·已完成·本次新增：聊天美化聊天背景样式]
+   [区域标注·已完成·聊天美化聊天背景样式：预览修复与删除按钮]
    说明：
-   1. 仅服务聊天设置页“双语模式”下方新增的“聊天美化 → 聊天背景”板块。
+   1. 仅服务聊天设置页“双语模式”下方的“聊天美化 → 聊天背景”板块。
    2. 视觉结构参照“功能玩法”板块：左上标题 + 暖色卡片 + 抽屉式展开。
-   3. 弹窗沿用闲谈应用内 chat-modal 风格，不使用浏览器原生弹窗或原生选择器。
-   4. 样式层不涉及持久化存储；确认保存由 JS 通过 DB.js / IndexedDB 完成。
+   3. 已补齐“更换 / 删除”同排按钮样式，删除按钮使用 IconPark 删除图标并保持暖棕主题。
+   4. 弹窗沿用闲谈应用内 chat-modal 风格，不使用浏览器原生弹窗或原生选择器。
+   5. 样式层不涉及持久化存储；确认保存/删除由 JS 通过 DB.js / IndexedDB 完成。
    ========================================================================== */
 .msg-settings-chat-beauty-section {
   display: flex;
@@ -1544,6 +1545,7 @@
 }
 
 .msg-chat-background-change-btn,
+.msg-chat-background-delete-btn,
 .msg-chat-background-local-btn,
 .msg-chat-background-source-tab {
   border: none;
@@ -1552,7 +1554,15 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.msg-chat-background-change-btn {
+.msg-chat-background-setting-row__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.msg-chat-background-change-btn,
+.msg-chat-background-delete-btn {
   min-height: 34px;
   border-radius: 999px;
   background: #4A342A;
@@ -1568,7 +1578,14 @@
   transition: transform 0.1s ease, opacity 0.15s ease;
 }
 
+.msg-chat-background-delete-btn {
+  background: rgba(157, 63, 49, 0.1);
+  color: #9d3f31;
+  box-shadow: inset 0 0 0 1px rgba(157, 63, 49, 0.08);
+}
+
 .msg-chat-background-change-btn svg,
+.msg-chat-background-delete-btn svg,
 .msg-chat-background-local-btn svg,
 .msg-chat-background-source-tab svg {
   width: 16px;
@@ -1576,6 +1593,7 @@
 }
 
 .msg-chat-background-change-btn:active,
+.msg-chat-background-delete-btn:active,
 .msg-chat-background-local-btn:active,
 .msg-chat-background-source-tab:active {
   transform: scale(0.96);
