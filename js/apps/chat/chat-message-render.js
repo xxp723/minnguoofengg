@@ -787,11 +787,11 @@ export function renderChatMessage(chatSession, messages, options = {}) {
 
   const chatBackgroundAttrs = getChatBackgroundListAreaAttrs(chatSettings);
   /* ======================================================================
-     [区域标注·已完成·聊天背景同步到真实消息窗口根容器]
+     [区域标注·已完成·聊天背景专用底层渲染]
      说明：
      1. 背景来源仍只读取当前 chatPromptSettings.chatBackgroundSrc，不新增任何持久化存储。
-     2. 本次修正设置页预览已更新但真实聊天窗口不显示的问题：同一背景 class/style 同步挂到 .msg-page 根容器。
-     3. 配合 .msg-conversation 与 .msg-list-area 原有背景属性，避免默认根底色在页面切换后遮住新背景。
+     2. 本次改为在真实聊天消息页 .msg-conversation 内渲染专用背景层，像桌面壁纸一样铺满聊天窗口底层。
+     3. 顶栏、消息列表、底栏都叠在背景层上方；消息列表保持透明，避免默认底色遮住新背景。
      ====================================================================== */
   const pageClassName = [
     'msg-page',
@@ -805,6 +805,10 @@ export function renderChatMessage(chatSession, messages, options = {}) {
     multiSelectMode ? 'msg-list-area is-multi-select-mode' : 'msg-list-area',
     chatBackgroundAttrs.className
   ].filter(Boolean).join(' ');
+
+  const chatBackgroundLayerHtml = `
+    <div class="msg-chat-background-layer ${chatBackgroundAttrs.className}" data-role="msg-chat-background-layer"${chatBackgroundAttrs.styleAttr}></div>
+  `;
 
   const inputBarHtml = `
     <div class="msg-input-shell ${pendingQuoteHtml ? 'has-pending-quote' : ''}">
@@ -852,6 +856,7 @@ export function renderChatMessage(chatSession, messages, options = {}) {
   return `
     <div class="${pageClassName}"${chatBackgroundAttrs.styleAttr}>
       <div class="${conversationClassName}" data-role="msg-conversation"${chatBackgroundAttrs.styleAttr}>
+        ${chatBackgroundLayerHtml}
         ${topBarHtml}
         ${searchPanelHtml}
         <!-- ==================================================================

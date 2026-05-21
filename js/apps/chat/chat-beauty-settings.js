@@ -49,8 +49,8 @@ function escapeCssUrlValue(value = '') {
 /* ==========================================================================
    [区域标注·已完成·当前聊天窗口背景样式生成]
    说明：
-   1. 供 chat-message-render.js 首屏渲染聊天会话容器与消息列表时直接带上背景 class/style，减少页面闪屏。
-   2. 同一 CSS 变量同时可作用于 .msg-conversation 与 .msg-list-area，避免默认底色覆盖聊天窗口背景。
+   1. 供 chat-message-render.js 首屏渲染聊天背景专用底层、会话容器与消息列表时直接带上背景 class/style，减少页面闪屏。
+   2. 同一 CSS 变量作用于 .msg-chat-background-layer，并同步给外层状态类用于控制透明层级。
    3. 只读取运行时 chatSettings，不涉及任何持久化存储。
    ========================================================================== */
 export function getChatBackgroundListAreaAttrs(chatSettings = {}) {
@@ -69,22 +69,30 @@ export function getChatBackgroundListAreaAttrs(chatSettings = {}) {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·当前聊天窗口背景 DOM 同步：真实消息窗口根容器同步]
+   [区域标注·已完成·当前聊天窗口背景 DOM 同步：专用底层实时更新]
    说明：
-   1. 确认更换聊天背景后，立即同步当前聊天窗口 .msg-page、data-role="msg-conversation" 与 data-role="msg-list" 的背景。
-   2. 只做局部 DOM 更新，不重渲染整页，避免闪屏。
-   3. 不涉及 localStorage/sessionStorage；保存动作由确认分支单独写入 DB.js / IndexedDB。
-   4. 本次补齐 .msg-page 根容器同步，避免设置页预览更新后真实聊天窗口仍被默认根底色覆盖。
+   1. 确认更换聊天背景后，立即同步当前聊天窗口 .msg-chat-background-layer、.msg-page、data-role="msg-conversation" 与 data-role="msg-list"。
+   2. 背景图片真正显示在 .msg-chat-background-layer 专用底层；顶栏、消息列表、底栏都叠在它上方。
+   3. 只做局部 DOM 更新，不重渲染整页，避免闪屏。
+   4. 不涉及 localStorage/sessionStorage；保存动作由确认分支单独写入 DB.js / IndexedDB。
    ========================================================================== */
 export function applyChatBackgroundToCurrentWindow(container, state = {}) {
+  const conversation = container?.querySelector?.('[data-role="msg-conversation"]');
+  const { chatBackgroundSrc } = normalizeChatBeautySettings(state.chatPromptSettings || {});
+  let backgroundLayer = container?.querySelector?.('[data-role="msg-chat-background-layer"]');
+
+  if (conversation && !backgroundLayer) {
+    conversation.insertAdjacentHTML('afterbegin', '<div class="msg-chat-background-layer" data-role="msg-chat-background-layer"></div>');
+    backgroundLayer = conversation.querySelector('[data-role="msg-chat-background-layer"]');
+  }
+
   const targets = [
     container?.querySelector?.('.msg-page'),
-    container?.querySelector?.('[data-role="msg-conversation"]'),
-    container?.querySelector?.('[data-role="msg-list"]')
+    conversation,
+    container?.querySelector?.('[data-role="msg-list"]'),
+    backgroundLayer
   ].filter(Boolean);
-  if (!targets.length) return;
 
-  const { chatBackgroundSrc } = normalizeChatBeautySettings(state.chatPromptSettings || {});
   targets.forEach(target => {
     target.classList.toggle('has-chat-background', Boolean(chatBackgroundSrc));
     if (chatBackgroundSrc) {

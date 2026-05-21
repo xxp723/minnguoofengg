@@ -413,19 +413,33 @@
 }
 
 /* ==========================================================================
-   [区域标注·已完成·聊天窗口背景显示：同步设置页预览到真实消息窗口]
+   [区域标注·已完成·聊天窗口背景显示：专用底层同步设置页预览]
    说明：
    1. 仅服务聊天设置页“聊天美化 → 聊天背景”确认后的当前聊天窗口背景展示。
    2. 背景图来源由 chat-beauty-settings.js 写入 CSS 变量 --msg-chat-background-image。
    3. 样式层不涉及持久化存储；持久化统一由 JS 通过 DB.js / IndexedDB 完成。
-   4. 本次修正真实消息窗口仍显示默认底色的原因：背景变量原先只挂在会话/列表层，页面根容器仍可能保留默认底色。
-      现在让 .msg-page、会话容器、顶部栏和消息列表共享同一背景状态，并保持消息列表透明，避免默认底色覆盖自定义背景。
+   4. 本次已改为 .msg-chat-background-layer 专用底层：它铺满整个聊天消息页，顶栏、消息流、底栏都叠在上方。
+      消息列表保持透明，不再用默认底色盖住聊天背景图。
    ========================================================================== */
 .msg-page.has-chat-background,
 .msg-conversation.has-chat-background {
   background-color: #f8f4ef;
+}
+
+.msg-chat-background-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: #f8f4ef;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.msg-chat-background-layer.has-chat-background {
+  opacity: 1;
   background-image:
-    linear-gradient(rgba(248, 244, 239, 0.36), rgba(248, 244, 239, 0.36)),
+    linear-gradient(rgba(248, 244, 239, 0.22), rgba(248, 244, 239, 0.22)),
     var(--msg-chat-background-image);
   background-size: cover, cover;
   background-position: center, center;
@@ -433,13 +447,19 @@
 }
 
 .msg-conversation.has-chat-background .msg-top-bar {
-  background: rgba(248, 244, 239, 0.86);
+  background: rgba(248, 244, 239, 0.72);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 
 .msg-list-area.has-chat-background {
+  position: relative;
+  z-index: 1;
   background: transparent;
+}
+
+.msg-conversation.has-chat-background .msg-input-shell {
+  z-index: 20;
 }
 
 /* ========================================================================
