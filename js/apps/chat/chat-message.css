@@ -418,9 +418,9 @@
    1. 仅服务聊天设置页“聊天美化 → 聊天背景”确认后的当前聊天窗口背景展示。
    2. 背景图来源由 chat-beauty-settings.js 写入 CSS 变量 --msg-chat-background-image。
    3. 样式层不涉及持久化存储；持久化统一由 JS 通过 DB.js / IndexedDB 完成。
-   4. 使用伪元素承载背景，避免重建消息列表造成闪屏，并保留暖色遮罩保证气泡可读性。
+   4. 背景已改由会话容器承载，消息列表保持透明，避免默认底色覆盖自定义背景。
    ========================================================================== */
-.msg-list-area.has-chat-background {
+.msg-conversation.has-chat-background {
   background-color: #f8f4ef;
   background-image:
     linear-gradient(rgba(248, 244, 239, 0.36), rgba(248, 244, 239, 0.36)),
@@ -428,6 +428,10 @@
   background-size: cover, cover;
   background-position: center, center;
   background-repeat: no-repeat, no-repeat;
+}
+
+.msg-list-area.has-chat-background {
+  background: transparent;
 }
 
 /* ========================================================================

@@ -49,8 +49,9 @@ function escapeCssUrlValue(value = '') {
 /* ==========================================================================
    [区域标注·已完成·当前聊天窗口背景样式生成]
    说明：
-   1. 供 chat-message-render.js 首屏渲染消息列表时直接带上背景 class/style，减少页面闪屏。
-   2. 只读取运行时 chatSettings，不涉及任何持久化存储。
+   1. 供 chat-message-render.js 首屏渲染聊天会话容器与消息列表时直接带上背景 class/style，减少页面闪屏。
+   2. 同一 CSS 变量同时可作用于 .msg-conversation 与 .msg-list-area，避免默认底色覆盖聊天窗口背景。
+   3. 只读取运行时 chatSettings，不涉及任何持久化存储。
    ========================================================================== */
 export function getChatBackgroundListAreaAttrs(chatSettings = {}) {
   const { chatBackgroundSrc } = normalizeChatBeautySettings(chatSettings);
@@ -75,16 +76,21 @@ export function getChatBackgroundListAreaAttrs(chatSettings = {}) {
    3. 不涉及 localStorage/sessionStorage；保存动作由确认分支单独写入 DB.js / IndexedDB。
    ========================================================================== */
 export function applyChatBackgroundToCurrentWindow(container, state = {}) {
-  const listArea = container?.querySelector?.('[data-role="msg-list"]');
-  if (!listArea) return;
+  const targets = [
+    container?.querySelector?.('[data-role="msg-conversation"]'),
+    container?.querySelector?.('[data-role="msg-list"]')
+  ].filter(Boolean);
+  if (!targets.length) return;
 
   const { chatBackgroundSrc } = normalizeChatBeautySettings(state.chatPromptSettings || {});
-  listArea.classList.toggle('has-chat-background', Boolean(chatBackgroundSrc));
-  if (chatBackgroundSrc) {
-    listArea.style.setProperty('--msg-chat-background-image', `url("${escapeCssUrlValue(chatBackgroundSrc)}")`);
-  } else {
-    listArea.style.removeProperty('--msg-chat-background-image');
-  }
+  targets.forEach(target => {
+    target.classList.toggle('has-chat-background', Boolean(chatBackgroundSrc));
+    if (chatBackgroundSrc) {
+      target.style.setProperty('--msg-chat-background-image', `url("${escapeCssUrlValue(chatBackgroundSrc)}")`);
+    } else {
+      target.style.removeProperty('--msg-chat-background-image');
+    }
+  });
 }
 
 function renderChatBackgroundPreviewHtml(src = '', extraClass = '') {

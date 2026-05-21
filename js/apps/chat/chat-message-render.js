@@ -785,8 +785,11 @@ export function renderChatMessage(chatSession, messages, options = {}) {
     </div>
   ` : '';
 
-  const conversationClassName = multiSelectMode ? 'msg-conversation is-multi-select-mode' : 'msg-conversation';
   const chatBackgroundAttrs = getChatBackgroundListAreaAttrs(chatSettings);
+  const conversationClassName = [
+    multiSelectMode ? 'msg-conversation is-multi-select-mode' : 'msg-conversation',
+    chatBackgroundAttrs.className
+  ].filter(Boolean).join(' ');
   const listAreaClassName = [
     multiSelectMode ? 'msg-list-area is-multi-select-mode' : 'msg-list-area',
     chatBackgroundAttrs.className
@@ -837,7 +840,7 @@ export function renderChatMessage(chatSession, messages, options = {}) {
 
   return `
     <div class="msg-page">
-      <div class="${conversationClassName}" data-role="msg-conversation">
+      <div class="${conversationClassName}" data-role="msg-conversation"${chatBackgroundAttrs.styleAttr}>
         ${topBarHtml}
         ${searchPanelHtml}
         <!-- ==================================================================
