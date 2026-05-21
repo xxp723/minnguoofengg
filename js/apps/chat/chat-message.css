@@ -413,12 +413,13 @@
 }
 
 /* ==========================================================================
-   [区域标注·已完成·本次新增：聊天窗口背景显示]
+   [区域标注·已完成·聊天窗口背景显示：同步设置页预览到真实消息窗口]
    说明：
    1. 仅服务聊天设置页“聊天美化 → 聊天背景”确认后的当前聊天窗口背景展示。
    2. 背景图来源由 chat-beauty-settings.js 写入 CSS 变量 --msg-chat-background-image。
    3. 样式层不涉及持久化存储；持久化统一由 JS 通过 DB.js / IndexedDB 完成。
-   4. 背景已改由会话容器承载，消息列表保持透明，避免默认底色覆盖自定义背景。
+   4. 本次修正真实消息窗口仍显示默认底色的原因：顶部栏与消息列表使用纯色背景时会遮住会话容器背景。
+      现在让已设置背景的会话容器、顶部栏和消息列表共享同一背景变量，并保持消息列表透明，避免默认底色覆盖自定义背景。
    ========================================================================== */
 .msg-conversation.has-chat-background {
   background-color: #f8f4ef;
@@ -428,6 +429,12 @@
   background-size: cover, cover;
   background-position: center, center;
   background-repeat: no-repeat, no-repeat;
+}
+
+.msg-conversation.has-chat-background .msg-top-bar {
+  background: rgba(248, 244, 239, 0.86);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .msg-list-area.has-chat-background {
