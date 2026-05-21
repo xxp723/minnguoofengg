@@ -786,6 +786,17 @@ export function renderChatMessage(chatSession, messages, options = {}) {
   ` : '';
 
   const chatBackgroundAttrs = getChatBackgroundListAreaAttrs(chatSettings);
+  /* ======================================================================
+     [区域标注·已完成·聊天背景同步到真实消息窗口根容器]
+     说明：
+     1. 背景来源仍只读取当前 chatPromptSettings.chatBackgroundSrc，不新增任何持久化存储。
+     2. 本次修正设置页预览已更新但真实聊天窗口不显示的问题：同一背景 class/style 同步挂到 .msg-page 根容器。
+     3. 配合 .msg-conversation 与 .msg-list-area 原有背景属性，避免默认根底色在页面切换后遮住新背景。
+     ====================================================================== */
+  const pageClassName = [
+    'msg-page',
+    chatBackgroundAttrs.className
+  ].filter(Boolean).join(' ');
   const conversationClassName = [
     multiSelectMode ? 'msg-conversation is-multi-select-mode' : 'msg-conversation',
     chatBackgroundAttrs.className
@@ -839,7 +850,7 @@ export function renderChatMessage(chatSession, messages, options = {}) {
   });
 
   return `
-    <div class="msg-page">
+    <div class="${pageClassName}"${chatBackgroundAttrs.styleAttr}>
       <div class="${conversationClassName}" data-role="msg-conversation"${chatBackgroundAttrs.styleAttr}>
         ${topBarHtml}
         ${searchPanelHtml}

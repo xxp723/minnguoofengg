@@ -69,14 +69,16 @@ export function getChatBackgroundListAreaAttrs(chatSettings = {}) {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·当前聊天窗口背景 DOM 同步]
+   [区域标注·已完成·当前聊天窗口背景 DOM 同步：真实消息窗口根容器同步]
    说明：
-   1. 确认更换聊天背景后，立即同步当前聊天窗口 data-role="msg-list" 的背景。
+   1. 确认更换聊天背景后，立即同步当前聊天窗口 .msg-page、data-role="msg-conversation" 与 data-role="msg-list" 的背景。
    2. 只做局部 DOM 更新，不重渲染整页，避免闪屏。
    3. 不涉及 localStorage/sessionStorage；保存动作由确认分支单独写入 DB.js / IndexedDB。
+   4. 本次补齐 .msg-page 根容器同步，避免设置页预览更新后真实聊天窗口仍被默认根底色覆盖。
    ========================================================================== */
 export function applyChatBackgroundToCurrentWindow(container, state = {}) {
   const targets = [
+    container?.querySelector?.('.msg-page'),
     container?.querySelector?.('[data-role="msg-conversation"]'),
     container?.querySelector?.('[data-role="msg-list"]')
   ].filter(Boolean);
