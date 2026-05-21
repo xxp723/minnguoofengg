@@ -9,7 +9,7 @@
  * 2. 聊天背景随当前聊天对象写入 chatPromptSettings，并通过 DB.js / IndexedDB 持久化。
  * 3. 禁止 localStorage/sessionStorage；不写双份存储兜底；不做长文本字段过滤。
  * 4. 所有弹窗均复用闲谈应用内 chat-modal 样式，不使用浏览器原生弹窗或原生选择器。
- * 5. 已完成本地图片上传预览/应用修复，并新增“删除”按钮恢复默认聊天背景。
+ * 5. 已完成本地图片上传预览/应用修复、来源持久化修复，并新增“删除”按钮恢复默认聊天背景。
  */
 
 import { escapeHtml, dbPut, getCurrentChatPromptSettingsKey, renderModalNotice, closeModal } from './chat-utils.js';
@@ -18,14 +18,22 @@ import { MSG_ICONS } from './chat-message-icons.js';
 /* ==========================================================================
    [区域标注·已完成·聊天美化数据规范化]
    说明：
-   1. 当前仅规范化聊天背景 chatBackgroundSrc，保存位置为当前会话 chatPromptSettings。
+   1. 当前规范化聊天背景 chatBackgroundSrc / chatBackgroundSource，保存位置为当前会话 chatPromptSettings。
    2. 持久化由 confirmChatBackgroundSelection() 调用 DB.js / IndexedDB 完成。
-   3. 不使用 localStorage/sessionStorage，不写双份兜底，不做大文本字段过滤。
+   3. chatBackgroundSource 用于区分本地 data:image 与 URL，避免本地图下次打开被塞进 URL 输入框。
+   4. 不使用 localStorage/sessionStorage，不写双份兜底，不做大文本字段过滤。
    ========================================================================== */
 export function normalizeChatBeautySettings(chatSettings = {}) {
   const source = chatSettings && typeof chatSettings === 'object' ? chatSettings : {};
+  const chatBackgroundSrc = String(source.chatBackgroundSrc || '').trim();
+  const rawSource = String(source.chatBackgroundSource || '').trim();
+  const chatBackgroundSource = rawSource === 'local' || rawSource === 'url'
+    ? rawSource
+    : (chatBackgroundSrc.startsWith('data:image/') ? 'local' : 'url');
+
   return {
-    chatBackgroundSrc: String(source.chatBackgroundSrc || '').trim()
+    chatBackgroundSrc,
+    chatBackgroundSource: chatBackgroundSrc ? chatBackgroundSource : 'local'
   };
 }
 
@@ -158,11 +166,11 @@ export function renderChatBeautySettingsSection(chatSettings = {}) {
 
 function getPendingChatBackgroundDraft(state = {}) {
   if (!state.pendingChatBackgroundDraft || typeof state.pendingChatBackgroundDraft !== 'object') {
-    const { chatBackgroundSrc } = normalizeChatBeautySettings(state.chatPromptSettings || {});
+    const { chatBackgroundSrc, chatBackgroundSource } = normalizeChatBeautySettings(state.chatPromptSettings || {});
     state.pendingChatBackgroundDraft = {
-      source: chatBackgroundSrc ? 'url' : 'local',
-      src: '',
-      url: chatBackgroundSrc || ''
+      source: chatBackgroundSrc ? chatBackgroundSource : 'local',
+      src: chatBackgroundSource === 'local' ? chatBackgroundSrc : '',
+      url: chatBackgroundSource === 'url' ? chatBackgroundSrc : ''
     };
   }
   return state.pendingChatBackgroundDraft;
@@ -214,11 +222,11 @@ function renderChatBackgroundModalBody(state = {}) {
    4. 不使用浏览器原生 alert/confirm/prompt，不使用原生选择器控件。
    ========================================================================== */
 export function showChatBackgroundModal(container, state = {}) {
-  const currentSrc = normalizeChatBeautySettings(state.chatPromptSettings || {}).chatBackgroundSrc || '';
+  const { chatBackgroundSrc, chatBackgroundSource } = normalizeChatBeautySettings(state.chatPromptSettings || {});
   state.pendingChatBackgroundDraft = {
-    source: currentSrc ? 'url' : 'local',
-    src: '',
-    url: currentSrc
+    source: chatBackgroundSrc ? chatBackgroundSource : 'local',
+    src: chatBackgroundSource === 'local' ? chatBackgroundSrc : '',
+    url: chatBackgroundSource === 'url' ? chatBackgroundSrc : ''
   };
 
   const mask = container.querySelector('[data-role="modal-mask"]');
@@ -320,7 +328,8 @@ export async function confirmChatBackgroundSelection(container, state = {}, db) 
 
   state.chatPromptSettings = {
     ...(state.chatPromptSettings || {}),
-    chatBackgroundSrc: nextSrc
+    chatBackgroundSrc: nextSrc,
+    chatBackgroundSource: source
   };
 
   await dbPut(db, getCurrentChatPromptSettingsKey(state), state.chatPromptSettings);
@@ -333,14 +342,15 @@ export async function confirmChatBackgroundSelection(container, state = {}, db) 
 /* ==========================================================================
    [区域标注·已完成·聊天背景删除恢复默认]
    说明：
-   1. 仅清空当前聊天对象 chatPromptSettings.chatBackgroundSrc，恢复默认聊天背景。
+   1. 仅清空当前聊天对象 chatPromptSettings.chatBackgroundSrc / chatBackgroundSource，恢复默认聊天背景。
    2. 删除动作统一通过 DB.js / IndexedDB 保存，不使用 localStorage/sessionStorage，不写双份兜底。
    3. 保存后只同步当前聊天窗口背景和设置页预览，不重渲染整页，避免闪屏。
    ========================================================================== */
 export async function deleteChatBackgroundSelection(container, state = {}, db) {
   state.chatPromptSettings = {
     ...(state.chatPromptSettings || {}),
-    chatBackgroundSrc: ''
+    chatBackgroundSrc: '',
+    chatBackgroundSource: 'local'
   };
 
   await dbPut(db, getCurrentChatPromptSettingsKey(state), state.chatPromptSettings);
@@ -351,7 +361,7 @@ export async function deleteChatBackgroundSelection(container, state = {}, db) {
 
 export function syncChatBackgroundSettingsPreview(container, state = {}) {
   const { chatBackgroundSrc } = normalizeChatBeautySettings(state.chatPromptSettings || {});
-  const preview = container.querySelector('.msg-chat-beauty-section [data-role="chat-background-preview"]');
+  const preview = container.querySelector('.msg-settings-chat-beauty-section [data-role="chat-background-preview"]');
   if (!preview) return;
   preview.outerHTML = renderChatBackgroundPreviewHtml(chatBackgroundSrc, 'msg-chat-beauty-preview--setting');
 }
