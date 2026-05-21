@@ -459,11 +459,12 @@ export function handleChatBackgroundFileInputChange(file, state = {}, container)
 }
 
 /* ==========================================================================
-   [区域标注·已完成·聊天背景确认保存：本地大图 IndexedDB Blob]
+   [区域标注·已完成·本次本地聊天背景确认保存修复：IndexedDB Blob + 独立运行时 URL]
    说明：
    1. URL 背景只保存 URL；本地图片保存 Blob 记录，chatPromptSettings 只保存 mediaKey。
    2. 更换来源或删除旧本地背景时，同步删除旧 Blob 记录，避免残留垃圾数据。
-   3. 保存后仅局部同步当前聊天窗口背景和设置页预览，不重渲染整页，避免闪屏。
+   3. 本地图片确认后会新建独立 objectURL 用于聊天窗口背景；不会复用弹窗预览 URL，避免关闭弹窗清理预览时把已应用背景一起 revoke。
+   4. 保存后仅局部同步当前聊天窗口背景和设置页预览，不重渲染整页，避免闪屏。
    ========================================================================== */
 export async function confirmChatBackgroundSelection(container, state = {}, db) {
   const draft = getPendingChatBackgroundDraft(state);
@@ -487,7 +488,15 @@ export async function confirmChatBackgroundSelection(container, state = {}, db) 
       return;
     }
 
-    setChatBackgroundRuntimeUrl(nextMediaKey, String(draft.src || '').trim());
+    /* ======================================================================
+       [区域标注·已完成·本次本地聊天背景无法显示修复]
+       说明：
+       1. 弹窗预览 URL 会在确认后随草稿清理被 revoke，不能直接作为正式聊天背景运行时 URL。
+       2. 这里基于同一个 File/Blob 创建新的 objectURL，交给运行时 Map 管理，确保几十 KB 到大图本地背景都能立即显示。
+       3. 正式持久化仍只保存 IndexedDB Blob 记录和 mediaKey，不保存 dataURL，不使用 localStorage/sessionStorage。
+       ====================================================================== */
+    const runtimeObjectUrl = URL.createObjectURL(draft.file);
+    setChatBackgroundRuntimeUrl(nextMediaKey, runtimeObjectUrl);
   } else if (String(draft.mediaKey || '').trim()) {
     nextMediaKey = String(draft.mediaKey || '').trim();
     if (!chatBackgroundRuntimeUrlByKey.get(nextMediaKey)) {
