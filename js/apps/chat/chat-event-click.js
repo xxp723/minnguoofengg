@@ -333,13 +333,24 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
       break;
     }
 
-    case 'add-chat':
-      if (state.activePanel === 'contacts') {
+    /* ========================================================================
+       [区域标注·已完成·本次聊天列表/通讯录“+”按钮点击修复]
+       说明：
+       1. 标题栏“+”是 Chat/Contacts 共用按钮，点击时优先读取当前 DOM 激活面板，避免只依赖 state.activePanel 导致分支判断失准。
+       2. 当前激活面板为 contacts 时打开通讯录搜索添加弹窗；其它情况打开聊天列表添加聊天弹窗。
+       3. 本区域只修复点击接线，不新增/修改任何持久化存储；不使用 localStorage/sessionStorage，不使用原生浏览器弹窗。
+       ======================================================================== */
+    case 'add-chat': {
+      const activePanelFromDom = String(container.querySelector('.chat-panel.is-active')?.dataset?.panel || '').trim();
+      const currentPanel = activePanelFromDom || String(state.activePanel || '').trim();
+
+      if (currentPanel === 'contacts') {
         openContactsAddModal(container, state);
       } else {
         showAddChatModal(container, state);
       }
       break;
+    }
 
     case 'moments-compose':
       openMomentsComposePage(container, state);
