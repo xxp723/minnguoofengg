@@ -78,16 +78,17 @@ export function buildPromptPayloadForLatestUserRound(messages = [], shortTermMem
 
   const getAiVisibleContentForMessage = (item = {}, options = {}) => {
     /* ========================================================================
-       [区域标注·已完成·本次角色气泡拍拍AI上下文]
+       [区域标注·已完成·本次修改·拍一拍方向识别修复]
        说明：
        1. user_pat_system 显示层仍是系统提示小字，AI 请求层在这里补充解释。
-       2. 明确告诉 AI：这是 QQ/微信式“拍一拍/戳一戳”社交软件互动，不是真实物理拍打。
-       3. 仅增强运行时 Prompt Payload，不新增持久化存储，不使用 localStorage/sessionStorage。
+       2. 明确告诉 AI：这是 QQ/微信式“拍一拍/戳一戳”线上互动，不是真实物理拍打。
+       3. 已补强方向识别：区分“用户拍了拍角色”和“角色上一轮拍了拍用户”，避免 AI 反向斥责用户拍角色。
+       4. 仅增强运行时 Prompt Payload，不新增持久化存储，不使用 localStorage/sessionStorage。
        ======================================================================== */
     if (String(item?.type || '') === 'user_pat_system') {
       const visibleTip = String(item?.content || '').trim() || '你拍了拍对方';
       const roleName = String(item?.patRoleName || '对方').trim() || '对方';
-      return `【系统提示小字】${visibleTip}\n请注意：这是一条类似 QQ/微信等社交软件里的“拍一拍/戳一戳”互动提示，不是真实物理上的拍打、触碰或现实动作。你正在扮演“${roleName}”，下一轮回复时请自然回应这次社交软件式拍一拍，不要把它误解成现实中的物理拍打。`;
+      return `【系统提示小字】${visibleTip}\n请注意：这是一条类似 QQ/微信等社交软件里的“拍一拍/戳一戳”线上互动提示，不是真实物理上的拍打、触碰或现实动作。你正在扮演“${roleName}”。请先根据系统小字判断方向：如果内容是“你拍了拍${roleName}的……”或“你拍了拍对方的……”，表示用户拍了拍你，你可以作为${roleName}自然回应；如果内容是“${roleName}拍了拍你的……”或“对方拍了拍你的……”，表示这是你上一轮主动拍了拍用户，只能当作你自己已发出的线上互动，禁止反过来斥责用户为什么拍你，也不要误认成用户拍了你。`;
     }
 
     if (String(item?.type || '') === 'user_withdraw_system') {

@@ -977,14 +977,14 @@ function parseProtocolRoleAndContent(raw = '', type = '') {
 }
 
 /* ========================================================================
-   [区域标注·已完成·AI拍一拍系统小字协议]
+   [区域标注·已完成·本次修改·AI拍一拍趣味系统小字协议]
    说明：
-   1. 解析 AI 输出的 **`[拍一拍] 角色名：身体部位`** 协议。
-   2. 生成 type=ai_pat_system 的系统提示小字：角色名拍了拍你的身体部位。
+   1. 解析 AI 输出的 **`[拍一拍] 角色名：身体部位｜短趣味补充`** 协议。
+   2. 已支持“身体部位｜短趣味补充”显示为：角色名拍了拍你的身体部位 + 短趣味文案。
    3. 这里只做运行时消息对象转换；最终持久化仍由上层统一写入 DB.js / IndexedDB。
    4. 不使用 localStorage/sessionStorage，不新增双份存储兜底，不使用原生浏览器弹窗。
    ======================================================================== */
-function normalizeAiPatBodyPart(content = '') {
+function parseAiPatDisplayPayload(content = '') {
   const text = cleanAiProtocolBlockContent(content)
     .replace(/^\{\s*(?:身体部位|部位)\s*[：:]\s*/i, '')
     .replace(/\s*\}\s*$/g, '')
@@ -996,22 +996,42 @@ function normalizeAiPatBodyPart(content = '') {
     .replace(/[，,。.!！？?；;：:~～…\s]+$/g, '')
     .trim();
 
-  if (!text) return '';
-  if (/[。！？!?；;]|(?:回复|消息|屏幕|手机|桌子|空气|快点|提醒|解释|因为|然后|顺便)/i.test(text)) return '';
-  return text;
+  if (!text) return null;
+
+  const [rawBodyPart, ...rawExtraParts] = text.split(/[|｜]/);
+  const bodyPart = String(rawBodyPart || '')
+    .replace(/[，,。.!！？?；;：:~～…\s]+$/g, '')
+    .trim();
+  if (!bodyPart) return null;
+  if (/[。！？!?；;]|(?:回复|消息|屏幕|手机|桌子|空气|快点|解释|因为|然后|顺便)/i.test(bodyPart)) return null;
+
+  const extraText = rawExtraParts
+    .join('｜')
+    .replace(/^[，,。.!！？?；;\s]+/g, '')
+    .replace(/[。.!！\s]+$/g, '')
+    .trim();
+  const safeExtraText = extraText.length > 36 ? '' : extraText;
+  const extraPrefix = /^说\s*[：:]/.test(safeExtraText) ? '，' : '';
+
+  return {
+    bodyPart,
+    extraText: safeExtraText,
+    displayText: `${bodyPart}${safeExtraText ? `${extraPrefix}${safeExtraText}` : ''}`
+  };
 }
 
 function createAiPatSystemMessageFromProtocol(block = {}) {
   const roleName = String(block?.roleName || '').trim() || '对方';
-  const bodyPart = normalizeAiPatBodyPart(block?.content || '');
-  if (!bodyPart) return null;
+  const patPayload = parseAiPatDisplayPayload(block?.content || '');
+  if (!patPayload) return null;
 
   return {
     role: 'user',
     type: 'ai_pat_system',
-    content: `${roleName}拍了拍你的${bodyPart}`,
+    content: `${roleName}拍了拍你的${patPayload.displayText}`,
     patRoleName: roleName,
-    patBodyPart: bodyPart,
+    patBodyPart: patPayload.bodyPart,
+    patExtraText: patPayload.extraText,
     __protocolOrder: getAiRuntimeProtocolOrder(block, 0),
     __protocolEndIndex: block.__protocolEndIndex
   };
