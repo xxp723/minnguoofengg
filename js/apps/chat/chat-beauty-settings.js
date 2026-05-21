@@ -9,31 +9,163 @@
  * 2. 聊天背景随当前聊天对象写入 chatPromptSettings，并通过 DB.js / IndexedDB 持久化。
  * 3. 禁止 localStorage/sessionStorage；不写双份存储兜底；不做长文本字段过滤。
  * 4. 所有弹窗均复用闲谈应用内 chat-modal 样式，不使用浏览器原生弹窗或原生选择器。
- * 5. 已完成本地图片上传预览/应用修复、来源持久化修复，并新增“删除”按钮恢复默认聊天背景。
+ * 5. 已完成本地大图 Blob 入库、运行时 objectURL 预览/应用、来源持久化与“删除”恢复默认背景。
  */
 
-import { escapeHtml, dbPut, getCurrentChatPromptSettingsKey, renderModalNotice, closeModal } from './chat-utils.js';
+import { escapeHtml, dbPut, getCurrentChatPromptSettingsKey, renderModalNotice, closeModal, STORE_NAME } from './chat-utils.js';
 import { MSG_ICONS } from './chat-message-icons.js';
 
+const CHAT_BACKGROUND_MEDIA_RECORD_PREFIX = 'chat_background_media';
+const chatBackgroundRuntimeUrlByKey = new Map();
+
+function createChatBackgroundMediaKey(state = {}) {
+  const maskId = String(state.activeMaskId || 'default').replace(/[^\w-]/g, '_');
+  const chatId = String(state.currentChatId || 'default').replace(/[^\w-]/g, '_');
+  return `${CHAT_BACKGROUND_MEDIA_RECORD_PREFIX}_${maskId}_${chatId}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function isBlobUrl(value = '') {
+  return String(value || '').startsWith('blob:');
+}
+
+function revokeChatBackgroundRuntimeUrl(mediaKey = '') {
+  const key = String(mediaKey || '').trim();
+  const url = key ? chatBackgroundRuntimeUrlByKey.get(key) : '';
+  if (url && isBlobUrl(url)) {
+    URL.revokeObjectURL(url);
+  }
+  if (key) chatBackgroundRuntimeUrlByKey.delete(key);
+}
+
+function setChatBackgroundRuntimeUrl(mediaKey = '', url = '') {
+  const key = String(mediaKey || '').trim();
+  const safeUrl = String(url || '').trim();
+  if (!key || !safeUrl) return '';
+
+  const existing = chatBackgroundRuntimeUrlByKey.get(key);
+  if (existing && existing !== safeUrl && isBlobUrl(existing)) {
+    URL.revokeObjectURL(existing);
+  }
+
+  chatBackgroundRuntimeUrlByKey.set(key, safeUrl);
+  return safeUrl;
+}
+
+function cleanupPendingChatBackgroundDraft(draft = null) {
+  if (draft?.previewObjectUrl && isBlobUrl(draft.previewObjectUrl)) {
+    URL.revokeObjectURL(draft.previewObjectUrl);
+  }
+}
+
+async function readChatBackgroundMediaRecord(db, mediaKey = '') {
+  const key = String(mediaKey || '').trim();
+  if (!db || typeof db.get !== 'function' || !key) return null;
+
+  try {
+    const record = await db.get(STORE_NAME, key);
+    return record ? (record.data ?? record.value ?? null) : null;
+  } catch (error) {
+    console.error('[Chat] 聊天背景图片读取失败:', key, error);
+    return null;
+  }
+}
+
+async function persistChatBackgroundMediaRecord(db, mediaKey = '', file) {
+  const key = String(mediaKey || '').trim();
+  if (!db || typeof db.put !== 'function' || !key || !(file instanceof Blob)) return false;
+
+  try {
+    await db.put(STORE_NAME, {
+      id: key,
+      appId: 'chat',
+      data: {
+        blob: file,
+        name: String(file.name || 'chat-background'),
+        type: String(file.type || 'image/*'),
+        size: Number(file.size || 0),
+        createdAt: Date.now()
+      }
+    });
+    return true;
+  } catch (error) {
+    console.error('[Chat] 聊天背景图片写入失败:', key, error);
+    return false;
+  }
+}
+
+async function deleteChatBackgroundMediaRecord(db, mediaKey = '') {
+  const key = String(mediaKey || '').trim();
+  if (!key) return;
+
+  revokeChatBackgroundRuntimeUrl(key);
+
+  if (!db || typeof db.delete !== 'function') return;
+  try {
+    await db.delete(STORE_NAME, key);
+  } catch (error) {
+    console.error('[Chat] 聊天背景图片删除失败:', key, error);
+  }
+}
+
+function getChatBackgroundBlobFromRecord(record = null) {
+  if (record instanceof Blob) return record;
+  if (record?.blob instanceof Blob) return record.blob;
+  if (record?.file instanceof Blob) return record.file;
+  return null;
+}
+
 /* ==========================================================================
-   [区域标注·已完成·聊天美化数据规范化]
+   [区域标注·已完成·聊天美化背景 Blob 运行时恢复]
    说明：
-   1. 当前规范化聊天背景 chatBackgroundSrc / chatBackgroundSource，保存位置为当前会话 chatPromptSettings。
-   2. 持久化由 confirmChatBackgroundSelection() 调用 DB.js / IndexedDB 完成。
-   3. chatBackgroundSource 用于区分本地 data:image 与 URL，避免本地图下次打开被塞进 URL 输入框。
+   1. 本地聊天背景原图保存为 DB.js / IndexedDB appsData 中的 Blob 记录，chatPromptSettings 只保存轻量 mediaKey。
+   2. 进入聊天页或确认更换后，按 mediaKey 读取 Blob 并生成运行时 objectURL，避免把超过 1MB 的 data URL 塞进设置对象。
+   3. objectURL 只保存在本模块运行时 Map，不写入 localStorage/sessionStorage，也不写入双份兜底存储。
+   ========================================================================== */
+export async function prepareChatBackgroundRuntimeUrl(state = {}, db) {
+  const settings = state.chatPromptSettings && typeof state.chatPromptSettings === 'object'
+    ? state.chatPromptSettings
+    : {};
+  const source = String(settings.chatBackgroundSource || '').trim();
+  const mediaKey = String(settings.chatBackgroundMediaKey || '').trim();
+
+  if (source !== 'local' || !mediaKey) return '';
+
+  const cachedUrl = chatBackgroundRuntimeUrlByKey.get(mediaKey);
+  if (cachedUrl) return cachedUrl;
+
+  const mediaRecord = await readChatBackgroundMediaRecord(db, mediaKey);
+  const blob = getChatBackgroundBlobFromRecord(mediaRecord);
+  if (!blob) return '';
+
+  const objectUrl = URL.createObjectURL(blob);
+  return setChatBackgroundRuntimeUrl(mediaKey, objectUrl);
+}
+
+/* ==========================================================================
+   [区域标注·已完成·聊天美化数据规范化：IndexedDB Blob 背景]
+   说明：
+   1. URL 背景继续使用 chatBackgroundSrc 保存 URL；本地背景使用 chatBackgroundMediaKey 指向 DB.js / IndexedDB Blob 记录。
+   2. chatBackgroundSrc 的本地大图运行时值来自 objectURL 缓存，不再新增 data URL 持久化写入。
+   3. chatBackgroundSource 用于区分 local/url，避免本地图下次打开被塞进 URL 输入框。
    4. 不使用 localStorage/sessionStorage，不写双份兜底，不做大文本字段过滤。
    ========================================================================== */
 export function normalizeChatBeautySettings(chatSettings = {}) {
   const source = chatSettings && typeof chatSettings === 'object' ? chatSettings : {};
-  const chatBackgroundSrc = String(source.chatBackgroundSrc || '').trim();
+  const persistedSrc = String(source.chatBackgroundSrc || '').trim();
+  const chatBackgroundMediaKey = String(source.chatBackgroundMediaKey || '').trim();
+  const runtimeBlobSrc = chatBackgroundMediaKey
+    ? String(chatBackgroundRuntimeUrlByKey.get(chatBackgroundMediaKey) || '').trim()
+    : '';
+  const chatBackgroundSrc = runtimeBlobSrc || persistedSrc;
   const rawSource = String(source.chatBackgroundSource || '').trim();
   const chatBackgroundSource = rawSource === 'local' || rawSource === 'url'
     ? rawSource
-    : (chatBackgroundSrc.startsWith('data:image/') ? 'local' : 'url');
+    : (chatBackgroundMediaKey || chatBackgroundSrc.startsWith('data:image/') || chatBackgroundSrc.startsWith('blob:') ? 'local' : 'url');
 
   return {
     chatBackgroundSrc,
-    chatBackgroundSource: chatBackgroundSrc ? chatBackgroundSource : 'local'
+    chatBackgroundSource: (chatBackgroundSrc || chatBackgroundMediaKey) ? chatBackgroundSource : 'local',
+    chatBackgroundMediaKey
   };
 }
 
@@ -47,11 +179,11 @@ function escapeCssUrlValue(value = '') {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·当前聊天窗口背景样式生成]
+   [区域标注·已完成·当前聊天窗口背景样式生成：支持 Blob objectURL]
    说明：
    1. 供 chat-message-render.js 首屏渲染聊天背景专用底层、会话容器与消息列表时直接带上背景 class/style，减少页面闪屏。
    2. 同一 CSS 变量作用于 .msg-chat-background-layer，并同步给外层状态类用于控制透明层级。
-   3. 只读取运行时 chatSettings，不涉及任何持久化存储。
+   3. 只读取运行时 chatSettings / objectURL 缓存，不涉及任何持久化存储。
    ========================================================================== */
 export function getChatBackgroundListAreaAttrs(chatSettings = {}) {
   const { chatBackgroundSrc } = normalizeChatBeautySettings(chatSettings);
@@ -69,7 +201,7 @@ export function getChatBackgroundListAreaAttrs(chatSettings = {}) {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·当前聊天窗口背景 DOM 同步：专用底层实时更新]
+   [区域标注·已完成·当前聊天窗口背景 DOM 同步：Blob 背景局部更新]
    说明：
    1. 确认更换聊天背景后，立即同步当前聊天窗口 .msg-chat-background-layer、.msg-page、data-role="msg-conversation" 与 data-role="msg-list"。
    2. 背景图片真正显示在 .msg-chat-background-layer 专用底层；顶栏、消息列表、底栏都叠在它上方。
@@ -116,25 +248,25 @@ function renderChatBackgroundPreviewHtml(src = '', extraClass = '') {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·聊天美化设置页 HTML]
+   [区域标注·已完成·聊天美化设置页 HTML：大图 Blob 背景]
    说明：
    1. 本区域插入在“双语模式”板块下方，结构参考“功能玩法”板块。
    2. “聊天背景”使用右侧 IconPark 风格箭头折叠，展开后抽屉式显示“更换聊天背景”设置栏。
    3. 左侧竖长方框显示当前聊天背景；右侧“更换 / 删除”按钮分别负责应用内选择与恢复默认背景。
    4. 隐藏 file input 只负责触发系统文件选择；图片确认前仅保存在运行时草稿，不写入 IndexedDB。
-   5. 删除按钮直接清空当前会话 chatBackgroundSrc，并通过 DB.js / IndexedDB 保存。
+   5. 删除按钮会清空当前会话聊天背景引用并删除对应 Blob 记录，仅通过 DB.js / IndexedDB 保存。
    ========================================================================== */
 export function renderChatBeautySettingsSection(chatSettings = {}) {
   const { chatBackgroundSrc } = normalizeChatBeautySettings(chatSettings);
 
   return `
         <!-- ==================================================================
-             [区域标注·已完成·聊天美化聊天背景板块：预览修复与删除按钮]
+             [区域标注·已完成·聊天美化聊天背景板块：大图 Blob 入库与透明背景同步]
              说明：
              1. 本板块位于“双语模式”板块下方，样式参照“功能玩法”板块。
              2. 点击“聊天背景”折叠栏后，向下抽屉式展开“更换聊天背景”设置栏。
              3. 左侧竖长方框预览当前聊天背景，右侧“更换 / 删除”按钮分别打开应用内弹窗与恢复默认背景。
-             4. 弹窗支持本地图片 / URL 图片；本地图片预览只读取当前本地草稿，避免被旧 URL 抢占显示。
+             4. 弹窗支持本地图片 / URL 图片；本地图片确认后以 Blob 写入 DB.js / IndexedDB，设置对象只保存 mediaKey。
              5. “确认 / 删除”均通过 DB.js / IndexedDB 写入当前 chatPromptSettings，并同步当前聊天窗口背景。
              6. 本区域仅保留 IndexedDB 单一路径，不写双份兜底，不做长文本过滤。
              ================================================================== -->
@@ -182,11 +314,14 @@ export function renderChatBeautySettingsSection(chatSettings = {}) {
 
 function getPendingChatBackgroundDraft(state = {}) {
   if (!state.pendingChatBackgroundDraft || typeof state.pendingChatBackgroundDraft !== 'object') {
-    const { chatBackgroundSrc, chatBackgroundSource } = normalizeChatBeautySettings(state.chatPromptSettings || {});
+    const { chatBackgroundSrc, chatBackgroundSource, chatBackgroundMediaKey } = normalizeChatBeautySettings(state.chatPromptSettings || {});
     state.pendingChatBackgroundDraft = {
-      source: chatBackgroundSrc ? chatBackgroundSource : 'local',
+      source: chatBackgroundSrc || chatBackgroundMediaKey ? chatBackgroundSource : 'local',
       src: chatBackgroundSource === 'local' ? chatBackgroundSrc : '',
-      url: chatBackgroundSource === 'url' ? chatBackgroundSrc : ''
+      url: chatBackgroundSource === 'url' ? chatBackgroundSrc : '',
+      mediaKey: chatBackgroundSource === 'local' ? chatBackgroundMediaKey : '',
+      file: null,
+      previewObjectUrl: ''
     };
   }
   return state.pendingChatBackgroundDraft;
@@ -213,7 +348,7 @@ function renderChatBackgroundModalBody(state = {}) {
           ${source === 'local'
             ? `
               <button class="msg-chat-background-local-btn" data-action="open-chat-background-local-picker" type="button">
-                ${MSG_ICONS.upload}<span>${draft.src ? '重新选择本地图片' : '选择本地图片'}</span>
+                ${MSG_ICONS.upload}<span>${draft.src || draft.mediaKey ? '重新选择本地图片' : '选择本地图片'}</span>
               </button>
             `
             : `
@@ -230,19 +365,24 @@ function renderChatBackgroundModalBody(state = {}) {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·聊天背景应用内弹窗：本地预览修复]
+   [区域标注·已完成·聊天背景应用内弹窗：本地大图 Blob 草稿]
    说明：
    1. 弹窗只包含右上角“关闭”和右下角“确认”按钮，沿用 chat-modal 暖色主题。
    2. 来源切换、本地图片读取、URL 输入都只更新运行时草稿；确认前不保存。
-   3. 本地来源预览只读取 draft.src，URL 来源预览只读取 draft.url，避免旧背景覆盖新上传预览。
+   3. 本地来源预览使用 objectURL，不再把本地大图读取为 data URL，避免超过 1MB 背景无法替换。
    4. 不使用浏览器原生 alert/confirm/prompt，不使用原生选择器控件。
    ========================================================================== */
 export function showChatBackgroundModal(container, state = {}) {
-  const { chatBackgroundSrc, chatBackgroundSource } = normalizeChatBeautySettings(state.chatPromptSettings || {});
+  cleanupPendingChatBackgroundDraft(state.pendingChatBackgroundDraft);
+
+  const { chatBackgroundSrc, chatBackgroundSource, chatBackgroundMediaKey } = normalizeChatBeautySettings(state.chatPromptSettings || {});
   state.pendingChatBackgroundDraft = {
-    source: chatBackgroundSrc ? chatBackgroundSource : 'local',
+    source: chatBackgroundSrc || chatBackgroundMediaKey ? chatBackgroundSource : 'local',
     src: chatBackgroundSource === 'local' ? chatBackgroundSrc : '',
-    url: chatBackgroundSource === 'url' ? chatBackgroundSrc : ''
+    url: chatBackgroundSource === 'url' ? chatBackgroundSrc : '',
+    mediaKey: chatBackgroundSource === 'local' ? chatBackgroundMediaKey : '',
+    file: null,
+    previewObjectUrl: ''
   };
 
   const mask = container.querySelector('[data-role="modal-mask"]');
@@ -289,10 +429,11 @@ export function openChatBackgroundLocalPicker(container) {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·聊天背景本地图片草稿]
+   [区域标注·已完成·聊天背景本地图片草稿：objectURL 预览]
    说明：
-   1. 读取本地图片为 data URL 后仅暂存 state.pendingChatBackgroundDraft.src。
-   2. 只有用户在弹窗中点击“确认”后，才写入 chatPromptSettings 与 IndexedDB。
+   1. 本地图片选择后仅把 File 和 objectURL 暂存到 state.pendingChatBackgroundDraft。
+   2. 不再读取为 data URL；只有用户在弹窗中点击“确认”后，才把 File 作为 Blob 写入 DB.js / IndexedDB。
+   3. 预览 objectURL 只存在运行时，切换草稿时及时释放，避免页面闪屏与内存堆积。
    ========================================================================== */
 export function handleChatBackgroundFileInputChange(file, state = {}, container) {
   if (!file) return;
@@ -302,30 +443,34 @@ export function handleChatBackgroundFileInputChange(file, state = {}, container)
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = () => {
-    const imageUrl = String(reader.result || '');
-    if (!imageUrl.startsWith('data:image/')) {
-      renderModalNotice(container, '图片读取失败，请重新选择');
-      return;
-    }
+  const draft = getPendingChatBackgroundDraft(state);
+  cleanupPendingChatBackgroundDraft(draft);
 
-    const draft = getPendingChatBackgroundDraft(state);
-    state.pendingChatBackgroundDraft = {
-      ...draft,
-      source: 'local',
-      src: imageUrl
-    };
-    rerenderChatBackgroundModal(container, state);
+  const previewUrl = URL.createObjectURL(file);
+  state.pendingChatBackgroundDraft = {
+    ...draft,
+    source: 'local',
+    src: previewUrl,
+    mediaKey: '',
+    file,
+    previewObjectUrl: previewUrl
   };
-  reader.onerror = () => renderModalNotice(container, '图片读取失败，请重新选择');
-  reader.readAsDataURL(file);
+  rerenderChatBackgroundModal(container, state);
 }
 
+/* ==========================================================================
+   [区域标注·已完成·聊天背景确认保存：本地大图 IndexedDB Blob]
+   说明：
+   1. URL 背景只保存 URL；本地图片保存 Blob 记录，chatPromptSettings 只保存 mediaKey。
+   2. 更换来源或删除旧本地背景时，同步删除旧 Blob 记录，避免残留垃圾数据。
+   3. 保存后仅局部同步当前聊天窗口背景和设置页预览，不重渲染整页，避免闪屏。
+   ========================================================================== */
 export async function confirmChatBackgroundSelection(container, state = {}, db) {
   const draft = getPendingChatBackgroundDraft(state);
   const source = String(draft.source || 'local') === 'url' ? 'url' : 'local';
+  const oldMediaKey = String(state.chatPromptSettings?.chatBackgroundMediaKey || '').trim();
   let nextSrc = '';
+  let nextMediaKey = '';
 
   if (source === 'url') {
     const input = container.querySelector('[data-role="chat-background-url-input"]');
@@ -333,6 +478,27 @@ export async function confirmChatBackgroundSelection(container, state = {}, db) 
     if (!/^https?:\/\/\S+/i.test(nextSrc) && !/^data:image\//i.test(nextSrc)) {
       renderModalNotice(container, '请输入有效的图片 URL');
       return;
+    }
+  } else if (draft.file instanceof Blob) {
+    nextMediaKey = createChatBackgroundMediaKey(state);
+    const saved = await persistChatBackgroundMediaRecord(db, nextMediaKey, draft.file);
+    if (!saved) {
+      renderModalNotice(container, '图片保存失败，请重新选择');
+      return;
+    }
+
+    setChatBackgroundRuntimeUrl(nextMediaKey, String(draft.src || '').trim());
+  } else if (String(draft.mediaKey || '').trim()) {
+    nextMediaKey = String(draft.mediaKey || '').trim();
+    if (!chatBackgroundRuntimeUrlByKey.get(nextMediaKey)) {
+      await prepareChatBackgroundRuntimeUrl({
+        ...state,
+        chatPromptSettings: {
+          ...(state.chatPromptSettings || {}),
+          chatBackgroundSource: 'local',
+          chatBackgroundMediaKey: nextMediaKey
+        }
+      }, db);
     }
   } else {
     nextSrc = String(draft.src || '').trim();
@@ -344,34 +510,47 @@ export async function confirmChatBackgroundSelection(container, state = {}, db) 
 
   state.chatPromptSettings = {
     ...(state.chatPromptSettings || {}),
-    chatBackgroundSrc: nextSrc,
-    chatBackgroundSource: source
+    chatBackgroundSrc: source === 'url' ? nextSrc : (nextMediaKey ? '' : nextSrc),
+    chatBackgroundSource: source,
+    chatBackgroundMediaKey: source === 'local' ? nextMediaKey : ''
   };
 
   await dbPut(db, getCurrentChatPromptSettingsKey(state), state.chatPromptSettings);
+
+  if (oldMediaKey && oldMediaKey !== nextMediaKey) {
+    await deleteChatBackgroundMediaRecord(db, oldMediaKey);
+  }
+
   applyChatBackgroundToCurrentWindow(container, state);
   syncChatBackgroundSettingsPreview(container, state);
+  cleanupPendingChatBackgroundDraft(state.pendingChatBackgroundDraft);
   state.pendingChatBackgroundDraft = null;
   closeModal(container);
 }
 
 /* ==========================================================================
-   [区域标注·已完成·聊天背景删除恢复默认]
+   [区域标注·已完成·聊天背景删除恢复默认：同步删除 Blob]
    说明：
-   1. 仅清空当前聊天对象 chatPromptSettings.chatBackgroundSrc / chatBackgroundSource，恢复默认聊天背景。
-   2. 删除动作统一通过 DB.js / IndexedDB 保存，不使用 localStorage/sessionStorage，不写双份兜底。
+   1. 仅清空当前聊天对象 chatPromptSettings.chatBackgroundSrc / chatBackgroundSource / chatBackgroundMediaKey，恢复默认聊天背景。
+   2. 删除动作统一通过 DB.js / IndexedDB 保存；若当前背景为本地 Blob，会同步删除对应 appsData 记录。
    3. 保存后只同步当前聊天窗口背景和设置页预览，不重渲染整页，避免闪屏。
    ========================================================================== */
 export async function deleteChatBackgroundSelection(container, state = {}, db) {
+  const oldMediaKey = String(state.chatPromptSettings?.chatBackgroundMediaKey || '').trim();
+
   state.chatPromptSettings = {
     ...(state.chatPromptSettings || {}),
     chatBackgroundSrc: '',
-    chatBackgroundSource: 'local'
+    chatBackgroundSource: 'local',
+    chatBackgroundMediaKey: ''
   };
 
   await dbPut(db, getCurrentChatPromptSettingsKey(state), state.chatPromptSettings);
+  if (oldMediaKey) await deleteChatBackgroundMediaRecord(db, oldMediaKey);
+
   applyChatBackgroundToCurrentWindow(container, state);
   syncChatBackgroundSettingsPreview(container, state);
+  cleanupPendingChatBackgroundDraft(state.pendingChatBackgroundDraft);
   state.pendingChatBackgroundDraft = null;
 }
 

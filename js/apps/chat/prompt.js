@@ -1139,14 +1139,16 @@ export function getDefaultChatPromptSettings() {
     autonomousMomentsIntervalUnit: 'hour',
 
     /* ======================================================================
-       [区域标注·已完成·聊天美化背景默认值：预览与聊天窗口背景修复]
+       [区域标注·已完成·本次聊天背景大图修复：默认值保留 IndexedDB Blob 引用]
        说明：
-       1. chatBackgroundSrc 保存当前聊天对象的聊天背景图片地址，可为 data:image 或 URL。
-       2. chatBackgroundSource 保存来源 local/url，避免本地 data:image 下次进入弹窗时被误放入 URL 页签。
-       3. 持久化由聊天美化模块写入 DB.js / IndexedDB；本默认值区不使用 localStorage/sessionStorage。
+       1. URL 背景继续使用 chatBackgroundSrc 保存 URL；本地背景使用 chatBackgroundMediaKey 指向 DB.js / IndexedDB Blob 记录。
+       2. 本地大图不再写入 chatBackgroundSrc 的 data URL；运行时 objectURL 由聊天美化模块按 mediaKey 恢复。
+       3. chatBackgroundSource 保存来源 local/url，避免本地图下次进入弹窗时被误放入 URL 页签。
+       4. 本默认值区不使用 localStorage/sessionStorage，不写双份兜底，不做长文本字段过滤。
        ====================================================================== */
     chatBackgroundSrc: '',
-    chatBackgroundSource: 'local'
+    chatBackgroundSource: 'local',
+    chatBackgroundMediaKey: ''
   };
 }
 
@@ -1287,16 +1289,24 @@ export function normalizeChatPromptSettings(rawSettings) {
     autonomousMomentsIntervalUnit,
 
     /* ======================================================================
-       [区域标注·已完成·聊天美化背景规范化输出：预览与聊天窗口背景修复]
+       [区域标注·已完成·本次聊天背景大图修复：规范化保留 IndexedDB Blob 引用]
        说明：
-       1. 将 chatBackgroundSrc / chatBackgroundSource 纳入聊天设置白名单，避免从 IndexedDB 读取后被规范化丢弃。
-       2. chatBackgroundSource 只允许 local/url；旧数据没有来源时，按 data:image 自动识别为 local。
-       3. 不使用 localStorage/sessionStorage，不写双份存储兜底，不做长文本过滤。
+       1. 将 chatBackgroundSrc / chatBackgroundSource / chatBackgroundMediaKey 纳入聊天设置白名单，避免从 IndexedDB 读取后被规范化丢弃。
+       2. URL 背景保存 URL；本地背景保存轻量 mediaKey，并由聊天美化模块读取 DB.js / IndexedDB Blob 生成运行时 objectURL。
+       3. chatBackgroundSource 只允许 local/url；旧数据没有来源时，按 mediaKey、data:image 或 blob: 自动识别为 local。
+       4. 不使用 localStorage/sessionStorage，不写双份存储兜底，不做长文本字段过滤。
        ====================================================================== */
     chatBackgroundSrc: String(source.chatBackgroundSrc || defaults.chatBackgroundSrc).trim(),
     chatBackgroundSource: ['local', 'url'].includes(String(source.chatBackgroundSource || '').trim())
       ? String(source.chatBackgroundSource || '').trim()
-      : (String(source.chatBackgroundSrc || '').trim().startsWith('data:image/') ? 'local' : defaults.chatBackgroundSource)
+      : (
+          String(source.chatBackgroundMediaKey || '').trim()
+          || String(source.chatBackgroundSrc || '').trim().startsWith('data:image/')
+          || String(source.chatBackgroundSrc || '').trim().startsWith('blob:')
+            ? 'local'
+            : defaults.chatBackgroundSource
+        ),
+    chatBackgroundMediaKey: String(source.chatBackgroundMediaKey || defaults.chatBackgroundMediaKey).trim()
   };
 }
 

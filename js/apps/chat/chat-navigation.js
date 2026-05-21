@@ -34,6 +34,7 @@ import {
 import { normalizeTranslationSettings } from './chat-translation.js';
 import { renderSubPage } from './profile.js';
 import { refreshPanel } from './chat-shell.js';
+import { prepareChatBackgroundRuntimeUrl } from './chat-beauty-settings.js';
 import {
   CHAT_MESSAGE_INITIAL_VISIBLE_COUNT,
   DATA_KEY_CHAT_CONSOLE,
@@ -80,9 +81,16 @@ export async function openChatMessage(container, state, db, chatId) {
   state.asideSettings = normalizeAsideSettings(asideModeState?.settings || getDefaultAsideSettings());
   state.asideHistory = Array.isArray(asideModeState?.history) ? asideModeState.history : [];
 
-  /* ===== 闲谈聊天设置按联系人独立存储 START ===== */
+  /* ========================================================================
+     [区域标注·已完成·本次聊天背景大图修复] 加载聊天设置并恢复本地 Blob 背景运行时 URL
+     说明：
+     1. 聊天背景设置仍按“当前面具 + 当前会话”从 DB.js / IndexedDB 读取。
+     2. 本地大图背景只在设置对象里保存 chatBackgroundMediaKey；这里在首屏渲染前读取 IndexedDB Blob 并生成 objectURL。
+     3. 先恢复运行时 URL 再 renderCurrentChatMessage，避免进入消息页时背景丢失或闪一下默认底色。
+     4. 不使用 localStorage/sessionStorage，不写双份存储兜底，不做长文本字段过滤。
+     ======================================================================== */
   state.chatPromptSettings = normalizeChatPromptSettings(await dbGet(db, DATA_KEY_CHAT_PROMPT_SETTINGS(state.activeMaskId, chatId)));
-  /* ===== 闲谈聊天设置按联系人独立存储 END ===== */
+  await prepareChatBackgroundRuntimeUrl(state, db);
 
   /* ========================================================================
      [区域标注·已完成·本次进入聊天消息页防闪屏修复] 先离屏渲染消息页，再同帧切换显隐
