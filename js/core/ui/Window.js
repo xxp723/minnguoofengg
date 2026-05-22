@@ -59,9 +59,17 @@ export class WindowManager {
       </button>
     `;
 
+    if (appMeta.id === 'trace' || appMeta.id === 'map') {
+      header.style.display = 'none';
+    }
+
     const content = document.createElement('div');
     content.className = 'app-window__content';
-    if (appMeta.id !== 'trace') {
+    
+    if (appMeta.id === 'trace') {
+      content.style.padding = '0';
+      content.style.backgroundColor = '#fdfdfd';
+    } else {
       content.innerHTML = '<div class="loading">应用加载中...</div>';
     }
 
