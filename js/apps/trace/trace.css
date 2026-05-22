@@ -1,19 +1,25 @@
 /*
  * 文件名: js/apps/trace/trace.css
- * 用途: 轨迹应用样式表。
- *       目前只提供基础骨架样式，保持与系统主题 UI 风格的统一，防止页面闪屏。
+ * 用途: 轨迹应用样式表。高级时尚杂志风、ins风格。
+ *       统一应用内样式作用域（以 .trace- 开头），不会影响全局样式。
  */
 
+/* ==========================================================================
+   [区域标注·本次需求·基础布局]
+   ========================================================================== */
 .trace-shell {
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background: var(--ui-bg, #f5f1ea);
-  color: var(--ui-text, #4A342A);
+  background: #fdfdfd; /* ins 风格纯净白底 */
+  color: #1a1a1a;      /* 高级感深灰/纯黑字体 */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   overflow: hidden;
+  position: relative;
 }
 
+/* 顶部标题栏 */
 .trace-header {
   flex-shrink: 0;
   display: flex;
@@ -21,42 +27,325 @@
   justify-content: space-between;
   height: 56px;
   padding: 0 16px;
-  background: var(--ui-bg, #f5f1ea);
-  border-bottom: 1px solid rgba(74, 52, 42, 0.08);
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05); /* 极细边框 */
+  z-index: 10;
 }
 
-.trace-header__title {
-  font-size: 17px;
-  font-weight: 700;
+.trace-header-spacer {
+  flex: 1;
+}
+
+.trace-header__title-wrap {
+  flex: 2;
+  text-align: center;
+}
+
+.trace-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
   margin: 0;
+  cursor: pointer; /* 提示可点击返回桌面 */
 }
 
-.trace-header__actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
+/* 主内容区 */
 .trace-body {
   flex-grow: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 0;
+  background: #f8f9fa; /* 极简浅灰背景，突出白色卡片 */
   /* 隐藏滚动条 */
   scrollbar-width: none;
 }
-
 .trace-body::-webkit-scrollbar {
   display: none;
 }
 
+/* 模块通用容器 */
+.trace-module-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding-bottom: 80px; /* 留出底部 tab 栏与悬浮按钮空间 */
+  position: relative;
+}
+
+.trace-module-content {
+  flex-grow: 1;
+  padding: 16px;
+}
+
+/* ==========================================================================
+   [区域标注·本次需求·底部 Tab 栏]
+   ========================================================================== */
+.trace-tabbar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 10;
+}
+
+.trace-tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #a0a0a0;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.2s ease;
+}
+
+.trace-tab-item.is-active {
+  color: #1a1a1a;
+}
+
+.trace-tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-bottom: 2px;
+}
+.trace-tab-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.trace-tab-text {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+/* ==========================================================================
+   [区域标注·本次需求·列表与卡片样式 (ins 风格)]
+   ========================================================================== */
 .trace-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--ui-text-muted, rgba(74, 52, 42, 0.5));
-  font-size: 14px;
+  min-height: 300px;
+  color: #999;
   text-align: center;
-  padding: 32px;
+}
+.trace-empty p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+.trace-empty-sub {
+  font-size: 12px !important;
+  margin-top: 8px !important;
+  color: #bbb !important;
+}
+
+.trace-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.trace-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03); /* 极简柔和阴影 */
+  border: 1px solid rgba(0, 0, 0, 0.02);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.trace-card:active {
+  transform: scale(0.98);
+}
+
+.trace-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 6px;
+}
+
+.trace-card-desc {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+}
+
+/* ==========================================================================
+   [区域标注·本次需求·悬浮添加按钮 (FAB)]
+   ========================================================================== */
+.trace-fab {
+  position: fixed;
+  bottom: 76px; /* 避开 tabbar */
+  right: 20px;
+  width: 52px;
+  height: 52px;
+  border-radius: 26px;
+  background: #1a1a1a;
+  color: #ffffff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  z-index: 20;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.trace-fab:active {
+  transform: scale(0.9);
+}
+
+.trace-fab svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* ==========================================================================
+   [区域标注·本次需求·应用内弹窗]
+   ========================================================================== */
+.trace-modal-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.trace-modal-mask.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.trace-modal-panel {
+  background: #ffffff;
+  width: 85%;
+  max-width: 320px;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  transform: translateY(0) scale(1);
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.trace-modal-mask.is-hidden .trace-modal-panel {
+  transform: translateY(20px) scale(0.95);
+}
+
+.trace-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.trace-modal-field {
+  margin-bottom: 16px;
+}
+
+.trace-modal-label {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+/* 表单输入框 - ins风极简圆角线框 */
+.trace-input,
+.trace-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: #f5f5f5;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: #1a1a1a;
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.trace-input::placeholder,
+.trace-textarea::placeholder {
+  color: #aaa;
+}
+
+.trace-input:focus,
+.trace-textarea:focus {
+  background: #ffffff;
+  border-color: #1a1a1a;
+  box-shadow: 0 0 0 3px rgba(26, 26, 26, 0.05);
+}
+
+.trace-textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.trace-modal-hint {
+  color: #e74c3c;
+  font-size: 12px;
+  min-height: 18px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.trace-modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* 按钮样式 */
+.trace-btn {
+  flex: 1;
+  padding: 12px 0;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.trace-btn:active {
+  transform: scale(0.96);
+}
+
+.trace-btn-cancel {
+  background: #f0f0f0;
+  color: #666;
+}
+
+.trace-btn-confirm {
+  background: #1a1a1a;
+  color: #ffffff;
 }

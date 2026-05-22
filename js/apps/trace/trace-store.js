@@ -37,15 +37,15 @@ export async function dbPut(db, key, data) {
 
 /* ==========================================================================
    [区域标注·本次需求·轨迹数据结构规范化]
-   说明：只读写 IndexedDB，返回规范化的状态对象
+   说明：只读写 IndexedDB，返回规范化的状态对象，分为日程、资产、位置三个模块
    ========================================================================== */
 export function normalizeTraceData(rawData) {
   const source = rawData && typeof rawData === 'object' ? rawData : {};
-  let traces = Array.isArray(source.traces) ? source.traces : [];
-
   return {
     hasInitialized: true,
-    traces
+    schedules: Array.isArray(source.schedules) ? source.schedules : [],
+    assets: Array.isArray(source.assets) ? source.assets : [],
+    locations: Array.isArray(source.locations) ? source.locations : []
   };
 }
 
