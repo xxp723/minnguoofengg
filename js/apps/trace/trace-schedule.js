@@ -248,11 +248,33 @@ export function bindScheduleEvents(shellContainer, container, state, context) {
       const maskSetting = archiveData.masks?.find(m => m.id === state.activeMaskId) || {};
       const maskPrompt = `用户面具：${activeMask?.name || '未知'}\n背景：${maskSetting.background || ''}\n人设：${maskSetting.prompt || ''}\n档案：${maskSetting.profile || ''}`;
 
-      // 2. 收集聊天记录（最近20条）
+      // 2. 收集聊天记录（最近20轮对话，一轮=一组连续User消息+一组连续Assistant消息）
       const chatKey = `chat_messages_${state.activeMaskId}_${state.activeContactId}`;
       const chatRecord = await context.db.get('appsData', chatKey);
       const chatRecordsRaw = chatRecord ? (chatRecord.data || chatRecord.value || []) : [];
-      const chatLines = chatRecordsRaw.slice(-20).map(msg => {
+      
+      // 合并连续同角色消息为块(Block)
+      const blocks = [];
+      let currentBlock = [];
+      for (const msg of chatRecordsRaw) {
+        if (currentBlock.length === 0) {
+          currentBlock.push(msg);
+        } else {
+          if (currentBlock[0].role === msg.role) {
+            currentBlock.push(msg);
+          } else {
+            blocks.push(currentBlock);
+            currentBlock = [msg];
+          }
+        }
+      }
+      if (currentBlock.length > 0) blocks.push(currentBlock);
+      
+      // 取最后 40 个块（约等于 20 轮对话，每轮一来一回算 2 个块）
+      const recentBlocks = blocks.slice(-40);
+      const recentMessages = recentBlocks.flat();
+
+      const chatLines = recentMessages.map(msg => {
         const role = msg.role === 'user' ? '用户' : activeContact?.name || '角色';
         return `[${new Date(msg.timestamp).toLocaleString()}] ${role}: ${msg.content}`;
       }).join('\n');
