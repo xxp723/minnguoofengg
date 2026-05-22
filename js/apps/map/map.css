@@ -157,6 +157,7 @@
    ========================================================================== */
 .map-content-scroll {
   flex: 1;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 12px 24px 40px 24px;
   scrollbar-width: none;
@@ -239,15 +240,18 @@
 .map-modal-mask {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background-color: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  /* [区域标注·已完成·修复编辑地图与弹窗的闪屏] 
+     移除 backdrop-filter 避免在含有 will-change: transform 图层的设备上产生合成层重绘闪屏。
+     加深背景透明度以维持暗化效果，并添加 transform: translateZ(0) 和 will-change 优化性能。 */
+  background-color: rgba(0, 0, 0, 0.55);
   z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 1;
   transition: opacity 0.2s;
+  will-change: opacity;
+  transform: translateZ(0);
 }
 
 .map-modal-mask.is-hidden {

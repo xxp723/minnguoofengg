@@ -31,7 +31,7 @@ export function buildMapShell() {
         </button>
         <div class="map-top-bar__title-wrap">
           <!-- [地图标题点击返回桌面] 标题文案已改为 Map，点击后通过 EventBus 关闭地图应用返回桌面 -->
-          <h1 class="map-title" id="map-title-btn">Map</h1>
+          <h1 class="map-title" id="map-title-btn" data-action="go-home">Map</h1>
         </div>
         <button class="map-add-btn" id="map-add-btn" title="创建新地图" aria-label="创建新地图">
           ${MAP_ICONS.add}
