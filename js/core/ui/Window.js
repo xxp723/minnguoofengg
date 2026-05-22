@@ -61,7 +61,9 @@ export class WindowManager {
 
     const content = document.createElement('div');
     content.className = 'app-window__content';
-    content.innerHTML = '<div class="loading">应用加载中...</div>';
+    if (appMeta.id !== 'trace') {
+      content.innerHTML = '<div class="loading">应用加载中...</div>';
+    }
 
     header.querySelector('.app-window__close')?.addEventListener('click', () => {
       this.eventBus.emit('app:close', { appId: appMeta.id });
