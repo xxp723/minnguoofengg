@@ -4,7 +4,6 @@
  */
 import { persistTraceData } from './trace-store.js';
 import { loadMapData } from '../map/map-store.js';
-import { dbGet } from '../../core/data/DB.js';
 import { showApiErrorModal } from '../../core/ui/components/ApiErrorModal.js';
 
 /* ==========================================================================
@@ -249,7 +248,9 @@ export function bindScheduleEvents(shellContainer, container, state, context) {
 
     try {
       // 1. 收集联系人和面具档案
-      const archiveData = (await dbGet(context.db, 'archive::archive-data')) || {};
+      const archiveRecord = await context.db.get('appsData', 'archive::archive-data');
+      const archiveData = archiveRecord ? (archiveRecord.data || archiveRecord.value || {}) : {};
+      
       const activeContact = state.contacts.find(c => c.id === state.activeContactId);
       const activeMask = (state.masks || []).find(m => m.id === state.activeMaskId);
       
@@ -261,14 +262,16 @@ export function bindScheduleEvents(shellContainer, container, state, context) {
 
       // 2. 收集聊天记录（最近20条）
       const chatKey = `chat_messages_${state.activeMaskId}_${state.activeContactId}`;
-      const chatRecordsRaw = (await dbGet(context.db, chatKey)) || [];
+      const chatRecord = await context.db.get('appsData', chatKey);
+      const chatRecordsRaw = chatRecord ? (chatRecord.data || chatRecord.value || []) : [];
       const chatLines = chatRecordsRaw.slice(-20).map(msg => {
         const role = msg.role === 'user' ? '用户' : activeContact?.name || '角色';
         return `[${new Date(msg.timestamp).toLocaleString()}] ${role}: ${msg.content}`;
       }).join('\n');
 
       // 3. 收集世界书
-      const worldBooksRaw = (await dbGet(context.db, 'worldbook::all-books')) || [];
+      const wbRecord = await context.db.get('appsData', 'worldbook::all-books');
+      const worldBooksRaw = wbRecord ? (wbRecord.data || wbRecord.value || []) : [];
       const relatedBooks = worldBooksRaw.filter(b => b.enabled !== false && b.entries);
       const bookText = relatedBooks.map(b => b.entries.filter(e => e.enabled !== false).map(e => `[${e.keys.join(',')}] ${e.content}`).join('\n')).join('\n');
 
@@ -305,7 +308,8 @@ ${mapPointsText}
 6. 严格返回纯 JSON 数组，禁止任何 Markdown 标记、代码块标记（如 \`\`\`json）或任何多余的解释性文本。`;
 
       // 6. 调用 API
-      const settingsStore = (await dbGet(context.db, 'settings')) || {};
+      const settingsRecord = await context.db.get('settings', 'settings');
+      const settingsStore = settingsRecord || {};
       const apiSettings = settingsStore.api || {};
       // 优先副 API，回退主 API
       const targetApi = (apiSettings.secondary && apiSettings.secondary.apiKey) ? apiSettings.secondary : apiSettings.primary;

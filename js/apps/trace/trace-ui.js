@@ -226,6 +226,7 @@ export function bindTraceEvents(container, state, context) {
 function switchTab(container, state, tabName, context) {
   const body = container.querySelector('#trace-body');
   const title = container.querySelector('#trace-title-btn');
+  // 此时 container 是最外层的 trace-shell，可以直接查找
   const generateBtn = container.querySelector('#trace-schedule-generate-btn');
   if (!body) return;
 
@@ -248,7 +249,7 @@ function switchTab(container, state, tabName, context) {
   // 根据 tab 渲染对应模块
   if (tabName === 'schedule') {
     renderSchedule(body, state);
-    // 这里把 container 也传给 schedule，因为按钮现在在头部
+    // 这里把 container（即 trace-shell）也传给 schedule，因为按钮现在在头部
     if (context) bindScheduleEvents(container, body, state, context);
   } else if (tabName === 'assets') {
     renderAssets(body, state);
