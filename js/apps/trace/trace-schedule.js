@@ -98,14 +98,20 @@ export function renderSchedule(container, state) {
 
   // 计算状态
   const getStatus = (timeStr) => {
-    // timeStr 格式如 "08:00 - 10:00"
+    const toMinutes = (t) => {
+      if (t === '00:00' || t === '24:00') return 24 * 60; // 跨天午夜作为 1440
+      const [h, m] = t.split(':').map(Number);
+      return (h || 0) * 60 + (m || 0);
+    };
+
     const parts = timeStr.split('-');
     if (parts.length !== 2) return 'future';
-    const start = parts[0].trim();
-    const end = parts[1].trim();
+    const start = toMinutes(parts[0].trim());
+    const end = toMinutes(parts[1].trim());
+    const current = toMinutes(currentHourStr);
     
-    if (currentHourStr >= end) return 'past';
-    if (currentHourStr >= start && currentHourStr < end) return 'current';
+    if (current >= end) return 'past';
+    if (current >= start && current < end) return 'current';
     return 'future';
   };
 
@@ -137,25 +143,6 @@ export function renderSchedule(container, state) {
       <div class="trace-module-content">
         ${listHtml}
       </div>
-      
-      <!-- 地图选择绑定弹窗 -->
-      <div class="trace-modal-mask is-hidden" id="trace-map-select-modal">
-        <div class="trace-modal-panel">
-          <div class="trace-modal-title">选择关联地图</div>
-          <div class="trace-modal-field">
-            <label class="trace-modal-label">为 AI 生成日程提供地点约束</label>
-            <div id="trace-map-list-container" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
-              <!-- 动态插入地图列表 -->
-              <div style="text-align:center;color:#999;font-size:12px;padding:10px;">加载中...</div>
-            </div>
-          </div>
-          <div class="trace-modal-hint" id="trace-map-select-hint"></div>
-          <div class="trace-modal-actions">
-            <button class="trace-btn trace-btn-cancel" id="trace-map-select-cancel">取消</button>
-            <button class="trace-btn trace-btn-confirm" id="trace-map-select-confirm">确认生成</button>
-          </div>
-        </div>
-      </div>
     </div>
   `;
 }
@@ -165,11 +152,12 @@ export function renderSchedule(container, state) {
    ========================================================================== */
 export function bindScheduleEvents(shellContainer, container, state, context) {
   const generateBtn = shellContainer.querySelector('#trace-schedule-generate-btn');
-  const mapModal = container.querySelector('#trace-map-select-modal');
-  const cancelBtn = container.querySelector('#trace-map-select-cancel');
-  const confirmBtn = container.querySelector('#trace-map-select-confirm');
-  const mapListContainer = container.querySelector('#trace-map-list-container');
-  const hintEl = container.querySelector('#trace-map-select-hint');
+  // 注意：弹窗现在已被移到 shellContainer (即 trace-shell) 级别
+  const mapModal = shellContainer.querySelector('#trace-map-select-modal');
+  const cancelBtn = shellContainer.querySelector('#trace-map-select-cancel');
+  const confirmBtn = shellContainer.querySelector('#trace-map-select-confirm');
+  const mapListContainer = shellContainer.querySelector('#trace-map-list-container');
+  const hintEl = shellContainer.querySelector('#trace-map-select-hint');
 
   let selectedMapId = state.boundMapId || null;
   let availableMaps = [];
@@ -191,7 +179,7 @@ export function bindScheduleEvents(shellContainer, container, state, context) {
         mapListContainer.innerHTML = '<div style="text-align:center;color:#999;font-size:12px;padding:10px;">暂无可用地图，请先在地图应用中创建</div>';
       } else {
         mapListContainer.innerHTML = availableMaps.map(m => {
-          const isSelected = m.id === selectedMapId ? 'background:#1a1a1a;color:#fff;' : 'background:#f5f5f5;color:#1a1a1a;';
+          const isSelected = String(m.id) === String(selectedMapId) ? 'background:#1a1a1a;color:#fff;' : 'background:#f5f5f5;color:#1a1a1a;';
           return `<div class="trace-map-select-item" data-id="${m.id}" style="padding:10px; border-radius:8px; cursor:pointer; font-size:14px; ${isSelected}">${escapeHtml(m.name)}</div>`;
         }).join('');
 
@@ -279,6 +267,14 @@ export function bindScheduleEvents(shellContainer, container, state, context) {
       const mapPointsText = (selectedMap.points || []).map(p => `- ${p.name || '未命名地点'}: ${p.description || '无具体描述'}`).join('\n');
 
       // 5. 组装 Prompt
+      const today = new Date();
+      const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+      const currentDay = days[today.getDay()];
+      const isWeekend = today.getDay() === 0 || today.getDay() === 6;
+      const dayTypeInfo = isWeekend 
+        ? '今天是周末（请安排娱乐、放松、休闲为主的活动，不要安排上班或上学，除非人设强烈要求）。' 
+        : '今天是工作日（周一至周五，请正常安排白天上班、上学或处理正事，晚上做休闲、放松的活动，不应出现白天在玩的情况，除非人设强烈要求）。';
+
       const systemPrompt = `你现在扮演角色：${activeContact?.name || '未知'}。
 【世界书背景】：
 ${bookText || '无特殊背景'}
@@ -295,10 +291,13 @@ ${chatLines || '暂无近期聊天记录'}
 【活动地图与已有地点】：以下是你所在地图（${selectedMap.name}）的已有地点：
 ${mapPointsText}
 
+【今日日期约束】：
+今天是${currentDay}。${dayTypeInfo}
+
 任务要求：
 1. 请根据上述背景为你自己生成今天的日程表，必须在上述【已有地点】中选择活动场所，绝不允许虚构新地点！
-2. 日程表固定生成 8 个时间段，每 2 小时一个时段，从 08:00 开始到次日 00:00 结束（即 08:00 - 10:00, 10:00 - 12:00, 12:00 - 14:00, 14:00 - 16:00, 16:00 - 18:00, 18:00 - 20:00, 20:00 - 22:00, 22:00 - 00:00）。
-3. 时间安排必须符合生活常识，分清早中晚的合理作息（如不能白天睡觉晚上去学校），且要有一定的独立自主性，但也要参考【最近聊天参考】中的对话或约定来安排合适的活动（体现活人感）。
+2. 严格遵守【今日日期约束】，符合生活常识。时间安排必须分清早中晚的合理作息，且要有一定的独立自主性，同时也要参考【最近聊天参考】中的对话或约定来安排合适的活动（体现活人感）。
+3. 日程表固定生成 8 个时间段，每 2 小时一个时段，从 08:00 开始到次日 00:00 结束（即 08:00 - 10:00, 10:00 - 12:00, 12:00 - 14:00, 14:00 - 16:00, 16:00 - 18:00, 18:00 - 20:00, 20:00 - 22:00, 22:00 - 00:00）。
 4. 严格输出为精简的 JSON 数组，包含以下字段：
   - time: 时间段（必须严格遵守格式，如 "08:00 - 10:00"）
   - location: 所在地点（必须是【已有地点】之一）

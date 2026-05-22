@@ -332,23 +332,40 @@
   border-left: 4px solid transparent;
 }
 
-/* 过去：浅色 */
+/* 过去：浅色（已经历过） */
 .trace-status-past {
-  opacity: 0.6;
-  border-left-color: #dcdcdc;
-  background: #fdfdfd;
+  opacity: 0.4;
+  border-left-color: #e0e0e0;
+  background: #fafafa;
+}
+.trace-status-past .trace-schedule-time,
+.trace-status-past .trace-card-title,
+.trace-status-past .trace-card-desc,
+.trace-status-past .trace-schedule-location {
+  color: #a0a0a0;
 }
 
-/* 正在进行：高亮色 */
+/* 正在进行：重点高亮色（正在经历） */
 .trace-status-current {
-  border-left-color: #1a1a1a;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.06);
-  background: #ffffff;
+  border-left-color: #FF4757; /* 醒目珊瑚红/重点色 */
+  box-shadow: 0 8px 24px rgba(255, 71, 87, 0.12);
+  background: #fffafa; /* 微暖底色 */
+  transform: scale(1.02); /* 稍微突出 */
+  z-index: 2;
+  position: relative;
+}
+.trace-status-current .trace-schedule-time {
+  color: #FF4757;
+  font-size: 14px; /* 字体稍微放大 */
+}
+.trace-status-current .trace-card-title {
+  color: #FF4757;
 }
 
-/* 未来：正常略深 */
+/* 未来：深色（还未经历） */
 .trace-status-future {
-  border-left-color: #888888;
+  border-left-color: #1a1a1a;
+  background: #ffffff;
 }
 
 .trace-schedule-time {
@@ -358,6 +375,7 @@
   color: #1a1a1a;
   min-width: 85px;
   padding-top: 2px;
+  transition: color 0.2s;
 }
 
 .trace-schedule-body {
@@ -415,7 +433,7 @@
    [区域标注·本次需求·应用内弹窗]
    ========================================================================== */
 .trace-modal-mask {
-  position: absolute;
+  position: absolute; /* 相对于 trace-shell 撑满 */
   top: 0;
   left: 0;
   right: 0;

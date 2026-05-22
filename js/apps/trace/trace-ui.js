@@ -106,6 +106,25 @@ export function buildTraceShell(state) {
           </div>
         </div>
       </div>
+
+      <!-- 地图选择绑定弹窗 (移至全局层，避免跟随滚动) -->
+      <div class="trace-modal-mask is-hidden" id="trace-map-select-modal">
+        <div class="trace-modal-panel">
+          <div class="trace-modal-title">选择关联地图</div>
+          <div class="trace-modal-field">
+            <label class="trace-modal-label">为 AI 生成日程提供地点约束</label>
+            <div id="trace-map-list-container" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+              <!-- 动态插入地图列表 -->
+              <div style="text-align:center;color:#999;font-size:12px;padding:10px;">加载中...</div>
+            </div>
+          </div>
+          <div class="trace-modal-hint" id="trace-map-select-hint"></div>
+          <div class="trace-modal-actions">
+            <button class="trace-btn trace-btn-cancel" id="trace-map-select-cancel">取消</button>
+            <button class="trace-btn trace-btn-confirm" id="trace-map-select-confirm">确认生成</button>
+          </div>
+        </div>
+      </div>
     </div>
   `;
 }
