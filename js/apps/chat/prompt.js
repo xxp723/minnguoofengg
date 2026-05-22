@@ -1824,6 +1824,13 @@ function formatDateForTimeAwareness(date = getCurrentRealDate()) {
   return `${parts.year}-${parts.month}-${parts.day} ${parts.weekday} ${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
+/* [区域标注·已完成·本次时间感知关键跨度精简锚定] 紧凑显示 24 小时制时间与时段，供“AI至本轮”跨度锚点使用。 */
+function formatTimeAnchorCompactForPrompt(date = getCurrentRealDate()) {
+  const parts = getBeijingDateTimeParts(date);
+  const period = getTimePeriodLabelForPrompt(parts.hour, parts.minute);
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}（${period}）`;
+}
+
 function formatRelativeDurationForPrompt(ms) {
   const value = Math.max(0, Number(ms) || 0);
   const minute = 60 * 1000;
@@ -2171,11 +2178,12 @@ function buildConversationTimeContext({ history = [], userInput = '', now = getC
 
   const lines = [
     /* ======================================================================
-       [区域标注·已完成·本次需求1·时间感知精简上下文]
+       [区域标注·已完成·本次时间感知关键跨度精简锚定]
        说明：
-       1. 只发送当前时间、关键消息时间锚点、自然日差和最近轮次摘要，减少 token。
-       2. 自然日差使用上海时区计算，明确“今天/昨天/前天/N天前”，避免多日前内容被误判为昨天。
-       3. 这里只做运行时提示词组装，不写 DB.js / IndexedDB，不使用 localStorage/sessionStorage。
+       1. 只发送当前时间、关键消息时间锚点、自然日差、AI至本轮间隔和最近轮次摘要，减少 token。
+       2. “AI至本轮”使用前端已计算的起止时间与间隔，避免 AI 自行改写时段或误算等待时长。
+       3. 自然日差使用上海时区计算，明确“今天/昨天/前天/N天前”，避免多日前内容被误判为昨天。
+       4. 这里只做运行时提示词组装，不写 DB.js / IndexedDB，不使用 localStorage/sessionStorage。
        ====================================================================== */
     `当前时间：${formatCurrentTimeCompactForPrompt(now)}`,
     todayFestivalPrompt,
@@ -2186,7 +2194,7 @@ function buildConversationTimeContext({ history = [], userInput = '', now = getC
   ];
 
   if (currentUserRoundLastTimestamp && previousLatestAssistantTimestamp) {
-    lines.push(`上一条AI到本轮用户：${formatRelativeDurationForPrompt(currentUserRoundLastTimestamp - previousLatestAssistantTimestamp)}；自然日跨越=${formatShanghaiDayDistanceForPrompt(previousLatestAssistantTimestamp, new Date(currentUserRoundLastTimestamp))}`);
+    lines.push(`AI至本轮：${formatTimeAnchorCompactForPrompt(new Date(previousLatestAssistantTimestamp))}→${formatTimeAnchorCompactForPrompt(new Date(currentUserRoundLastTimestamp))}，间隔=${formatRelativeDurationForPrompt(currentUserRoundLastTimestamp - previousLatestAssistantTimestamp)}，自然日=${formatShanghaiDayDistanceForPrompt(previousLatestAssistantTimestamp, new Date(currentUserRoundLastTimestamp))}`);
   }
 
   if (latestUserTimestamp) {
@@ -2223,7 +2231,7 @@ export function getTimeAwarenessPrompt({ enabled = false, context = {} } = {}) {
 1. 当前时间格式为“日期 星期 时间（时段）”；时段：凌晨00:00-05:59，早上06:00-08:59，上午09:00-11:29，中午11:30-13:29，下午13:30-17:59，晚上18:00-22:59，深夜23:00-23:59。
 2. “现在”只按当前真实时间；历史消息必须按各自时间锚点理解，不能当作刚发生；判断今天/昨天/前天/N天前优先看“自然日=...”，相差2天以上绝不能说成昨天。
 3. 按当前星期和时段理解生活节奏：凌晨/深夜多为睡眠休息；早上多为起床、早饭、通勤、上学上班；上午多为学习工作；中午多为午饭午休；下午多为学习工作办事；晚上多为晚饭、休息、娱乐、聊天。工作日更偏上学/上班/通勤，周末更偏休息/娱乐；仍以用户设定和聊天内容为准。
-4. 用户说忘回、刚看到或者隔了会儿才发消息等，先看“上一条AI到本轮用户”的真实间隔和自然日跨越；超过30分钟或跨自然日，禁止说刚才/刚刚。
+4. 用户说忘回、刚看到、失踪或隔了会儿才发消息等，优先使用“AI至本轮”的间隔和自然日，不要自行重算或改写起止时段；超过30分钟或跨自然日，禁止说刚才/刚刚。
 5. 历史里的昨天/明天/今晚/明早/过几天，先锚定到那条消息的发送日，再换算到现在；白天不要沿用昨晚/凌晨的劝睡语境。
 6. 外卖、吃饭、洗澡、通勤、办事等要按真实耗时推进状态；仅当上下文明确给出今日节日或用户主动提到时才送节日祝福，禁止编造节日。
 7. 若用户设定明确显示今天是用户生日，可自然送一句生日祝福；不要反复机械祝福。最终回复不要输出任何时间字段、时间轴或后台标注。`);
