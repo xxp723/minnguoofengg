@@ -107,6 +107,11 @@ export function bindAssetsEvents(container, state, context) {
     const amount = inputAmount.value.trim();
     const category = inputCategory.value.trim();
 
+    if (!state.activeContactId) {
+      hintEl.textContent = '请先选择一个联系人';
+      return;
+    }
+
     if (!name || !amount) {
       hintEl.textContent = '名称和金额不能为空';
       return;
@@ -121,7 +126,7 @@ export function bindAssetsEvents(container, state, context) {
       createdAt: Date.now()
     });
 
-    await persistTraceData(context.db, state);
+    await persistTraceData(context.db, state, state.activeMaskId, state.activeContactId);
     renderAssets(container, state);
     bindAssetsEvents(container, state, context);
   });

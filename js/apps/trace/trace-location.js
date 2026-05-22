@@ -100,6 +100,11 @@ export function bindLocationEvents(container, state, context) {
     const name = inputName.value.trim();
     const desc = inputDesc.value.trim();
 
+    if (!state.activeContactId) {
+      hintEl.textContent = '请先选择一个联系人';
+      return;
+    }
+
     if (!name) {
       hintEl.textContent = '名称不能为空';
       return;
@@ -113,7 +118,7 @@ export function bindLocationEvents(container, state, context) {
       createdAt: Date.now()
     });
 
-    await persistTraceData(context.db, state);
+    await persistTraceData(context.db, state, state.activeMaskId, state.activeContactId);
     renderLocation(container, state);
     bindLocationEvents(container, state, context);
   });

@@ -100,6 +100,11 @@ export function bindScheduleEvents(container, state, context) {
     const title = inputTitle.value.trim();
     const content = inputContent.value.trim();
 
+    if (!state.activeContactId) {
+      hintEl.textContent = '请先选择一个联系人';
+      return;
+    }
+
     if (!title) {
       hintEl.textContent = '标题不能为空';
       return;
@@ -113,7 +118,7 @@ export function bindScheduleEvents(container, state, context) {
       createdAt: Date.now()
     });
 
-    await persistTraceData(context.db, state);
+    await persistTraceData(context.db, state, state.activeMaskId, state.activeContactId);
     renderSchedule(container, state);
     bindScheduleEvents(container, state, context);
   });

@@ -5,7 +5,7 @@
  *       绑定/解绑事件与 AppManager 挂载生命周期。
  */
 
-import { loadTraceData } from './trace-store.js';
+import { loadTraceData, getArchiveMasks, getContactsByMask } from './trace-store.js';
 import { buildTraceShell, renderTraceGrid, bindTraceEvents } from './trace-ui.js';
 
 /* ==========================================================================
@@ -46,17 +46,35 @@ export async function mount(container, context) {
   // 1. 预加载轨迹应用独立 CSS
   await loadTraceCSS('./js/apps/trace/trace.css', 'trace-app-css');
   
-  // 2. 读取 IndexedDB 数据
+  // 2. 读取 IndexedDB 数据及面具、联系人隔离上下文
   const db = context.db;
-  const traceData = await loadTraceData(db);
+  const { masks, activeMaskId } = await getArchiveMasks(db);
+  
+  // 默认使用当前全局激活的面具，否则取第一个
+  const currentMaskId = activeMaskId || (masks.length > 0 ? String(masks[0].id) : null);
+  
+  let contacts = [];
+  if (currentMaskId) {
+    contacts = await getContactsByMask(db, currentMaskId);
+  }
+  
+  // 默认选中第一个联系人
+  const currentContactId = contacts.length > 0 ? String(contacts[0].id) : null;
+  
+  // 加载对应面具和联系人下的专属轨迹数据
+  const traceData = await loadTraceData(db, currentMaskId, currentContactId);
   
   const state = {
     destroyed: false,
+    masks,
+    contacts,
+    activeMaskId: currentMaskId,
+    activeContactId: currentContactId,
     ...traceData
   };
 
-  // 3. 渲染应用骨架
-  container.innerHTML = buildTraceShell();
+  // 3. 渲染应用骨架（带入 state 以渲染顶部横向头像栏和标题栏扩展）
+  container.innerHTML = buildTraceShell(state);
   
   // 4. 渲染初始列表/网格
   renderTraceGrid(container, state);

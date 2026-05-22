@@ -5,7 +5,11 @@
 
 export const APP_ID = 'trace';
 export const STORE_NAME = 'appsData';
-export const DATA_KEY_TRACE = 'trace_global_data';
+
+/* [区域标注·本次修改·隔离存储键名与跨应用数据获取] */
+export const DATA_KEY_TRACE = (maskId, contactId) => `trace_data_${maskId || 'default'}_${contactId || 'none'}`;
+export const ARCHIVE_DB_RECORD_ID = 'archive::archive-data';
+export const DATA_KEY_CONTACTS = (maskId) => `chat_contacts_${maskId || 'default'}`;
 
 /* ==========================================================================
    [区域标注·本次需求·轨迹应用 IndexedDB 专用读写]
@@ -35,8 +39,22 @@ export async function dbPut(db, key, data) {
   }
 }
 
+/* [区域标注·本次修改·读取档案面具及通讯录联系人] */
+export async function getArchiveMasks(db) {
+  const record = await dbGet(db, ARCHIVE_DB_RECORD_ID);
+  const data = record && typeof record === 'object' ? record : {};
+  const masks = Array.isArray(data.masks) ? data.masks : [];
+  const activeMaskId = String(data.activeMaskId || '').trim();
+  return { masks, activeMaskId };
+}
+
+export async function getContactsByMask(db, maskId) {
+  const contacts = await dbGet(db, DATA_KEY_CONTACTS(maskId));
+  return Array.isArray(contacts) ? contacts : [];
+}
+
 /* ==========================================================================
-   [区域标注·本次需求·轨迹数据结构规范化]
+   [区域标注·本次修改·轨迹数据结构规范化与隔离加载]
    说明：只读写 IndexedDB，返回规范化的状态对象，分为日程、资产、位置三个模块
    ========================================================================== */
 export function normalizeTraceData(rawData) {
@@ -49,20 +67,27 @@ export function normalizeTraceData(rawData) {
   };
 }
 
-export async function loadTraceData(db) {
-  const raw = await dbGet(db, DATA_KEY_TRACE);
+export async function loadTraceData(db, maskId, contactId) {
+  // 联系人为空时不加载任何有效数据，返回空结构
+  if (!contactId) return normalizeTraceData(null);
+  
+  const key = DATA_KEY_TRACE(maskId, contactId);
+  const raw = await dbGet(db, key);
   const data = normalizeTraceData(raw);
 
   // 初次加载时如果不存在数据，初始化空数组并保存一次
   if (!raw) {
-    await dbPut(db, DATA_KEY_TRACE, data);
+    await dbPut(db, key, data);
   }
 
   return data;
 }
 
-export async function persistTraceData(db, state) {
+export async function persistTraceData(db, state, maskId, contactId) {
+  if (!contactId) return normalizeTraceData(null);
+  
+  const key = DATA_KEY_TRACE(maskId, contactId);
   const data = normalizeTraceData(state);
-  await dbPut(db, DATA_KEY_TRACE, data);
+  await dbPut(db, key, data);
   return data;
 }
