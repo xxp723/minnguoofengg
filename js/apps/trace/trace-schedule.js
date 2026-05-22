@@ -273,10 +273,10 @@ export function bindScheduleEvents(shellContainer, container, state, context) {
       const wbRecord = await context.db.get('appsData', 'worldbook::all-books');
       const worldBooksRaw = wbRecord ? (wbRecord.data || wbRecord.value || []) : [];
       const relatedBooks = worldBooksRaw.filter(b => b.enabled !== false && b.entries);
-      const bookText = relatedBooks.map(b => b.entries.filter(e => e.enabled !== false).map(e => `[${e.keys.join(',')}] ${e.content}`).join('\n')).join('\n');
+      const bookText = relatedBooks.map(b => b.entries.filter(e => e.enabled !== false).map(e => `[${(e.keys || []).join(',')}] ${e.content}`).join('\n')).join('\n');
 
       // 4. 提取地图地点
-      const mapPointsText = selectedMap.points.map(p => `- ${p.name}: ${p.description || '无具体描述'}`).join('\n');
+      const mapPointsText = (selectedMap.points || []).map(p => `- ${p.name || '未命名地点'}: ${p.description || '无具体描述'}`).join('\n');
 
       // 5. 组装 Prompt
       const systemPrompt = `你现在扮演角色：${activeContact?.name || '未知'}。
