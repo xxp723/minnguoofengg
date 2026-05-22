@@ -390,7 +390,7 @@ export function showChatBackgroundModal(container, state = {}) {
 
   mask.classList.remove('is-hidden');
   mask.innerHTML = `
-    <div class="chat-modal-panel chat-background-modal-panel" role="dialog" aria-modal="true" aria-label="更换聊天背景">
+    <div class="chat-modal-panel chat-background-modal-panel" data-role="modal-panel" role="dialog" aria-modal="true" aria-label="更换聊天背景">
       <div class="chat-modal-header">
         <span>更换聊天背景</span>
         <button class="chat-modal-close" data-action="close-modal" type="button" aria-label="关闭">${MSG_ICONS.close}</button>
