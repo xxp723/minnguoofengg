@@ -5,6 +5,23 @@
  */
 
 /* ==========================================================================
+   [区域标注·本次反馈修复·全局覆盖]
+   说明：隐藏系统默认标题栏及内容区 padding 清零，确保完全覆盖
+   ========================================================================== */
+.app-window[data-app-id="trace"] .app-window__header {
+  display: none !important;
+}
+
+.app-window[data-app-id="trace"] .app-window__content {
+  padding: 0 !important;
+  background-color: #fdfdfd;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ==========================================================================
    [区域标注·本次需求·基础布局]
    ========================================================================== */
 .trace-shell {

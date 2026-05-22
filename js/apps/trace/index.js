@@ -46,18 +46,6 @@ export async function mount(container, context) {
   // 1. 预加载轨迹应用独立 CSS
   await loadTraceCSS('./js/apps/trace/trace.css', 'trace-app-css');
   
-  // 隐藏系统的原生窗口标题栏并去掉内边距，实现沉浸式全局 CSS 覆盖
-  const winEl = container.closest('.window');
-  if (winEl) {
-    const header = winEl.querySelector('.window-header');
-    if (header) header.style.display = 'none';
-    winEl.style.background = 'transparent';
-    winEl.style.border = 'none';
-    winEl.style.boxShadow = 'none';
-    container.style.padding = '0';
-    container.style.height = '100%';
-  }
-  
   // 2. 读取 IndexedDB 数据
   const db = context.db;
   const traceData = await loadTraceData(db);
