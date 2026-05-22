@@ -5,13 +5,6 @@
 import { persistTraceData } from './trace-store.js';
 
 /* ==========================================================================
-   [区域标注·本次需求·资产模块 IconPark 图标]
-   ========================================================================== */
-const ICONS = {
-  add: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 8v32M8 24h32" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
-};
-
-/* ==========================================================================
    [区域标注·本次需求·资产模块 UI 渲染]
    ========================================================================== */
 export function renderAssets(container, state) {
@@ -22,7 +15,7 @@ export function renderAssets(container, state) {
     listHtml = `
       <div class="trace-empty">
         <p>暂无资产记录</p>
-        <p class="trace-empty-sub">点击下方“添加”按钮记录您的资产</p>
+        <p class="trace-empty-sub">目前没有可用的资产信息</p>
       </div>
     `;
   } else {
@@ -39,97 +32,16 @@ export function renderAssets(container, state) {
       <div class="trace-module-content">
         ${listHtml}
       </div>
-      <button class="trace-fab" id="trace-assets-add-btn" aria-label="添加资产">
-        ${ICONS.add}
-      </button>
-
-      <!-- 资产新增弹窗 -->
-      <div class="trace-modal-mask is-hidden" id="trace-assets-modal">
-        <div class="trace-modal-panel">
-          <div class="trace-modal-title">添加资产</div>
-          <div class="trace-modal-field">
-            <label class="trace-modal-label">资产名称</label>
-            <input type="text" class="trace-input" id="trace-assets-name" placeholder="例如：工资、餐饮" />
-          </div>
-          <div class="trace-modal-field">
-            <label class="trace-modal-label">金额</label>
-            <input type="number" class="trace-input" id="trace-assets-amount" placeholder="例如：100" />
-          </div>
-          <div class="trace-modal-field">
-            <label class="trace-modal-label">类别</label>
-            <input type="text" class="trace-input" id="trace-assets-category" placeholder="例如：收入、支出" />
-          </div>
-          <div class="trace-modal-hint" id="trace-assets-hint"></div>
-          <div class="trace-modal-actions">
-            <button class="trace-btn trace-btn-cancel" id="trace-assets-cancel">取消</button>
-            <button class="trace-btn trace-btn-confirm" id="trace-assets-confirm">确认</button>
-          </div>
-        </div>
-      </div>
     </div>
   `;
 }
 
 /* ==========================================================================
    [区域标注·本次需求·资产模块交互事件绑定]
+   说明：已移除手动添加按钮逻辑，保留空函数供外部调用
    ========================================================================== */
 export function bindAssetsEvents(container, state, context) {
-  const addBtn = container.querySelector('#trace-assets-add-btn');
-  const modal = container.querySelector('#trace-assets-modal');
-  const cancelBtn = container.querySelector('#trace-assets-cancel');
-  const confirmBtn = container.querySelector('#trace-assets-confirm');
-  const inputName = container.querySelector('#trace-assets-name');
-  const inputAmount = container.querySelector('#trace-assets-amount');
-  const inputCategory = container.querySelector('#trace-assets-category');
-  const hintEl = container.querySelector('#trace-assets-hint');
-
-  const openModal = () => {
-    inputName.value = '';
-    inputAmount.value = '';
-    inputCategory.value = '';
-    hintEl.textContent = '';
-    modal.classList.remove('is-hidden');
-    setTimeout(() => inputName.focus(), 50);
-  };
-
-  const closeModal = () => {
-    modal.classList.add('is-hidden');
-  };
-
-  addBtn?.addEventListener('click', openModal);
-  cancelBtn?.addEventListener('click', closeModal);
-  modal?.addEventListener('click', (e) => {
-    if (e.target === modal) closeModal();
-  });
-
-  confirmBtn?.addEventListener('click', async () => {
-    const name = inputName.value.trim();
-    const amount = inputAmount.value.trim();
-    const category = inputCategory.value.trim();
-
-    if (!state.activeContactId) {
-      hintEl.textContent = '请先选择一个联系人';
-      return;
-    }
-
-    if (!name || !amount) {
-      hintEl.textContent = '名称和金额不能为空';
-      return;
-    }
-
-    if (!Array.isArray(state.assets)) state.assets = [];
-    state.assets.push({
-      id: Date.now().toString(),
-      name,
-      amount,
-      category,
-      createdAt: Date.now()
-    });
-
-    await persistTraceData(context.db, state, state.activeMaskId, state.activeContactId);
-    renderAssets(container, state);
-    bindAssetsEvents(container, state, context);
-  });
+  // 无附加交互事件
 }
 
 function escapeHtml(text) {

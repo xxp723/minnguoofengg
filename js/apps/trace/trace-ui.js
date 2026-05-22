@@ -14,11 +14,12 @@ const ICONS = {
   schedule: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M14 4V12M34 4V12" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12C8 10.8954 8.89543 10 10 10H38C39.1046 10 40 10.8954 40 12V42C40 43.1046 39.1046 44 38 44H10C8.89543 44 8 43.1046 8 42V12Z" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 22H40" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   assets: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M39 16V40C39 41.1046 38.1046 42 37 42H11C9.89543 42 9 41.1046 9 40V8C9 6.89543 9.89543 6 11 6H32" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 18H31" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 26H31" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 34H31" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 8H31V16H40V8Z" fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`,
   location: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 44C24 44 40 32 40 19C40 10.1634 32.8366 3 24 3C15.1634 3 8 10.1634 8 19C8 32 24 44 24 44Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="24" cy="19" r="6" fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`,
-  more: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 12C26.2091 12 28 10.2091 28 8C28 5.79086 26.2091 4 24 4C21.7909 4 20 5.79086 20 8C20 10.2091 21.7909 12 24 12Z" fill="currentColor"/><path d="M24 28C26.2091 28 28 26.2091 28 24C28 21.7909 26.2091 20 24 20C21.7909 20 20 21.7909 20 24C20 26.2091 21.7909 28 24 28Z" fill="currentColor"/><path d="M24 44C26.2091 44 28 42.2091 28 40C28 37.7909 26.2091 36 24 36C21.7909 36 20 37.7909 20 40C20 42.2091 21.7909 44 24 44Z" fill="currentColor"/></svg>`
+  more: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 12C26.2091 12 28 10.2091 28 8C28 5.79086 26.2091 4 24 4C21.7909 4 20 5.79086 20 8C20 10.2091 21.7909 12 24 12Z" fill="currentColor"/><path d="M24 28C26.2091 28 28 26.2091 28 24C28 21.7909 26.2091 20 24 20C21.7909 20 20 21.7909 20 24C20 26.2091 21.7909 28 24 28Z" fill="currentColor"/><path d="M24 44C26.2091 44 28 42.2091 28 40C28 37.7909 26.2091 36 24 36C21.7909 36 20 37.7909 20 40C20 42.2091 21.7909 44 24 44Z" fill="currentColor"/></svg>`,
+  pen: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M34.9961 40L23.9961 16L12.9961 40" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.9961 24L31.9961 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M37.9961 20L25.9961 34" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 };
 
 /* ==========================================================================
-   [区域标注·本次修改·应用主骨架与面具/联系人切换]
+   [区域标注·本次需求·应用主骨架与面具/联系人切换]
    ========================================================================== */
 export function buildTraceShell(state) {
   // 生成横向联系人头像栏
@@ -54,12 +55,16 @@ export function buildTraceShell(state) {
   return `
     <div class="trace-shell">
       <header class="trace-header">
-        <div class="trace-header-spacer"></div>
+        <div class="trace-header-spacer trace-header-left">
+          <button class="trace-icon-btn trace-generate-btn" id="trace-schedule-generate-btn" aria-label="生成日程">
+            ${ICONS.pen}
+          </button>
+        </div>
         <div class="trace-header__title-wrap">
           <h1 class="trace-title" id="trace-title-btn" data-action="go-home">Schedule</h1>
         </div>
         <div class="trace-header-spacer trace-header-right">
-          <button class="trace-more-btn" id="trace-mask-switch-btn" aria-label="切换面具身份">
+          <button class="trace-icon-btn trace-more-btn" id="trace-mask-switch-btn" aria-label="切换面具身份">
             ${ICONS.more}
           </button>
         </div>
@@ -221,6 +226,7 @@ export function bindTraceEvents(container, state, context) {
 function switchTab(container, state, tabName, context) {
   const body = container.querySelector('#trace-body');
   const title = container.querySelector('#trace-title-btn');
+  const generateBtn = container.querySelector('#trace-schedule-generate-btn');
   if (!body) return;
 
   // 标题映射
@@ -234,10 +240,16 @@ function switchTab(container, state, tabName, context) {
     title.textContent = titleMap[tabName] || 'Trace';
   }
 
+  // 只有在日程页面才显示羽毛笔生成按钮
+  if (generateBtn) {
+    generateBtn.style.display = tabName === 'schedule' ? 'flex' : 'none';
+  }
+
   // 根据 tab 渲染对应模块
   if (tabName === 'schedule') {
     renderSchedule(body, state);
-    if (context) bindScheduleEvents(body, state, context);
+    // 这里把 container 也传给 schedule，因为按钮现在在头部
+    if (context) bindScheduleEvents(container, body, state, context);
   } else if (tabName === 'assets') {
     renderAssets(body, state);
     if (context) bindAssetsEvents(body, state, context);
