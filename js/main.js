@@ -126,13 +126,14 @@ class MiniPhoneApp {
       await this.registry.initDefaults();
 
       /* ==========================================================================
-         [区域标注·本次需求2·设置世情档案闲谈点击即进预热]
+         [区域标注·本次需求·常用及地图旧事轨迹应用点击即进预热]
          说明：
-         - Registry 初始化后立即预热用户点名的 4 个应用入口模块与关键 CSS。
+         - Registry 初始化后立即预热用户点名的相关应用入口模块与关键 CSS。
+         - 包含：设置、世情、档案、闲谈、地图、旧事、轨迹。
          - 这里只做资源加载缓存，不 mount 应用、不读写业务数据。
          - 持久化仍统一走项目 DB/IndexedDB 链路，不引入浏览器同步存储。
          ========================================================================== */
-      await this.appManager.warmupCriticalApps(['settings', 'worldbook', 'archive', 'chat']);
+      await this.appManager.warmupCriticalApps(['settings', 'worldbook', 'archive', 'chat', 'map', 'memory', 'trace']);
 
       await this.desktopConfig.initDefaults();
       await this.globalMemory.init();

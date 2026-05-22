@@ -223,13 +223,13 @@ export class AppManager {
   }
 
   /* ==========================================================================
-     [区域标注·本次需求2·四个常用应用点击即进预热]
+     [区域标注·本次需求·常用及地图旧事轨迹应用点击即进预热]
      说明：
-     - 仅预热用户点名的设置、世情、档案、闲谈四个应用。
+     - 预热用户点名的设置、世情、档案、闲谈、地图、旧事、轨迹应用。
      - 只提前加载入口模块和关键 CSS；不 mount、不读写持久化数据。
      - 持久化仍统一使用项目 DB/IndexedDB 链路，不引入浏览器同步存储。
      ========================================================================== */
-  async warmupCriticalApps(appIds = ['settings', 'worldbook', 'archive', 'chat']) {
+  async warmupCriticalApps(appIds = ['settings', 'worldbook', 'archive', 'chat', 'map', 'memory', 'trace']) {
     const cssTasks = [
       this.preloadStylesheet('./js/apps/chat/chat.css', 'chat-app-css'),
       /* ======================================================================
@@ -244,7 +244,14 @@ export class AppManager {
          ====================================================================== */
       this.preloadStylesheet('./js/apps/chat/chat-message-settings.css', 'chat-msg-settings-css'),
       this.preloadStylesheet('./js/apps/archive/archive.css', 'archive-app-css'),
-      this.preloadStylesheet('./js/apps/worldbook/worldbook.css', 'worldbook-app-css')
+      this.preloadStylesheet('./js/apps/worldbook/worldbook.css', 'worldbook-app-css'),
+      /* ======================================================================
+         [区域标注·本次需求·预加载地图旧事轨迹应用CSS]
+         说明：避免这些应用在初次加载时出现无样式闪屏。
+         ====================================================================== */
+      this.preloadStylesheet('./js/apps/map/map.css', 'map-app-css'),
+      this.preloadStylesheet('./js/apps/memory/memory.css?v=20260519-grand-summary-dock-range-scroll', 'memory-app-css'),
+      this.preloadStylesheet('./js/apps/trace/trace.css', 'trace-app-css')
     ];
 
     const moduleTasks = appIds
@@ -274,7 +281,12 @@ export class AppManager {
 
   async warmupRegisteredAppModules() {
     try {
-      const criticalAppIds = new Set(['settings', 'worldbook', 'archive', 'chat']);
+      /* ==========================================================================
+         [区域标注·本次需求·空闲预热过滤]
+         说明：
+         - 过滤掉已经在关键应用预热阶段加载过的应用。
+         ========================================================================== */
+      const criticalAppIds = new Set(['settings', 'worldbook', 'archive', 'chat', 'map', 'memory', 'trace']);
       const apps = this.registry.getAll().filter((appMeta) => !criticalAppIds.has(appMeta.id));
       await Promise.allSettled(apps.map((appMeta) => this.loadModule(appMeta)));
     } catch (error) {
