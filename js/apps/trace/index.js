@@ -77,7 +77,7 @@ export async function mount(container, context) {
   container.innerHTML = buildTraceShell(state);
   
   // 4. 渲染初始列表/网格
-  renderTraceGrid(container, state);
+  renderTraceGrid(container, state, context);
   
   // 5. 绑定交互事件
   bindTraceEvents(container, state, context);

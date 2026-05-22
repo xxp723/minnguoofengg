@@ -15,7 +15,7 @@ const ICONS = {
   assets: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M39 16V40C39 41.1046 38.1046 42 37 42H11C9.89543 42 9 41.1046 9 40V8C9 6.89543 9.89543 6 11 6H32" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 18H31" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 26H31" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 34H31" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 8H31V16H40V8Z" fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`,
   location: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 44C24 44 40 32 40 19C40 10.1634 32.8366 3 24 3C15.1634 3 8 10.1634 8 19C8 32 24 44 24 44Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="24" cy="19" r="6" fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`,
   more: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 12C26.2091 12 28 10.2091 28 8C28 5.79086 26.2091 4 24 4C21.7909 4 20 5.79086 20 8C20 10.2091 21.7909 12 24 12Z" fill="currentColor"/><path d="M24 28C26.2091 28 28 26.2091 28 24C28 21.7909 26.2091 20 24 20C21.7909 20 20 21.7909 20 24C20 26.2091 21.7909 28 24 28Z" fill="currentColor"/><path d="M24 44C26.2091 44 28 42.2091 28 40C28 37.7909 26.2091 36 24 36C21.7909 36 20 37.7909 20 40C20 42.2091 21.7909 44 24 44Z" fill="currentColor"/></svg>`,
-  pen: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M31 4H16C14.8954 4 14 4.89543 14 6V42C14 43.1046 14.8954 44 16 44H32C33.1046 44 34 43.1046 34 42V17.5L31 4Z" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M34 17.5H20.5V4L34 17.5Z" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 27L24 30L30 24" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  pen: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M40 8C40 8 36 14 36 20C36 26 29 34 23 38C17 42 10 44 10 44C10 44 13 41 15 37C17 33 18 29 18 29C18 29 23 30 27 28C31 26 36 20 40 14C44 8 40 8 40 8Z" fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M27 28L15 37" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 };
 
 /* ==========================================================================
@@ -56,7 +56,7 @@ export function buildTraceShell(state) {
     <div class="trace-shell">
       <header class="trace-header">
         <div class="trace-header-spacer trace-header-left">
-          <button class="trace-icon-btn trace-generate-btn" id="trace-schedule-generate-btn" aria-label="生成日程" style="position: relative; z-index: 100;">
+          <button class="trace-icon-btn trace-generate-btn" id="trace-schedule-generate-btn" aria-label="生成日程">
             ${ICONS.pen}
           </button>
         </div>
@@ -126,9 +126,9 @@ function escapeHtml(text) {
 /* ==========================================================================
    [区域标注·本次需求·模块调度与事件绑定]
    ========================================================================== */
-export function renderTraceGrid(container, state) {
+export function renderTraceGrid(container, state, context) {
   // 首次渲染默认展示日程模块
-  switchTab(container, state, 'schedule', null);
+  switchTab(container, state, 'schedule', context);
 }
 
 export function bindTraceEvents(container, state, context) {
@@ -249,7 +249,7 @@ function switchTab(container, state, tabName, context) {
   // 根据 tab 渲染对应模块
   if (tabName === 'schedule') {
     renderSchedule(body, state);
-    // 这里把 container（即 trace-shell）也传给 schedule，因为按钮现在在头部
+    // 把最外层 container 传进去绑定事件，否则无法绑定顶部羽毛笔按钮
     if (context) bindScheduleEvents(container, body, state, context);
   } else if (tabName === 'assets') {
     renderAssets(body, state);
