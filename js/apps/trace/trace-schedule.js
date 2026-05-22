@@ -308,7 +308,7 @@ ${mapPointsText}
 6. 严格返回纯 JSON 数组，禁止任何 Markdown 标记、代码块标记（如 \`\`\`json）或任何多余的解释性文本。`;
 
       // 6. 调用 API
-      const settingsRecord = await context.db.get('settings', 'settings');
+      const settingsRecord = await context.db.get('settings', 'global-settings');
       const settingsStore = settingsRecord || {};
       const apiSettings = settingsStore.api || {};
       // 优先副 API，回退主 API
