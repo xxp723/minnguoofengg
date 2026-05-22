@@ -1,0 +1,62 @@
+/*
+ * 文件名: js/apps/trace/trace.css
+ * 用途: 轨迹应用样式表。
+ *       目前只提供基础骨架样式，保持与系统主题 UI 风格的统一，防止页面闪屏。
+ */
+
+.trace-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--ui-bg, #f5f1ea);
+  color: var(--ui-text, #4A342A);
+  overflow: hidden;
+}
+
+.trace-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 16px;
+  background: var(--ui-bg, #f5f1ea);
+  border-bottom: 1px solid rgba(74, 52, 42, 0.08);
+}
+
+.trace-header__title {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.trace-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trace-body {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 16px;
+  /* 隐藏滚动条 */
+  scrollbar-width: none;
+}
+
+.trace-body::-webkit-scrollbar {
+  display: none;
+}
+
+.trace-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--ui-text-muted, rgba(74, 52, 42, 0.5));
+  font-size: 14px;
+  text-align: center;
+  padding: 32px;
+}

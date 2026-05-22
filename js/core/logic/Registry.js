@@ -44,7 +44,10 @@ const ICONPARK_ICONS = {
   textgame: '<svg width="28" height="28" viewBox="0 0 48 48" fill="none"><rect x="8" y="4" width="32" height="40" rx="2" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><line x1="16" y1="14" x2="32" y2="14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="16" y1="22" x2="32" y2="22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="16" y1="30" x2="26" y2="30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
 
   /* 游戏 - GameHandle (游戏手柄) */
-  game: '<svg width="28" height="28" viewBox="0 0 48 48" fill="none"><rect x="4" y="14" width="40" height="22" rx="8" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="16" cy="25" r="3" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="25" r="3" stroke="currentColor" stroke-width="3"/><line x1="23" y1="21" x2="25" y2="21" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="23" y1="29" x2="25" y2="29" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>'
+  game: '<svg width="28" height="28" viewBox="0 0 48 48" fill="none"><rect x="4" y="14" width="40" height="22" rx="8" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="16" cy="25" r="3" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="25" r="3" stroke="currentColor" stroke-width="3"/><line x1="23" y1="21" x2="25" y2="21" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="23" y1="29" x2="25" y2="29" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
+
+  /* [区域标注·本次需求·轨迹应用注册] 轨迹 - Route (路线/轨迹) */
+  trace: '<svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 40C10 40 19.5 35 24 28C28.5 21 21 16 21 16" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="40" r="4" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="21" cy="16" r="4" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="38" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="3"/><path d="M21 16C21 16 26 8 38 8" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 };
 
 export class Registry {
@@ -66,7 +69,9 @@ export class Registry {
       { id: 'reader', name: '观书', icon: ICONPARK_ICONS.reader, entry: '../../apps/reader/index.js' },
       { id: 'doujin', name: '戏笔', icon: ICONPARK_ICONS.doujin, entry: '../../apps/doujin/index.js' },
       { id: 'textgame', name: '梦笺', icon: ICONPARK_ICONS.textgame, entry: '../../apps/textgame/index.js' },
-      { id: 'game', name: '游戏', icon: ICONPARK_ICONS.game, entry: '../../apps/game/index.js' }
+      { id: 'game', name: '游戏', icon: ICONPARK_ICONS.game, entry: '../../apps/game/index.js' },
+      /* [区域标注·本次需求·轨迹应用注册] 注册轨迹入口 */
+      { id: 'trace', name: '轨迹', icon: ICONPARK_ICONS.trace, entry: '../../apps/trace/index.js' }
     ];
 
     defaultApps.forEach((app) => this.register(app));

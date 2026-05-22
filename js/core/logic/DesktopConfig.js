@@ -41,7 +41,8 @@ export class DesktopConfig {
         },
         {
           id: 'page-2',
-          appIds: ['doujin', 'textgame', 'game']
+          /* [区域标注·本次需求·默认配置增加轨迹应用] */
+          appIds: ['doujin', 'textgame', 'game', 'trace']
         }
       ],
       widgets: []
