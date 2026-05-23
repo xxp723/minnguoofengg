@@ -96,8 +96,17 @@ export function renderSchedule(container, state) {
   const now = new Date();
   const currentHourStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
 
+  // 判断当前选中的日期是否是今天
+  const todayStr = now.toISOString().split('T')[0];
+  const targetDateStr = state.selectedDate || todayStr;
+  const isToday = targetDateStr === todayStr;
+  const isPastDay = targetDateStr < todayStr;
+
   // 计算状态
   const getStatus = (timeStr) => {
+    if (isPastDay) return 'past';
+    if (!isToday && targetDateStr > todayStr) return 'future';
+
     const toMinutes = (t) => {
       if (t === '00:00' || t === '24:00') return 24 * 60; // 跨天午夜作为 1440
       const [h, m] = t.split(':').map(Number);
@@ -119,20 +128,40 @@ export function renderSchedule(container, state) {
   if (schedules.length === 0) {
     listHtml = `
       <div class="trace-empty">
-        <p>暂无今日日程</p>
+        <p>暂无${isToday ? '今日' : '该日'}日程</p>
         <p class="trace-empty-sub">点击左上角羽毛笔生成</p>
       </div>
     `;
   } else {
-    listHtml = `<div class="trace-list">` + schedules.map(s => {
+    // 采用时间轴 + 色块布局
+    listHtml = `<div class="trace-timeline-list">` + schedules.map((s, index) => {
       const status = getStatus(s.time);
+      const isPast = status === 'past';
+      const timeParts = s.time.split('-');
+      const startTime = timeParts[0] ? timeParts[0].trim() : '';
+      
+      // 添加索引 data-index 方便后续内联编辑保存
       return `
-      <div class="trace-card trace-schedule-card trace-status-${status}">
-        <div class="trace-schedule-time">${escapeHtml(s.time)}</div>
-        <div class="trace-schedule-body">
-          <div class="trace-schedule-location">📍 ${escapeHtml(s.location)}</div>
-          <div class="trace-card-title">${escapeHtml(s.title || '活动')}</div>
-          <div class="trace-card-desc">${escapeHtml(s.detail || '')}</div>
+      <div class="trace-timeline-item trace-status-${status}" data-index="${index}">
+        <div class="trace-timeline-time-col">
+          <div class="trace-timeline-time">${escapeHtml(startTime)}</div>
+        </div>
+        <div class="trace-timeline-line">
+          <div class="trace-timeline-dot"></div>
+        </div>
+        <div class="trace-timeline-content">
+          <div class="trace-card trace-schedule-card">
+            <div class="trace-schedule-body">
+              <div class="trace-schedule-location">📍 <span class="editable-text" data-field="location">${escapeHtml(s.location)}</span></div>
+              <div class="trace-card-title ${isPast ? 'is-completed' : ''}">
+                <span class="editable-text" data-field="title">${escapeHtml(s.title || '活动')}</span>
+              </div>
+              <div class="trace-card-desc ${isPast ? 'is-completed' : ''}">
+                <span class="editable-text" data-field="detail">${escapeHtml(s.detail || '')}</span>
+                <span class="trace-schedule-duration">${escapeHtml(s.time)}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     `}).join('') + `</div>`;
@@ -211,6 +240,50 @@ export function bindScheduleEvents(shellContainer, container, state, context) {
   cancelBtn?.addEventListener('click', closeMapModal);
   mapModal?.addEventListener('click', (e) => {
     if (e.target === mapModal) closeMapModal();
+  });
+
+  // 添加内联编辑事件委托
+  container.addEventListener('click', (e) => {
+    const editableSpan = e.target.closest('.editable-text');
+    if (!editableSpan || editableSpan.querySelector('input, textarea')) return;
+
+    const field = editableSpan.dataset.field;
+    const itemEl = editableSpan.closest('.trace-timeline-item');
+    if (!itemEl) return;
+    const index = parseInt(itemEl.dataset.index, 10);
+    const schedule = state.schedules[index];
+    if (!schedule) return;
+
+    const originalText = schedule[field] || '';
+
+    // 创建输入框
+    const isTextarea = field === 'detail';
+    const inputEl = document.createElement(isTextarea ? 'textarea' : 'input');
+    if (!isTextarea) inputEl.type = 'text';
+    inputEl.value = originalText;
+    inputEl.className = isTextarea ? 'trace-inline-textarea' : 'trace-inline-input';
+    
+    editableSpan.innerHTML = '';
+    editableSpan.appendChild(inputEl);
+    inputEl.focus();
+
+    // 失去焦点或回车保存
+    const saveChanges = async () => {
+      const newText = inputEl.value.trim();
+      if (newText !== originalText) {
+        schedule[field] = newText;
+        // 保存到数据库
+        await persistTraceData(context.db, state, state.activeMaskId, state.activeContactId);
+      }
+      editableSpan.innerHTML = escapeHtml(schedule[field] || '');
+    };
+
+    inputEl.addEventListener('blur', saveChanges);
+    if (!isTextarea) {
+      inputEl.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') saveChanges();
+      });
+    }
   });
 
   confirmBtn?.addEventListener('click', async () => {
@@ -324,7 +397,7 @@ ${mapPointsText}
   - time: 时间段（必须严格遵守格式，如 "08:00 - 10:00"）
   - location: 所在地点（必须是【已有地点】之一）
   - title: 正在做的事（小标题，不超过10字）
-  - detail: 正在做的事（正文描述，详细版，50字以内）
+  - detail: 正在做的事（正文描述，详细版，80字以内）
 5. 禁止生成违背人设（OOC）的行为！
 6. 严格返回纯 JSON 数组，禁止任何 Markdown 标记、代码块标记（如 \`\`\`json）或任何多余的解释性文本。`;
 
