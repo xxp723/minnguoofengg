@@ -124,8 +124,11 @@ export function renderSchedule(container, state) {
     return 'future';
   };
 
+  // 按天过滤数据
+  const dailySchedules = schedules.filter(s => (s.date === targetDateStr) || (!s.date && isToday)); // 兼容旧数据，如果没有 date 字段认为是今天生成的
+
   let listHtml = '';
-  if (schedules.length === 0) {
+  if (dailySchedules.length === 0) {
     listHtml = `
       <div class="trace-empty">
         <p>暂无${isToday ? '今日' : '该日'}日程</p>
@@ -134,15 +137,17 @@ export function renderSchedule(container, state) {
     `;
   } else {
     // 采用时间轴 + 色块布局
-    listHtml = `<div class="trace-timeline-list">` + schedules.map((s, index) => {
+    listHtml = `<div class="trace-timeline-list">` + dailySchedules.map((s, index) => {
       const status = getStatus(s.time);
       const isPast = status === 'past';
       const timeParts = s.time.split('-');
       const startTime = timeParts[0] ? timeParts[0].trim() : '';
       
-      // 添加索引 data-index 方便后续内联编辑保存
+      // 查找该项在全局数组中的原始索引以绑定编辑事件
+      const originalIndex = schedules.findIndex(orig => orig === s);
+      
       return `
-      <div class="trace-timeline-item trace-status-${status}" data-index="${index}">
+      <div class="trace-timeline-item trace-status-${status}" data-index="${originalIndex}">
         <div class="trace-timeline-time-col">
           <div class="trace-timeline-time">${escapeHtml(startTime)}</div>
         </div>
@@ -152,11 +157,13 @@ export function renderSchedule(container, state) {
         <div class="trace-timeline-content">
           <div class="trace-card trace-schedule-card">
             <div class="trace-schedule-body">
-              <div class="trace-schedule-location">📍 <span class="editable-text" data-field="location">${escapeHtml(s.location)}</span></div>
-              <div class="trace-card-title ${isPast ? 'is-completed' : ''}">
-                <span class="editable-text" data-field="title">${escapeHtml(s.title || '活动')}</span>
+              <div class="trace-schedule-header">
+                <div class="trace-card-title ${isPast ? 'is-completed' : ''}">
+                  <span class="editable-text" data-field="title">${escapeHtml(s.title || '活动')}</span>
+                </div>
+                <div class="trace-schedule-location">📍 <span class="editable-text" data-field="location">${escapeHtml(s.location)}</span></div>
               </div>
-              <div class="trace-card-desc ${isPast ? 'is-completed' : ''}">
+              <div class="trace-card-desc">
                 <span class="editable-text" data-field="detail">${escapeHtml(s.detail || '')}</span>
                 <span class="trace-schedule-duration">${escapeHtml(s.time)}</span>
               </div>
@@ -413,15 +420,22 @@ ${mapPointsText}
       }
 
       const rawAiText = await requestScheduleFromSecondaryApi(targetApi, [{ role: 'system', content: systemPrompt }]);
-      const parsedSchedules = extractJsonArrayFromAiText(rawAiText);
+      let parsedSchedules = extractJsonArrayFromAiText(rawAiText);
 
       if (!Array.isArray(parsedSchedules) || parsedSchedules.length === 0) {
         throw new Error('AI 返回的数据无效。');
       }
 
+      // 为生成的日程打上日期标签
+      const targetDateStr = state.selectedDate || new Date().toISOString().split('T')[0];
+      parsedSchedules = parsedSchedules.map(s => ({ ...s, date: targetDateStr }));
+
+      // 合并到全局日程列表中 (覆盖当天的)
+      const otherSchedules = (state.schedules || []).filter(s => s.date !== targetDateStr);
+      state.schedules = [...otherSchedules, ...parsedSchedules];
+
       // 保存绑定关系和日程数据
       state.boundMapId = selectedMapId;
-      state.schedules = parsedSchedules;
 
       await persistTraceData(context.db, state, state.activeMaskId, state.activeContactId);
       
