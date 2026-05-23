@@ -35,22 +35,21 @@
 }
 
 /* ==========================================================================
-   [区域标注·本次聊天背景透出：顶部栏更低磨砂更高透明玻璃]
+   [区域标注·本次修改] 聊天消息页顶部栏透明化
    说明：
    1. 仅作用于聊天消息页顶部栏 .msg-top-bar。
-   2. 按本次需求进一步降低磨砂度并加大透明度，让聊天背景图片细节能从顶栏透出。
-   3. 不修改消息气泡、设置卡片或其它无关区域；样式层不涉及任何持久化存储。
+   2. 完全透明，移除磨砂和边框阴影，直接透出聊天背景。
    ========================================================================== */
 .msg-top-bar {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.002);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  box-shadow: 0 8px 18px rgba(74, 52, 42, 0.01);
-  backdrop-filter: blur(1px) saturate(1.01);
-  -webkit-backdrop-filter: blur(1px) saturate(1.01);
+  background: transparent;
+  border-bottom: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   flex-shrink: 0;
   position: relative;
   z-index: 10;
@@ -451,10 +450,10 @@
 }
 
 .msg-conversation.has-chat-background .msg-top-bar {
-  background: rgba(255, 255, 255, 0.002);
-  border-bottom-color: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(1px) saturate(1.01);
-  -webkit-backdrop-filter: blur(1px) saturate(1.01);
+  background: transparent;
+  border-bottom: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .msg-list-area.has-chat-background {
@@ -900,11 +899,10 @@
 }
 
 /* ==========================================================================
-   [区域标注·已完成·本次转账显示优化] 转账消息气泡样式
+   [区域标注·本次修改] 转账消息气泡样式 - 黑金高定VIP卡片风格
    说明：
-   1. 仅作用于聊天消息页 type:transfer 消息气泡。
-   2. 已去除“待处理/已接收/已退回”文字状态，改用气泡颜色变化与 IconPark 对钩表现已接收。
-   3. 这里只处理展示样式，不涉及 localStorage/sessionStorage，持久化统一走 DB.js / IndexedDB。
+   1. 改为高级感黑金配色，使用深色背景+金色文字和边框。
+   2. UI 结构更现代极简，去除过多的彩色。
    ========================================================================== */
 .msg-bubble--transfer {
   padding: 0;
@@ -913,54 +911,68 @@
 }
 
 .msg-transfer-bubble {
-  width: min(228px, 60vw);
+  width: min(238px, 65vw);
   max-width: 100%;
-  padding: 14px;
+  padding: 16px 14px;
   box-sizing: border-box;
-  border-radius: 18px;
+  border-radius: 16px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   position: relative;
-  background: linear-gradient(135deg, rgba(255, 252, 247, 0.98), rgba(245, 236, 227, 0.94));
-  border: 1px solid rgba(74, 52, 42, 0.08);
-  box-shadow: 0 8px 18px rgba(74, 52, 42, 0.08);
+  background: linear-gradient(135deg, #2b2b2b 0%, #1a1a1a 100%);
+  border: 1px solid rgba(223, 190, 143, 0.3);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .msg-bubble--user .msg-transfer-bubble {
-  background: linear-gradient(135deg, rgba(241, 228, 208, 0.96), rgba(230, 211, 184, 0.92));
+  background: linear-gradient(135deg, #222222 0%, #111111 100%);
+  border: 1px solid rgba(223, 190, 143, 0.4);
 }
 
 .msg-transfer-bubble--accepted {
-  background: linear-gradient(135deg, rgba(235, 246, 235, 0.98), rgba(213, 232, 214, 0.94));
-  border-color: rgba(89, 139, 91, 0.22);
+  background: linear-gradient(135deg, #1e2a22 0%, #111a14 100%);
+  border-color: rgba(168, 201, 156, 0.4);
 }
 
 .msg-bubble--user .msg-transfer-bubble--accepted {
-  background: linear-gradient(135deg, rgba(225, 238, 218, 0.98), rgba(203, 224, 196, 0.94));
+  background: linear-gradient(135deg, #18231c 0%, #0d1510 100%);
 }
 
 .msg-transfer-bubble--returned {
-  background: linear-gradient(135deg, rgba(244, 238, 233, 0.9), rgba(232, 222, 213, 0.84));
-  border-color: rgba(74, 52, 42, 0.08);
-  opacity: 0.72;
+  background: linear-gradient(135deg, #333 0%, #222 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+  opacity: 0.8;
 }
 
 .msg-transfer-bubble__icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 14px;
-  background: rgba(74, 52, 42, 0.08);
-  color: #4A342A;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(223, 190, 143, 0.15), rgba(223, 190, 143, 0.05));
+  border: 1px solid rgba(223, 190, 143, 0.2);
+  color: #dfbe8f;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
+.msg-transfer-bubble--accepted .msg-transfer-bubble__icon {
+  color: #a8c99c;
+  background: rgba(168, 201, 156, 0.1);
+  border-color: rgba(168, 201, 156, 0.2);
+}
+
+.msg-transfer-bubble--returned .msg-transfer-bubble__icon {
+  color: #999;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
 .msg-transfer-bubble__icon svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 }
 
 .msg-transfer-bubble__content {
@@ -968,57 +980,69 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .msg-transfer-bubble__label {
   font-size: 11px;
-  font-weight: 700;
-  color: rgba(74, 52, 42, 0.56);
-  letter-spacing: 0.02em;
+  font-weight: 500;
+  color: rgba(223, 190, 143, 0.6);
+  letter-spacing: 0.5px;
 }
 
 .msg-transfer-bubble__amount {
-  font-size: 18px;
-  line-height: 1.2;
-  font-weight: 800;
-  color: #4A342A;
+  font-size: 19px;
+  line-height: 1.15;
+  font-weight: 600;
+  color: #dfbe8f;
   word-break: break-word;
+}
+
+.msg-transfer-bubble--accepted .msg-transfer-bubble__amount,
+.msg-transfer-bubble--accepted .msg-transfer-bubble__label {
+  color: #a8c99c;
+}
+
+.msg-transfer-bubble--returned .msg-transfer-bubble__amount,
+.msg-transfer-bubble--returned .msg-transfer-bubble__label {
+  color: #999;
 }
 
 .msg-transfer-bubble__note {
-  font-size: 12px;
-  line-height: 1.45;
-  color: rgba(74, 52, 42, 0.76);
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.5);
   word-break: break-word;
+  margin-top: 2px;
 }
 
 .msg-transfer-bubble__note--empty {
-  color: rgba(74, 52, 42, 0.38);
+  color: rgba(255, 255, 255, 0.25);
 }
 
 .msg-transfer-bubble__check {
   position: absolute;
-  right: 10px;
-  bottom: 8px;
+  right: 12px;
+  bottom: 12px;
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: rgba(47, 106, 58, 0.16);
-  color: #2f6a3a;
+  background: rgba(168, 201, 156, 0.15);
+  border: 1px solid rgba(168, 201, 156, 0.3);
+  color: #a8c99c;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
 .msg-bubble-row--right .msg-transfer-bubble__check {
-  left: 10px;
+  left: 12px;
   right: auto;
 }
 
 .msg-transfer-bubble__check svg {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
 }
 
 /* ==========================================================================

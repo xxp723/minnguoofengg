@@ -615,8 +615,8 @@ export function renderInnerVoicePanel(innerVoice, activeTab = 'voice', options =
       <div class="iv-panel-header">
         <div class="iv-tabs">
           <div class="iv-tabs__track">
-            <button class="iv-tab ${isVoiceTab ? 'is-active' : ''}" data-action="iv-switch-tab" data-iv-tab="voice" type="button">${IV_ICONS.heart}Voice</button>
-            <button class="iv-tab ${isDataTab ? 'is-active' : ''}" data-action="iv-switch-tab" data-iv-tab="data" type="button">${IV_ICONS.chart}Now</button>
+            <button class="iv-tab ${isVoiceTab ? 'is-active' : ''}" data-action="iv-switch-tab" data-iv-tab="voice" type="button">Voice</button>
+            <button class="iv-tab ${isDataTab ? 'is-active' : ''}" data-action="iv-switch-tab" data-iv-tab="data" type="button">Now</button>
           </div>
         </div>
       </div>
@@ -708,8 +708,8 @@ function renderEmptyInnerVoicePanel() {
       <div class="iv-panel-header">
         <div class="iv-tabs">
           <div class="iv-tabs__track">
-            <button class="iv-tab is-active" data-action="iv-switch-tab" data-iv-tab="voice" type="button">${IV_ICONS.heart}Voice</button>
-            <button class="iv-tab" data-action="iv-switch-tab" data-iv-tab="data" type="button">${IV_ICONS.chart}Now</button>
+            <button class="iv-tab is-active" data-action="iv-switch-tab" data-iv-tab="voice" type="button">Voice</button>
+            <button class="iv-tab" data-action="iv-switch-tab" data-iv-tab="data" type="button">Now</button>
           </div>
         </div>
       </div>
@@ -753,8 +753,8 @@ function renderInnerVoiceHistoryPanel(history = [], options = {}) {
       <div class="iv-panel-header">
         <div class="iv-tabs">
           <div class="iv-tabs__track">
-            <button class="iv-tab is-active" data-action="iv-show-current" type="button">${IV_ICONS.heart}Voice</button>
-            <button class="iv-tab" data-action="iv-show-current" type="button">${IV_ICONS.chart}Now</button>
+            <button class="iv-tab is-active" data-action="iv-show-current" type="button">Voice</button>
+            <button class="iv-tab" data-action="iv-show-current" type="button">Now</button>
           </div>
         </div>
       </div>

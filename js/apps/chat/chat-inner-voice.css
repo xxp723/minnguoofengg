@@ -35,30 +35,27 @@
   visibility: visible;
 }
 
-/* ===== [已修改·面板主容器] 游戏机风格主面板 - 统一 root 变量 ===== */
+/* ===== [已修改·本次修改] 面板主容器 - 日记便签杂志风 ===== */
 .iv-panel {
   position: fixed;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%) scale(0.92);
   z-index: 8001;
-  width: min(82vw, 320px);
-  max-height: min(78vh, 560px);
-  background: var(--c-white-rice);
-  border: 2px solid var(--c-border);
-  border-radius: 18px;
-  box-shadow:
-    0 20px 48px rgba(74, 52, 42, 0.18),
-    0 2px 8px rgba(74, 52, 42, 0.06),
-    inset 0 1px 0 rgba(255,255,255,0.6);
+  width: min(85vw, 340px);
+  max-height: min(82vh, 600px);
+  background: #fdfbf7;
+  border: 1px solid rgba(74, 52, 42, 0.15);
+  border-radius: 8px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.04);
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.26s ease, transform 0.26s ease, visibility 0.26s ease;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  font-family: var(--font-retro);
-  color: var(--c-text-main);
+  font-family: "Georgia", "PingFang SC", serif;
+  color: #332b26;
 }
 .iv-panel.is-open {
   opacity: 1;
@@ -66,16 +63,17 @@
   transform: translate(-50%, -50%) scale(1);
 }
 
-/* ===== [已完成·面板顶部栏] 仅保留两个花体标签，工具图标统一下移到同一行 ===== */
+/* ===== [已完成·本次修改] 面板顶部栏 - 网页标签样式 ===== */
 .iv-panel-header {
   display: flex;
-  align-items: center;
-  padding: 12px 12px 0 12px;
-  gap: 8px;
+  align-items: flex-end;
+  padding: 0 12px;
+  background: rgba(74, 52, 42, 0.02);
+  border-bottom: 1px solid rgba(74, 52, 42, 0.12);
   flex-shrink: 0;
+  padding-top: 12px;
 }
 
-/* ===== [已修改·游戏机风格标签栏] 圆角凸起按钮分段控件 ===== */
 .iv-tabs {
   flex: 1;
   min-width: 0;
@@ -84,12 +82,7 @@
 .iv-tabs__track {
   display: flex;
   width: 100%;
-  background: var(--c-milktea-trans);
-  border-radius: 14px;
-  padding: 3px;
-  position: relative;
-  border: 1.5px solid var(--c-gray-light);
-  box-shadow: inset 0 2px 4px rgba(74, 52, 42, 0.06);
+  gap: 4px;
 }
 
 .iv-tab {
@@ -102,19 +95,19 @@
   padding: 10px 0;
   text-align: center;
   font-family: 'Dancing Script', cursive;
-  font-size: 21px;
+  font-size: 20px;
   font-weight: 700;
-  letter-spacing: 0.8px;
-  color: var(--c-text-main);
-  opacity: 0.48;
-  border: none;
+  color: rgba(74, 52, 42, 0.4);
+  border: 1px solid transparent;
+  border-bottom: none;
   background: transparent;
-  border-radius: 11px;
+  border-radius: 8px 8px 0 0;
   cursor: pointer;
   position: relative;
-  transition: opacity 0.22s ease, background 0.22s ease, box-shadow 0.22s ease, transform 0.15s ease;
+  transition: all 0.2s ease;
   -webkit-tap-highlight-color: transparent;
   z-index: 1;
+  margin-bottom: -1px;
 }
 
 .iv-tab svg {
@@ -124,63 +117,50 @@
 }
 
 .iv-tab.is-active {
-  opacity: 1;
-  background: var(--c-white-rice);
-  box-shadow:
-    0 3px 10px rgba(74, 52, 42, 0.13),
-    0 1px 3px rgba(74, 52, 42, 0.08),
-    inset 0 1px 0 rgba(255,255,255,0.8);
-  transform: translateY(-1px);
-  border: 1px solid var(--c-gray-light);
+  color: #332b26;
+  background: #fdfbf7;
+  border-color: rgba(74, 52, 42, 0.12);
+  z-index: 2;
 }
 
 .iv-tab:not(.is-active):active {
-  transform: translateY(1px);
-  opacity: 0.6;
-}
-
-/* 移除旧的下划线样式 */
-.iv-tab.is-active::after {
-  display: none;
+  background: rgba(74, 52, 42, 0.05);
 }
 
 /* ===== [已完成·同排纯图标工具栏] 历史/多选/全选/删除/下载按钮区域 ===== */
 .iv-toolbar {
   display: flex;
   align-items: center;
-  padding: 7px 14px 3px;
-  gap: 7px;
+  padding: 12px 16px 4px;
+  gap: 12px;
   flex-shrink: 0;
 }
 
 .iv-toolbar-btn {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0;
   padding: 0;
   font-size: 0;
-  font-weight: 600;
-  color: var(--c-text-main);
-  opacity: 0.65;
-  background: var(--c-milktea-trans);
-  border: 1px solid var(--c-gray-light);
-  border-radius: 10px;
+  color: rgba(74, 52, 42, 0.6);
+  background: transparent;
+  border: none;
+  border-radius: 50%;
   cursor: pointer;
-  transition: opacity 0.2s, background 0.2s, transform 0.15s;
+  transition: all 0.2s;
   -webkit-tap-highlight-color: transparent;
 }
 .iv-toolbar-btn:active {
-  opacity: 1;
-  background: var(--c-milktea);
-  transform: translateY(1px);
+  color: rgba(74, 52, 42, 0.9);
+  background: rgba(74, 52, 42, 0.05);
+  transform: scale(0.92);
 }
 .iv-toolbar-btn.is-active {
-  opacity: 1;
-  background: var(--c-milktea);
-  border-color: var(--c-border);
+  color: rgba(74, 52, 42, 0.9);
+  background: rgba(74, 52, 42, 0.08);
 }
 .iv-toolbar-btn svg {
   width: 16px;
@@ -202,18 +182,16 @@
   flex: 1;
 }
 
-/* ===== [已完成·心声面板日期时间] 当前心声面板日期时间显示 ===== */
+/* ===== [已完成·本次修改] 当前心声面板日期时间显示 - 杂志印记风 ===== */
 .iv-panel-time {
-  margin: 3px 16px 2px;
-  padding: 5px 10px;
-  border: 1px solid var(--c-gray-light);
-  border-radius: 999px;
-  background: var(--c-milktea-trans);
-  color: var(--c-border);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  text-align: center;
+  margin: 4px 16px 8px;
+  font-family: "Georgia", serif;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: rgba(74, 52, 42, 0.45);
+  text-align: right;
+  border-bottom: 1px solid rgba(74, 52, 42, 0.06);
+  padding-bottom: 8px;
   flex-shrink: 0;
 }
 
@@ -227,135 +205,110 @@
 }
 .iv-tab-page {
   display: none;
-  padding: 14px 16px 18px;
+  padding: 10px 20px 24px;
 }
 .iv-tab-page.is-active {
   display: block;
 }
 
-/* ===== [已修改·漫画分镜格子] 统一 root 变量 ===== */
+/* ===== [已修改·本次修改] 杂志风分栏排版 ===== */
 .iv-cell {
-  border: 1px solid var(--c-gray-light);
-  border-radius: 14px;
-  padding: 12px 14px;
-  margin-bottom: 10px;
-  background: rgba(255, 255, 255, 0.72);
+  border: none;
+  border-top: 1px solid rgba(74, 52, 42, 0.1);
+  border-radius: 0;
+  padding: 18px 0;
+  margin-bottom: 0;
+  background: transparent;
   position: relative;
-  min-width: 0;
-  max-width: 100%;
   box-sizing: border-box;
 }
+
 .iv-cell__label {
-  position: absolute;
-  top: -9px;
-  left: 12px;
-  max-width: calc(100% - 24px);
-  background: var(--c-white-rice);
-  padding: 0 7px;
+  position: static;
+  background: transparent;
+  padding: 0;
+  font-family: "Georgia", serif;
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
-  color: var(--c-border);
+  font-weight: 400;
+  letter-spacing: 1.5px;
+  color: rgba(74, 52, 42, 0.45);
   text-transform: uppercase;
-  opacity: 0.62;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  box-sizing: border-box;
+  margin-bottom: 10px;
+  display: block;
 }
+
 .iv-cell__text {
   min-width: 0;
   max-width: 100%;
-  font-size: 13.5px;
-  line-height: 1.65;
-  color: var(--c-text-main);
+  font-size: 14.5px;
+  line-height: 1.75;
+  color: #332b26;
+  font-weight: 300;
   word-break: break-word;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
-/* ===== [已完成·本次修正：Voice页心声与性幻想格子] 渐变背景；FANTASY 标题与间距已对齐 INNER VOICE 的英文标题节奏 ===== */
+/* ===== Voice页心声与性幻想 ===== */
 .iv-voice-cell {
-  border-color: var(--c-milktea);
-  background: linear-gradient(135deg, rgba(255, 253, 248, 0.9) 0%, var(--c-milktea-trans) 100%);
-  min-height: 90px;
-}
-.iv-voice-cell .iv-cell__label {
-  font-size: 11px;
-  color: var(--c-border);
-  letter-spacing: 1.5px;
-  opacity: 0.72;
+  border-top: none; /* 第一个无顶线 */
+  padding-top: 4px;
 }
 .iv-voice-cell .iv-cell__text {
-  font-size: 14px;
-  line-height: 1.72;
-  color: var(--c-text-main);
+  font-family: "Georgia", serif;
   font-style: italic;
+  font-size: 15.5px;
+  color: #2b231f;
+  line-height: 1.8;
 }
 
 .iv-fantasy-cell {
-  border-color: var(--c-milktea);
-  background: linear-gradient(135deg, var(--c-milktea-trans) 0%, rgba(255, 255, 255, 0.76) 100%);
-  min-height: 74px;
-  margin-top: 14px;
-}
-.iv-fantasy-cell .iv-cell__label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  color: var(--c-border);
-  text-transform: uppercase;
-  opacity: 0.72;
+  padding-bottom: 8px;
 }
 .iv-fantasy-cell .iv-cell__text {
-  font-size: 13.5px;
-  line-height: 1.68;
+  font-family: "Georgia", serif;
   font-style: italic;
+  font-size: 14px;
+  color: #4a3e36;
 }
 
-/* ===== [已修改·数据页两列分镜] ===== */
+/* ===== 数据页布局 ===== */
 .iv-grid-row {
   display: flex;
-  gap: 10px;
+  gap: 24px;
   margin-bottom: 0;
   flex-wrap: wrap;
 }
 .iv-grid-row > .iv-cell {
-  flex: 1 1 120px;
+  flex: 1 1 100px;
   min-width: 0;
+  border-top: none; /* 去除列上的顶线 */
+  padding-top: 4px;
 }
 
-/* ===== [已完成·本次修正：Now页动作格子间距] ACTION 标题与板块距离已对齐 MOOD 的舒展节奏 ===== */
 .iv-action-cell {
-  min-height: 56px;
-  margin-top: 14px;
+  min-height: auto;
 }
 
-/* ===== [已完成·本次修正：Now页进度条板块间距] METERS 标题与板块距离已对齐 MOOD 的舒展节奏，统一 root 变量 ===== */
+/* ===== 进度条板块 ===== */
 .iv-meters {
-  border: 1px solid var(--c-gray-light);
-  border-radius: 14px;
-  padding: 14px 14px 8px;
-  margin-top: 14px;
-  margin-bottom: 10px;
-  background: rgba(255, 255, 255, 0.72);
+  border: none;
+  border-top: 1px solid rgba(74, 52, 42, 0.1);
+  padding: 20px 0 8px;
+  margin-top: 0;
+  background: transparent;
   position: relative;
 }
 .iv-meters .iv-cell__label {
-  position: absolute;
-  top: -9px;
-  left: 12px;
-  background: var(--c-white-rice);
-  padding: 0 7px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
-  color: var(--c-border);
-  opacity: 0.62;
+  position: static;
+  background: transparent;
+  padding: 0;
+  margin-bottom: 16px;
+  display: block;
 }
 
 .iv-meter {
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 .iv-meter:last-child {
   margin-bottom: 4px;
@@ -366,22 +319,23 @@
   align-items: baseline;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
 .iv-meter__name {
   min-width: 0;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--c-border);
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(74, 52, 42, 0.6);
   word-break: break-word;
   overflow-wrap: anywhere;
 }
 .iv-meter__value {
   min-width: 0;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--c-text-main);
-  letter-spacing: 0.3px;
+  font-family: "Georgia", serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: #332b26;
+  letter-spacing: 0.5px;
   word-break: break-word;
   overflow-wrap: anywhere;
   text-align: right;
@@ -389,15 +343,15 @@
 
 .iv-meter__bar {
   width: 100%;
-  height: 8px;
-  background: var(--c-milktea-trans);
-  border-radius: 4px;
+  height: 3px;
+  background: rgba(74, 52, 42, 0.06);
+  border-radius: 2px;
   overflow: hidden;
   position: relative;
 }
 .iv-meter__fill {
   height: 100%;
-  border-radius: 4px;
+  border-radius: 2px;
   transition: width 0.5s ease;
   min-width: 2px;
 }
@@ -419,14 +373,15 @@
   background: linear-gradient(90deg, #efb4c4 0%, #d66b8a 100%);
 }
 
-/* ===== [已修改·空状态] 统一 root 变量 ===== */
+/* ===== [已修改·空状态] ===== */
 .iv-empty {
   text-align: center;
-  padding: 32px 16px;
-  color: var(--c-border);
-  opacity: 0.62;
+  padding: 48px 16px;
+  color: rgba(74, 52, 42, 0.4);
+  font-family: "Georgia", serif;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.8;
+  font-style: italic;
 }
 .iv-empty__icon {
   display: block;
@@ -442,11 +397,11 @@
 
 /* ===== [已修改·滚动条美化] ===== */
 .iv-tab-body::-webkit-scrollbar {
-  width: 3px;
+  width: 4px;
 }
 .iv-tab-body::-webkit-scrollbar-thumb {
-  background: var(--c-milktea);
-  border-radius: 3px;
+  background: rgba(74, 52, 42, 0.15);
+  border-radius: 4px;
 }
 .iv-tab-body::-webkit-scrollbar-track {
   background: transparent;
@@ -460,45 +415,47 @@
 .iv-history-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  padding: 10px 14px;
+  padding: 14px;
   margin-bottom: 8px;
-  border: 1px solid var(--c-gray-light);
-  border-radius: 12px;
-  background: rgba(255,255,255,0.72);
-  transition: background 0.15s;
+  border: 1px solid rgba(74, 52, 42, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.4);
+  transition: background 0.2s, border-color 0.2s;
   position: relative;
   box-sizing: border-box;
 }
 
 .iv-history-item.is-selected {
-  background: var(--c-milktea-trans);
-  border-color: var(--c-milktea);
+  background: #fcf8f2;
+  border-color: rgba(74, 52, 42, 0.2);
 }
 
 .iv-history-checkbox {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--c-gray-light);
-  border-radius: 6px;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(74, 52, 42, 0.3);
+  border-radius: 4px;
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 3px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.15s, background 0.15s;
+  transition: all 0.2s;
   cursor: pointer;
+  background: transparent;
 }
 .iv-history-checkbox.is-checked {
-  border-color: var(--c-border);
-  background: var(--c-milktea);
+  border-color: rgba(74, 52, 42, 0.8);
+  background: rgba(74, 52, 42, 0.8);
 }
 .iv-history-checkbox svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   opacity: 0;
-  transition: opacity 0.15s;
+  color: #fff;
+  transition: opacity 0.2s;
 }
 .iv-history-checkbox.is-checked svg {
   opacity: 1;
@@ -510,22 +467,24 @@
 }
 
 .iv-history-voice {
-  font-size: 13px;
+  font-family: "Georgia", serif;
+  font-size: 14px;
   line-height: 1.6;
-  color: var(--c-text-main);
+  color: #332b26;
   font-style: italic;
   word-break: break-word;
   overflow-wrap: anywhere;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 
 .iv-history-meta {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
-  font-size: 10.5px;
-  color: var(--c-border);
-  opacity: 0.7;
+  font-family: "Georgia", serif;
+  font-size: 10px;
+  color: rgba(74, 52, 42, 0.5);
+  letter-spacing: 0.5px;
 }
 
 .iv-history-meta span {
@@ -554,11 +513,11 @@
 
 .iv-confirm-dialog {
   width: min(78vw, 280px);
-  background: var(--c-white-rice);
-  border: 1.5px solid var(--c-gray-light);
-  border-radius: 18px;
-  box-shadow: 0 16px 40px rgba(74,52,42,0.2);
-  padding: 22px 20px 16px;
+  background: #fdfbf7;
+  border: 1px solid rgba(74, 52, 42, 0.15);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.1);
+  padding: 24px 20px 20px;
   text-align: center;
   transform: scale(0.92);
   transition: transform 0.2s;
@@ -589,15 +548,15 @@
 .iv-confirm-btn {
   flex: 1;
   padding: 10px 0;
-  border: 1.5px solid var(--c-gray-light);
-  border-radius: 12px;
+  border: 1px solid rgba(74, 52, 42, 0.2);
+  border-radius: 8px;
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition: background 0.15s, opacity 0.15s;
   -webkit-tap-highlight-color: transparent;
-  background: var(--c-white-rice);
-  color: var(--c-text-main);
+  background: #fdfbf7;
+  color: #332b26;
 }
 .iv-confirm-btn:active {
   opacity: 0.7;
