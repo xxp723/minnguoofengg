@@ -91,8 +91,8 @@ function extractJsonArrayFromAiText(text) {
    [区域标注·本次需求·日程模块 UI 渲染]
    ========================================================================== */
 export function renderSchedule(container, state) {
-  // 从按日期存储的数组中取出当前日期的日程列表
-  const allSchedules = Array.isArray(state.schedules) ? state.schedules : [];
+  const schedules = Array.isArray(state.schedules) ? state.schedules : [];
+  
   const now = new Date();
   const currentHourStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
 
@@ -101,9 +101,6 @@ export function renderSchedule(container, state) {
   const targetDateStr = state.selectedDate || todayStr;
   const isToday = targetDateStr === todayStr;
   const isPastDay = targetDateStr < todayStr;
-
-  const dayScheduleData = allSchedules.find(item => item.date === targetDateStr);
-  const schedules = dayScheduleData && Array.isArray(dayScheduleData.list) ? dayScheduleData.list : [];
 
   // 计算状态
   const getStatus = (timeStr) => {
@@ -158,7 +155,9 @@ export function renderSchedule(container, state) {
               <div class="trace-card-title ${isPast ? 'is-completed' : ''}">
                 <span class="editable-text" data-field="title">${escapeHtml(s.title || '活动')}</span>
               </div>
-              <div class="trace-schedule-location">📍 <span class="editable-text" data-field="location">${escapeHtml(s.location)}</span></div>
+              <div class="trace-schedule-location">
+                📍 <span class="editable-text" data-field="location">${escapeHtml(s.location)}</span>
+              </div>
               <div class="trace-card-desc">
                 <span class="editable-text" data-field="detail">${escapeHtml(s.detail || '')}</span>
                 <span class="trace-schedule-duration">${escapeHtml(s.time)}</span>
@@ -184,13 +183,11 @@ export function renderSchedule(container, state) {
    ========================================================================== */
 export function bindScheduleEvents(shellContainer, container, state, context) {
   const generateBtn = shellContainer.querySelector('#trace-schedule-generate-btn');
-  // 注意：弹窗现在已被移到 shellContainer (即 trace-shell) 级别
-  const mapModal = shellContainer.querySelector('#trace-map-select-modal');
-  const cancelBtn = shellContainer.querySelector('#trace-map-select-cancel');
-  const confirmBtn = shellContainer.querySelector('#trace-map-select-confirm');
-  const mapListContainer = shellContainer.querySelector('#trace-map-list-container');
-  const hintEl = shellContainer.querySelector('#trace-map-select-hint');
-
+  const dropdownMask = shellContainer.querySelector('#trace-dropdown-mask');
+  const dropdownTitle = shellContainer.querySelector('#trace-dropdown-title');
+  const dropdownContent = shellContainer.querySelector('#trace-dropdown-content');
+  const dropdownFooter = shellContainer.querySelector('#trace-dropdown-footer');
+  
   let selectedMapId = state.boundMapId || null;
   let availableMaps = [];
 
@@ -200,7 +197,24 @@ export function bindScheduleEvents(shellContainer, container, state, context) {
       return;
     }
 
-    mapModal.classList.remove('is-hidden');
+    // 复用折叠菜单
+    dropdownTitle.textContent = '选择关联地图';
+    const tpl = shellContainer.querySelector('#tpl-map-list');
+    if (tpl) {
+      dropdownContent.innerHTML = tpl.innerHTML;
+    }
+    dropdownFooter.style.display = 'block';
+    
+    // 替换确认按钮防止事件重复绑定
+    const oldConfirmBtn = dropdownFooter.querySelector('#trace-dropdown-confirm');
+    const confirmBtn = oldConfirmBtn.cloneNode(true);
+    oldConfirmBtn.parentNode.replaceChild(confirmBtn, oldConfirmBtn);
+    confirmBtn.textContent = '确认生成';
+
+    dropdownMask.classList.remove('is-hidden');
+    
+    const mapListContainer = dropdownContent.querySelector('#trace-map-list-container');
+    const hintEl = dropdownContent.querySelector('#trace-map-select-hint');
     hintEl.textContent = '';
     
     // 加载地图列表
@@ -233,17 +247,163 @@ export function bindScheduleEvents(shellContainer, container, state, context) {
       console.error(e);
       mapListContainer.innerHTML = '<div style="text-align:center;color:#e74c3c;font-size:12px;padding:10px;">加载地图失败</div>';
     }
-  };
 
-  const closeMapModal = () => {
-    mapModal.classList.add('is-hidden');
+    confirmBtn.addEventListener('click', async () => {
+      if (!selectedMapId) {
+        hintEl.textContent = '请先选择一个关联地图';
+        return;
+      }
+
+      const selectedMap = availableMaps.find(m => m.id === selectedMapId);
+      if (!selectedMap) {
+        hintEl.textContent = '地图数据无效';
+        return;
+      }
+
+      if (!selectedMap.points || selectedMap.points.length === 0) {
+        hintEl.textContent = '该地图中还没有任何地点，无法生成日程，请先前往地图应用添加地点。';
+        return;
+      }
+
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = '生成中...';
+      hintEl.textContent = '';
+
+      try {
+        // 1. 收集联系人和面具档案
+        const archiveRecord = await context.db.get('appsData', 'archive::archive-data');
+        const archiveData = archiveRecord ? (archiveRecord.data || archiveRecord.value || {}) : {};
+        
+        const activeContact = state.contacts.find(c => c.id === state.activeContactId);
+        const activeMask = (state.masks || []).find(m => m.id === state.activeMaskId);
+        
+        const charSetting = archiveData.characters?.find(c => c.id === activeContact?.id) || {};
+        const charPrompt = `角色姓名：${activeContact?.name || '未知'}\n背景：${charSetting.background || ''}\n人设：${charSetting.prompt || ''}\n档案：${charSetting.profile || ''}`;
+        
+        const maskSetting = archiveData.masks?.find(m => m.id === state.activeMaskId) || {};
+        const maskPrompt = `用户面具：${activeMask?.name || '未知'}\n背景：${maskSetting.background || ''}\n人设：${maskSetting.prompt || ''}\n档案：${maskSetting.profile || ''}`;
+
+        // 2. 收集聊天记录（最近20轮对话，一轮=一组连续User消息+一组连续Assistant消息）
+        const chatKey = `chat_messages_${state.activeMaskId}_${state.activeContactId}`;
+        const chatRecord = await context.db.get('appsData', chatKey);
+        const chatRecordsRaw = chatRecord ? (chatRecord.data || chatRecord.value || []) : [];
+        
+        // 合并连续同角色消息为块(Block)
+        const blocks = [];
+        let currentBlock = [];
+        for (const msg of chatRecordsRaw) {
+          if (currentBlock.length === 0) {
+            currentBlock.push(msg);
+          } else {
+            if (currentBlock[0].role === msg.role) {
+              currentBlock.push(msg);
+            } else {
+              blocks.push(currentBlock);
+              currentBlock = [msg];
+            }
+          }
+        }
+        if (currentBlock.length > 0) blocks.push(currentBlock);
+        
+        // 取最后 40 个块（约等于 20 轮对话，每轮一来一回算 2 个块）
+        const recentBlocks = blocks.slice(-40);
+        const recentMessages = recentBlocks.flat();
+
+        const chatLines = recentMessages.map(msg => {
+          const role = msg.role === 'user' ? '用户' : activeContact?.name || '角色';
+          return `[${new Date(msg.timestamp).toLocaleString()}] ${role}: ${msg.content}`;
+        }).join('\n');
+
+        // 3. 收集世界书
+        const wbRecord = await context.db.get('appsData', 'worldbook::all-books');
+        const worldBooksRaw = wbRecord ? (wbRecord.data || wbRecord.value || []) : [];
+        const relatedBooks = worldBooksRaw.filter(b => b.enabled !== false && b.entries);
+        const bookText = relatedBooks.map(b => b.entries.filter(e => e.enabled !== false).map(e => `[${(e.keys || []).join(',')}] ${e.content}`).join('\n')).join('\n');
+
+        // 4. 提取地图地点
+        const mapPointsText = (selectedMap.points || []).map(p => `- ${p.name || '未命名地点'}: ${p.description || '无具体描述'}`).join('\n');
+
+        // 5. 组装 Prompt
+        const targetDate = new Date(state.selectedDate);
+        const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+        const currentDay = days[targetDate.getDay()];
+        const isWeekend = targetDate.getDay() === 0 || targetDate.getDay() === 6;
+        const dayTypeInfo = isWeekend 
+          ? '这一天是周末（请安排娱乐、放松、休闲为主的活动，不要安排上班或上学，除非人设强烈要求）。' 
+          : '这一天是工作日（周一至周五，请正常安排白天上班、上学或处理正事，晚上做休闲、放松的活动，不应出现白天在玩的情况，除非人设强烈要求）。';
+
+        const systemPrompt = `你现在扮演角色：${activeContact?.name || '未知'}。
+【世界书背景】：
+${bookText || '无特殊背景'}
+
+【你的档案设定】：
+${charPrompt}
+
+【当前用户面具（互动对象）】：
+${maskPrompt}
+
+【最近聊天参考】：
+${chatLines || '暂无近期聊天记录'}
+
+【活动地图与已有地点】：以下是你所在地图（${selectedMap.name}）的已有地点：
+${mapPointsText}
+
+【日期约束】：
+这天是${currentDay}。${dayTypeInfo}
+
+任务要求：
+1. 请根据上述背景为你自己生成这一天的日程表，必须在上述【已有地点】中选择活动场所，绝不允许虚构新地点！
+2. 严格遵守【日期约束】，符合生活常识。时间安排必须分清早中晚的合理作息，且要有一定的独立自主性，同时也要参考【最近聊天参考】中的对话或约定来安排合适的活动（体现活人感）。
+3. 日程表固定生成 8 个时间段，每 2 小时一个时段，从 08:00 开始到次日 00:00 结束（即 08:00 - 10:00, 10:00 - 12:00, 12:00 - 14:00, 14:00 - 16:00, 16:00 - 18:00, 18:00 - 20:00, 20:00 - 22:00, 22:00 - 00:00）。
+4. 严格输出为精简的 JSON 数组，包含以下字段：
+  - time: 时间段（必须严格遵守格式，如 "08:00 - 10:00"）
+  - location: 所在地点（必须是【已有地点】之一）
+  - title: 正在做的事（小标题，不超过10字）
+  - detail: 正在做的事（正文描述，详细版，80字以内）
+5. 禁止生成违背人设（OOC）的行为！
+6. 严格返回纯 JSON 数组，禁止任何 Markdown 标记、代码块标记（如 \`\`\`json）或任何多余的解释性文本。`;
+
+        // 6. 调用 API
+        const settingsRecord = await context.db.get('settings', 'global-settings');
+        const settingsStore = settingsRecord || {};
+        const apiSettings = settingsStore.api || {};
+        // 优先副 API，回退主 API
+        const targetApi = (apiSettings.secondary && apiSettings.secondary.apiKey) ? apiSettings.secondary : apiSettings.primary;
+
+        if (!targetApi || !targetApi.apiKey) {
+          throw new Error('请先在设置应用中配置主 API 或副 API。');
+        }
+
+        const rawAiText = await requestScheduleFromSecondaryApi(targetApi, [{ role: 'system', content: systemPrompt }]);
+        const parsedSchedules = extractJsonArrayFromAiText(rawAiText);
+
+        if (!Array.isArray(parsedSchedules) || parsedSchedules.length === 0) {
+          throw new Error('AI 返回的数据无效。');
+        }
+
+        // 保存绑定关系和日程数据
+        state.boundMapId = selectedMapId;
+        state.schedules = parsedSchedules;
+
+        await persistTraceData(context.db, state, state.activeMaskId, state.activeContactId, state.selectedDate);
+        
+        dropdownMask.classList.add('is-hidden');
+        renderSchedule(container, state);
+        // 注意重新绑定事件
+        bindScheduleEvents(shellContainer, container, state, context);
+
+      } catch (err) {
+        console.error(err);
+        showApiErrorModal(shellContainer, { title: '生成日程失败', message: err.message || '未知错误' });
+        hintEl.textContent = '生成失败，请重试。';
+      } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = '确认生成';
+      }
+    });
   };
 
   generateBtn?.addEventListener('click', openMapModal);
-  cancelBtn?.addEventListener('click', closeMapModal);
-  mapModal?.addEventListener('click', (e) => {
-    if (e.target === mapModal) closeMapModal();
-  });
 
   // 添加内联编辑事件委托
   container.addEventListener('click', (e) => {
@@ -254,13 +414,7 @@ export function bindScheduleEvents(shellContainer, container, state, context) {
     const itemEl = editableSpan.closest('.trace-timeline-item');
     if (!itemEl) return;
     const index = parseInt(itemEl.dataset.index, 10);
-    
-    // 找到当天数据
-    const targetDateStr = state.selectedDate || new Date().toISOString().split('T')[0];
-    const allSchedules = Array.isArray(state.schedules) ? state.schedules : [];
-    const dayScheduleData = allSchedules.find(item => item.date === targetDateStr);
-    const dayList = dayScheduleData && Array.isArray(dayScheduleData.list) ? dayScheduleData.list : [];
-    const schedule = dayList[index];
+    const schedule = state.schedules[index];
     if (!schedule) return;
 
     const originalText = schedule[field] || '';
@@ -282,7 +436,7 @@ export function bindScheduleEvents(shellContainer, container, state, context) {
       if (newText !== originalText) {
         schedule[field] = newText;
         // 保存到数据库
-        await persistTraceData(context.db, state, state.activeMaskId, state.activeContactId);
+        await persistTraceData(context.db, state, state.activeMaskId, state.activeContactId, state.selectedDate);
       }
       editableSpan.innerHTML = escapeHtml(schedule[field] || '');
     };
@@ -295,167 +449,6 @@ export function bindScheduleEvents(shellContainer, container, state, context) {
     }
   });
 
-  confirmBtn?.addEventListener('click', async () => {
-    if (!selectedMapId) {
-      hintEl.textContent = '请先选择一个关联地图';
-      return;
-    }
-
-    const selectedMap = availableMaps.find(m => m.id === selectedMapId);
-    if (!selectedMap) {
-      hintEl.textContent = '地图数据无效';
-      return;
-    }
-
-    if (!selectedMap.points || selectedMap.points.length === 0) {
-      hintEl.textContent = '该地图中还没有任何地点，无法生成日程，请先前往地图应用添加地点。';
-      return;
-    }
-
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = '生成中...';
-    hintEl.textContent = '';
-
-    try {
-      // 1. 收集联系人和面具档案
-      const archiveRecord = await context.db.get('appsData', 'archive::archive-data');
-      const archiveData = archiveRecord ? (archiveRecord.data || archiveRecord.value || {}) : {};
-      
-      const activeContact = state.contacts.find(c => c.id === state.activeContactId);
-      const activeMask = (state.masks || []).find(m => m.id === state.activeMaskId);
-      
-      const charSetting = archiveData.characters?.find(c => c.id === activeContact?.id) || {};
-      const charPrompt = `角色姓名：${activeContact?.name || '未知'}\n背景：${charSetting.background || ''}\n人设：${charSetting.prompt || ''}\n档案：${charSetting.profile || ''}`;
-      
-      const maskSetting = archiveData.masks?.find(m => m.id === state.activeMaskId) || {};
-      const maskPrompt = `用户面具：${activeMask?.name || '未知'}\n背景：${maskSetting.background || ''}\n人设：${maskSetting.prompt || ''}\n档案：${maskSetting.profile || ''}`;
-
-      // 2. 收集聊天记录（最近20轮对话，一轮=一组连续User消息+一组连续Assistant消息）
-      const chatKey = `chat_messages_${state.activeMaskId}_${state.activeContactId}`;
-      const chatRecord = await context.db.get('appsData', chatKey);
-      const chatRecordsRaw = chatRecord ? (chatRecord.data || chatRecord.value || []) : [];
-      
-      // 合并连续同角色消息为块(Block)
-      const blocks = [];
-      let currentBlock = [];
-      for (const msg of chatRecordsRaw) {
-        if (currentBlock.length === 0) {
-          currentBlock.push(msg);
-        } else {
-          if (currentBlock[0].role === msg.role) {
-            currentBlock.push(msg);
-          } else {
-            blocks.push(currentBlock);
-            currentBlock = [msg];
-          }
-        }
-      }
-      if (currentBlock.length > 0) blocks.push(currentBlock);
-      
-      // 取最后 40 个块（约等于 20 轮对话，每轮一来一回算 2 个块）
-      const recentBlocks = blocks.slice(-40);
-      const recentMessages = recentBlocks.flat();
-
-      const chatLines = recentMessages.map(msg => {
-        const role = msg.role === 'user' ? '用户' : activeContact?.name || '角色';
-        return `[${new Date(msg.timestamp).toLocaleString()}] ${role}: ${msg.content}`;
-      }).join('\n');
-
-      // 3. 收集世界书
-      const wbRecord = await context.db.get('appsData', 'worldbook::all-books');
-      const worldBooksRaw = wbRecord ? (wbRecord.data || wbRecord.value || []) : [];
-      const relatedBooks = worldBooksRaw.filter(b => b.enabled !== false && b.entries);
-      const bookText = relatedBooks.map(b => b.entries.filter(e => e.enabled !== false).map(e => `[${(e.keys || []).join(',')}] ${e.content}`).join('\n')).join('\n');
-
-      // 4. 提取地图地点
-      const mapPointsText = (selectedMap.points || []).map(p => `- ${p.name || '未命名地点'}: ${p.description || '无具体描述'}`).join('\n');
-
-      // 5. 组装 Prompt
-      const today = new Date();
-      const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-      const currentDay = days[today.getDay()];
-      const isWeekend = today.getDay() === 0 || today.getDay() === 6;
-      const dayTypeInfo = isWeekend 
-        ? '今天是周末（请安排娱乐、放松、休闲为主的活动，不要安排上班或上学，除非人设强烈要求）。' 
-        : '今天是工作日（周一至周五，请正常安排白天上班、上学或处理正事，晚上做休闲、放松的活动，不应出现白天在玩的情况，除非人设强烈要求）。';
-
-      const systemPrompt = `你现在扮演角色：${activeContact?.name || '未知'}。
-【世界书背景】：
-${bookText || '无特殊背景'}
-
-【你的档案设定】：
-${charPrompt}
-
-【当前用户面具（互动对象）】：
-${maskPrompt}
-
-【最近聊天参考】：
-${chatLines || '暂无近期聊天记录'}
-
-【活动地图与已有地点】：以下是你所在地图（${selectedMap.name}）的已有地点：
-${mapPointsText}
-
-【今日日期约束】：
-今天是${currentDay}。${dayTypeInfo}
-
-任务要求：
-1. 请根据上述背景为你自己生成今天的日程表，必须在上述【已有地点】中选择活动场所，绝不允许虚构新地点！
-2. 严格遵守【今日日期约束】，符合生活常识。时间安排必须分清早中晚的合理作息，且要有一定的独立自主性，同时也要参考【最近聊天参考】中的对话或约定来安排合适的活动（体现活人感）。
-3. 日程表固定生成 8 个时间段，每 2 小时一个时段，从 08:00 开始到次日 00:00 结束（即 08:00 - 10:00, 10:00 - 12:00, 12:00 - 14:00, 14:00 - 16:00, 16:00 - 18:00, 18:00 - 20:00, 20:00 - 22:00, 22:00 - 00:00）。
-4. 严格输出为精简的 JSON 数组，包含以下字段：
-  - time: 时间段（必须严格遵守格式，如 "08:00 - 10:00"）
-  - location: 所在地点（必须是【已有地点】之一）
-  - title: 正在做的事（小标题，不超过10字）
-  - detail: 正在做的事（正文描述，详细版，80字以内）
-5. 禁止生成违背人设（OOC）的行为！
-6. 严格返回纯 JSON 数组，禁止任何 Markdown 标记、代码块标记（如 \`\`\`json）或任何多余的解释性文本。`;
-
-      // 6. 调用 API
-      const settingsRecord = await context.db.get('settings', 'global-settings');
-      const settingsStore = settingsRecord || {};
-      const apiSettings = settingsStore.api || {};
-      // 优先副 API，回退主 API
-      const targetApi = (apiSettings.secondary && apiSettings.secondary.apiKey) ? apiSettings.secondary : apiSettings.primary;
-
-      if (!targetApi || !targetApi.apiKey) {
-        throw new Error('请先在设置应用中配置主 API 或副 API。');
-      }
-
-      const rawAiText = await requestScheduleFromSecondaryApi(targetApi, [{ role: 'system', content: systemPrompt }]);
-      const parsedSchedules = extractJsonArrayFromAiText(rawAiText);
-
-      if (!Array.isArray(parsedSchedules) || parsedSchedules.length === 0) {
-        throw new Error('AI 返回的数据无效。');
-      }
-
-      // 保存绑定关系和日程数据
-      state.boundMapId = selectedMapId;
-      
-      const targetDateStr = state.selectedDate || new Date().toISOString().split('T')[0];
-      if (!Array.isArray(state.schedules)) state.schedules = [];
-      const dayIndex = state.schedules.findIndex(item => item.date === targetDateStr);
-      if (dayIndex >= 0) {
-        state.schedules[dayIndex].list = parsedSchedules;
-      } else {
-        state.schedules.push({ date: targetDateStr, list: parsedSchedules });
-      }
-
-      await persistTraceData(context.db, state, state.activeMaskId, state.activeContactId);
-      
-      closeMapModal();
-      renderSchedule(container, state);
-      // 注意重新绑定事件
-      bindScheduleEvents(shellContainer, container, state, context);
-
-    } catch (err) {
-      console.error(err);
-      showApiErrorModal(shellContainer, { title: '生成日程失败', message: err.message || '未知错误' });
-      hintEl.textContent = '生成失败，请重试。';
-    } finally {
-      confirmBtn.disabled = false;
-      confirmBtn.textContent = '确认生成';
-    }
-  });
 }
 
 function escapeHtml(text) {

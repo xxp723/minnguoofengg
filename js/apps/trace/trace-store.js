@@ -7,9 +7,11 @@ export const APP_ID = 'trace';
 export const STORE_NAME = 'appsData';
 
 /* [区域标注·本次修改·隔离存储键名与跨应用数据获取] */
-export const DATA_KEY_TRACE = (maskId, contactId) => `trace_data_${maskId || 'default'}_${contactId || 'none'}`;
+export const DATA_KEY_TRACE_BASE = (maskId, contactId) => `trace_data_base_${maskId || 'default'}_${contactId || 'none'}`;
+export const DATA_KEY_TRACE_SCHEDULE = (maskId, contactId, date) => `trace_schedule_${maskId || 'default'}_${contactId || 'none'}_${date}`;
 export const ARCHIVE_DB_RECORD_ID = 'archive::archive-data';
 export const DATA_KEY_CONTACTS = (maskId) => `chat_contacts_${maskId || 'default'}`;
+export const KEY_LAST_VIEW = 'trace_last_view';
 
 /* ==========================================================================
    [区域标注·本次需求·轨迹应用 IndexedDB 专用读写]
@@ -53,6 +55,15 @@ export async function getContactsByMask(db, maskId) {
   return Array.isArray(contacts) ? contacts : [];
 }
 
+export async function getLastView(db) {
+  const data = await dbGet(db, KEY_LAST_VIEW);
+  return data || {};
+}
+
+export async function saveLastView(db, maskId, contactId) {
+  await dbPut(db, KEY_LAST_VIEW, { maskId, contactId });
+}
+
 /* ==========================================================================
    [区域标注·本次修改·轨迹数据结构规范化与隔离加载]
    说明：只读写 IndexedDB，返回规范化的状态对象，分为日程、资产、位置三个模块
@@ -61,33 +72,53 @@ export function normalizeTraceData(rawData) {
   const source = rawData && typeof rawData === 'object' ? rawData : {};
   return {
     hasInitialized: true,
-    schedules: Array.isArray(source.schedules) ? source.schedules : [], // 这里现在存储按天的数据对象数组：[{ date: 'YYYY-MM-DD', list: [...] }]
+    schedules: Array.isArray(source.schedules) ? source.schedules : [],
     assets: Array.isArray(source.assets) ? source.assets : [],
-    locations: Array.isArray(source.locations) ? source.locations : []
+    locations: Array.isArray(source.locations) ? source.locations : [],
+    boundMapId: source.boundMapId || null
   };
 }
 
-export async function loadTraceData(db, maskId, contactId) {
+export async function loadTraceData(db, maskId, contactId, date) {
   // 联系人为空时不加载任何有效数据，返回空结构
   if (!contactId) return normalizeTraceData(null);
   
-  const key = DATA_KEY_TRACE(maskId, contactId);
-  const raw = await dbGet(db, key);
-  const data = normalizeTraceData(raw);
-
-  // 初次加载时如果不存在数据，初始化空数组并保存一次
-  if (!raw) {
-    await dbPut(db, key, data);
+  const baseKey = DATA_KEY_TRACE_BASE(maskId, contactId);
+  const baseRaw = await dbGet(db, baseKey);
+  const data = normalizeTraceData(baseRaw);
+  
+  // 日程按天独立读取
+  const scheduleKey = DATA_KEY_TRACE_SCHEDULE(maskId, contactId, date);
+  const scheduleRaw = await dbGet(db, scheduleKey);
+  
+  if (scheduleRaw) {
+    data.schedules = Array.isArray(scheduleRaw.schedules) ? scheduleRaw.schedules : [];
+    data.boundMapId = scheduleRaw.boundMapId || null;
+  } else {
+    data.schedules = [];
+    data.boundMapId = null;
   }
 
   return data;
 }
 
-export async function persistTraceData(db, state, maskId, contactId) {
+export async function persistTraceData(db, state, maskId, contactId, date) {
   if (!contactId) return normalizeTraceData(null);
   
-  const key = DATA_KEY_TRACE(maskId, contactId);
-  const data = normalizeTraceData(state);
-  await dbPut(db, key, data);
-  return data;
+  const baseKey = DATA_KEY_TRACE_BASE(maskId, contactId);
+  const baseData = {
+    hasInitialized: true,
+    assets: state.assets,
+    locations: state.locations
+  };
+  await dbPut(db, baseKey, baseData);
+  
+  const scheduleKey = DATA_KEY_TRACE_SCHEDULE(maskId, contactId, date);
+  const scheduleData = {
+    schedules: state.schedules,
+    boundMapId: state.boundMapId
+  };
+  await dbPut(db, scheduleKey, scheduleData);
+  
+  return state;
 }

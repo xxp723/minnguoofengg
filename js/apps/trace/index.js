@@ -5,7 +5,7 @@
  *       绑定/解绑事件与 AppManager 挂载生命周期。
  */
 
-import { loadTraceData, getArchiveMasks, getContactsByMask } from './trace-store.js';
+import { loadTraceData, getArchiveMasks, getContactsByMask, getLastView, saveLastView } from './trace-store.js';
 import { buildTraceShell, renderTraceGrid, bindTraceEvents } from './trace-ui.js';
 
 /* ==========================================================================
@@ -49,20 +49,35 @@ export async function mount(container, context) {
   // 2. 读取 IndexedDB 数据及面具、联系人隔离上下文
   const db = context.db;
   const { masks, activeMaskId } = await getArchiveMasks(db);
+  const lastView = await getLastView(db);
   
-  // 默认使用当前全局激活的面具，否则取第一个
-  const currentMaskId = activeMaskId || (masks.length > 0 ? String(masks[0].id) : null);
+  // 优先使用上次浏览的面具，否则使用全局激活的面具，再否则取第一个
+  let currentMaskId = lastView.maskId;
+  if (!currentMaskId || !masks.some(m => String(m.id) === currentMaskId)) {
+    currentMaskId = activeMaskId || (masks.length > 0 ? String(masks[0].id) : null);
+  }
   
   let contacts = [];
   if (currentMaskId) {
     contacts = await getContactsByMask(db, currentMaskId);
   }
   
-  // 默认选中第一个联系人
-  const currentContactId = contacts.length > 0 ? String(contacts[0].id) : null;
+  // 优先使用上次浏览的联系人，否则选第一个
+  let currentContactId = lastView.contactId;
+  if (!currentContactId || !contacts.some(c => String(c.id) === currentContactId)) {
+    currentContactId = contacts.length > 0 ? String(contacts[0].id) : null;
+  }
   
-  // 加载对应面具和联系人下的专属轨迹数据
-  const traceData = await loadTraceData(db, currentMaskId, currentContactId);
+  // 默认选中的日期为今天
+  const todayStr = new Date().toISOString().split('T')[0];
+  
+  // 加载对应面具、联系人、日期下的专属轨迹数据
+  const traceData = await loadTraceData(db, currentMaskId, currentContactId, todayStr);
+  
+  // 保存这次的访问记录
+  if (currentMaskId && currentContactId) {
+    await saveLastView(db, currentMaskId, currentContactId);
+  }
   
   const state = {
     destroyed: false,
@@ -70,6 +85,7 @@ export async function mount(container, context) {
     contacts,
     activeMaskId: currentMaskId,
     activeContactId: currentContactId,
+    selectedDate: todayStr,
     ...traceData
   };
 

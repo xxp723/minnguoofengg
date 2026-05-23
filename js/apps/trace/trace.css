@@ -103,67 +103,39 @@
   height: 20px;
 }
 
-/* 当前面具及联系人下拉折叠条组件 (Pill) */
-.trace-active-mask-pill,
-.trace-active-contact-pill {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #f8f9fa;
-  border: 1px solid #eaeaea;
-  border-radius: 20px;
-  padding: 4px 12px 4px 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-width: 120px;
-  max-width: 160px;
-}
-
-.trace-active-mask-pill:active,
-.trace-active-contact-pill:active {
-  transform: scale(0.98);
-  background: #f0f0f0;
-}
-
-.trace-pill-avatar {
-  width: 24px;
-  height: 24px;
+/* 当前联系人头像 */
+.trace-active-contact-avatar {
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  flex-shrink: 0;
-  overflow: hidden;
-  background: #e0e0e0;
+  padding: 2px;
+  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s;
 }
 
-.trace-pill-avatar img,
-.trace-pill-avatar span {
+.trace-active-contact-avatar:active {
+  transform: scale(0.95);
+}
+
+.trace-active-contact-avatar img,
+.trace-active-contact-avatar span {
   width: 100%;
   height: 100%;
+  border-radius: 50%;
+  border: 2px solid #fff;
   object-fit: cover;
-  font-size: 10px;
-  font-weight: 600;
-  color: #666;
+  background: #f5f5f5;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.trace-pill-name {
-  flex: 1;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
-  color: #1a1a1a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.trace-pill-arrow {
-  font-size: 10px;
-  color: #999;
-  flex-shrink: 0;
+  color: #666;
+  box-sizing: border-box;
 }
 
 /* 周视图样式 */
@@ -399,19 +371,18 @@
 
 .trace-card-title {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   color: #1a1a1a;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   line-height: 1.3;
   text-align: center;
 }
 
 .trace-schedule-location {
   font-size: 13px;
-  color: #888;
+  color: #666;
   text-align: center;
   margin-bottom: 8px;
-  font-style: italic;
 }
 
 .trace-card-desc {
@@ -427,8 +398,6 @@
   font-size: 11px;
   color: #999;
   font-family: monospace;
-  text-align: center;
-  margin-top: 4px;
 }
 
 /* 状态颜色 (已完成、进行中、未经历) */
@@ -440,13 +409,9 @@
   background: #f5f5f5;
   color: #a0a0a0;
 }
-.trace-status-past .trace-card-title.is-completed {
+.trace-status-past .is-completed {
   text-decoration: line-through;
   color: #a0a0a0;
-}
-.trace-status-past .trace-schedule-location,
-.trace-status-past .trace-card-desc {
-  color: #b0b0b0;
 }
 
 /* 正在进行：重点柔和橙/红 */

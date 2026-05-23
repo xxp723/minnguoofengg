@@ -2,7 +2,7 @@
  * 文件名: js/apps/trace/trace-ui.js
  * 用途: 轨迹应用 UI 层。提供基础骨架，连接日程、资产、位置三个模块。
  */
-import { loadTraceData, getContactsByMask } from './trace-store.js';
+import { loadTraceData, getContactsByMask, saveLastView } from './trace-store.js';
 import { renderSchedule, bindScheduleEvents } from './trace-schedule.js';
 import { renderAssets, bindAssetsEvents } from './trace-assets.js';
 import { renderLocation, bindLocationEvents } from './trace-location.js';
@@ -23,7 +23,7 @@ const ICONS = {
    [区域标注·本次需求·应用主骨架与面具/联系人切换]
    ========================================================================== */
 export function buildTraceShell(state) {
-  // 标题栏联系人按钮：折叠条样式 (仅显示当前联系人头像和姓名)
+  // 当前联系人头像（仅显示一个，点击后下拉列表）
   let activeContactHtml = '';
   let contactsDropdownHtml = '';
   
@@ -33,10 +33,8 @@ export function buildTraceShell(state) {
       const avatarSrc = activeContact.avatar || '';
       const avatarContent = avatarSrc ? `<img src="${escapeHtml(avatarSrc)}" alt="avatar">` : `<span>${escapeHtml((activeContact.name || 'U').charAt(0))}</span>`;
       activeContactHtml = `
-        <div class="trace-active-contact-pill" id="trace-contact-switch-btn">
-          <div class="trace-pill-avatar">${avatarContent}</div>
-          <div class="trace-pill-name">${escapeHtml(activeContact.name || '未命名')}</div>
-          <div class="trace-pill-arrow">▼</div>
+        <div class="trace-active-contact-avatar" id="trace-contact-switch-btn">
+          ${avatarContent}
         </div>
       `;
     }
@@ -54,20 +52,6 @@ export function buildTraceShell(state) {
     }).join('');
   } else {
     contactsDropdownHtml = `<div class="trace-dropdown-empty">当前面具暂无联系人</div>`;
-  }
-
-  // 面具按钮：折叠条样式
-  let activeMaskHtml = '';
-  const activeMask = (state.masks || []).find(m => String(m.id) === String(state.activeMaskId));
-  if (activeMask) {
-    const avatarContent = activeMask.avatar ? `<img src="${escapeHtml(activeMask.avatar)}" alt="avatar">` : `<span>${escapeHtml((activeMask.name || 'M').charAt(0))}</span>`;
-    activeMaskHtml = `
-      <div class="trace-active-mask-pill" id="trace-mask-switch-btn">
-        <div class="trace-pill-avatar">${avatarContent}</div>
-        <div class="trace-pill-name">${escapeHtml(activeMask.name || '未命名面具')}</div>
-        <div class="trace-pill-arrow">▼</div>
-      </div>
-    `;
   }
 
   // 生成面具切换下拉列表（带头像/首字母）
@@ -130,10 +114,10 @@ export function buildTraceShell(state) {
           <h1 class="trace-title" id="trace-title-btn" data-action="go-home">Schedule</h1>
         </div>
         <div class="trace-header-right">
-          <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
-            ${activeContactHtml}
-            ${activeMaskHtml}
-          </div>
+          ${activeContactHtml}
+          <button class="trace-icon-btn trace-more-btn" id="trace-mask-switch-btn" aria-label="切换面具身份">
+            ${ICONS.more}
+          </button>
         </div>
       </header>
 
@@ -244,15 +228,16 @@ export function bindTraceEvents(container, state, context) {
   // 周视图日期点击切换
   const weekBar = container.querySelector('.trace-week-bar');
   if (weekBar) {
-    weekBar.addEventListener('click', (e) => {
+    weekBar.addEventListener('click', async (e) => {
       const item = e.target.closest('.trace-week-day');
       if (!item) return;
       const dateStr = item.dataset.date;
       if (dateStr === state.selectedDate) return;
       
       state.selectedDate = dateStr;
-      // 重新渲染当前 Tab（会触发重新加载对应日期的日程数据，虽然我们当前 state 是一起加载的，但逻辑需要对应更新）
-      // TODO: 可以在此处扩展，把 dateStr 传给渲染函数，或者通过重新渲染骨架刷新 week-bar
+      const newData = await loadTraceData(context.db, state.activeMaskId, state.activeContactId, state.selectedDate);
+      Object.assign(state, newData);
+      
       container.innerHTML = buildTraceShell(state);
       switchTab(container, state, state.currentTab || 'schedule', context);
       bindTraceEvents(container, state, context);
@@ -299,10 +284,13 @@ export function bindTraceEvents(container, state, context) {
     const newConfirm = confirmBtn.cloneNode(true);
     confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
     
-    newConfirm.addEventListener('click', () => {
+    newConfirm.addEventListener('click', async () => {
       const input = dropdownContent.querySelector('#trace-date-picker-input');
       if (input && input.value) {
         state.selectedDate = input.value;
+        const newData = await loadTraceData(context.db, state.activeMaskId, state.activeContactId, state.selectedDate);
+        Object.assign(state, newData);
+        
         closeDropdown();
         container.innerHTML = buildTraceShell(state);
         switchTab(container, state, state.currentTab || 'schedule', context);
@@ -324,7 +312,11 @@ export function bindTraceEvents(container, state, context) {
       state.activeMaskId = maskId;
       state.contacts = await getContactsByMask(context.db, maskId);
       state.activeContactId = state.contacts.length > 0 ? String(state.contacts[0].id) : null;
-      const newData = await loadTraceData(context.db, state.activeMaskId, state.activeContactId);
+      
+      if (state.activeContactId) {
+        await saveLastView(context.db, state.activeMaskId, state.activeContactId);
+      }
+      const newData = await loadTraceData(context.db, state.activeMaskId, state.activeContactId, state.selectedDate);
       Object.assign(state, newData);
       
       closeDropdown();
@@ -343,7 +335,9 @@ export function bindTraceEvents(container, state, context) {
         return;
       }
       state.activeContactId = contactId;
-      const newData = await loadTraceData(context.db, state.activeMaskId, state.activeContactId);
+      
+      await saveLastView(context.db, state.activeMaskId, state.activeContactId);
+      const newData = await loadTraceData(context.db, state.activeMaskId, state.activeContactId, state.selectedDate);
       Object.assign(state, newData);
       
       closeDropdown();
