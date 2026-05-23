@@ -384,6 +384,15 @@ ${mapPointsText}
           throw new Error('AI 返回的数据无效。');
         }
 
+        // 自动解析标注收支属性
+        parsedSchedules.forEach(s => {
+          const contentToParse = (s.title || '') + ' ' + (s.detail || '');
+          const types = [];
+          if (/[买转花付]|消费|支出|购物|买单/.test(contentToParse)) types.push('expense');
+          if (/[赚收]|工资|收入|收益|发薪/.test(contentToParse)) types.push('income');
+          if (types.length > 0) s.financialTypes = types;
+        });
+
         // 保存绑定关系和日程数据
         state.boundMapId = selectedMapId;
         state.schedules = parsedSchedules;
@@ -438,6 +447,20 @@ ${mapPointsText}
       const newText = inputEl.value.trim();
       if (newText !== originalText) {
         schedule[field] = newText;
+        
+        // 如果修改的是标题或详情，重新解析收支属性
+        if (field === 'title' || field === 'detail') {
+          const contentToParse = (schedule.title || '') + ' ' + (schedule.detail || '');
+          const types = [];
+          if (/[买转花付]|消费|支出|购物|买单/.test(contentToParse)) types.push('expense');
+          if (/[赚收]|工资|收入|收益|发薪/.test(contentToParse)) types.push('income');
+          if (types.length > 0) {
+            schedule.financialTypes = types;
+          } else {
+            delete schedule.financialTypes;
+          }
+        }
+
         // 保存到数据库
         await persistTraceData(context.db, state, state.activeMaskId, state.activeContactId, state.selectedDate);
       }

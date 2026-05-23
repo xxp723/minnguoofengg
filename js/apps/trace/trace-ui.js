@@ -16,7 +16,8 @@ const ICONS = {
   location: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 44C24 44 40 32 40 19C40 10.1634 32.8366 3 24 3C15.1634 3 8 10.1634 8 19C8 32 24 44 24 44Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="24" cy="19" r="6" fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`,
   more: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 12C26.2091 12 28 10.2091 28 8C28 5.79086 26.2091 4 24 4C21.7909 4 20 5.79086 20 8C20 10.2091 21.7909 12 24 12Z" fill="currentColor"/><path d="M24 28C26.2091 28 28 26.2091 28 24C28 21.7909 26.2091 20 24 20C21.7909 20 20 21.7909 20 24C20 26.2091 21.7909 28 24 28Z" fill="currentColor"/><path d="M24 44C26.2091 44 28 42.2091 28 40C28 37.7909 26.2091 36 24 36C21.7909 36 20 37.7909 20 40C20 42.2091 21.7909 44 24 44Z" fill="currentColor"/></svg>`,
   pen: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M31.1341 7.23414L40.7658 16.8659M31.1341 7.23414C33.6496 4.7186 37.728 4.7186 40.2435 7.23414L40.7658 7.75647C43.2814 10.272 43.2814 14.3504 40.7658 16.8659M31.1341 7.23414L10.3341 28.0341C9.64573 28.7225 9.2088 29.6106 9.09117 30.5756L8.03534 39.243C7.88607 40.4678 8.94857 41.4883 10.1852 41.2721L18.8475 39.7554C19.821 39.585 20.7208 39.1172 21.4194 38.4185L40.7658 16.8659" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-  menu: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M7.94971 11.9497H39.9497" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.94971 23.9497H39.9497" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.94971 35.9497H39.9497" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  menu: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M7.94971 11.9497H39.9497" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.94971 23.9497H39.9497" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.94971 35.9497H39.9497" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  walletGenerate: `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M41 14L41 38C41 39.6569 39.6569 41 38 41L10 41C8.34315 41 7 39.6569 7 38L7 14C7 12.3431 8.34315 11 10 11L38 11C39.6569 11 41 12.3431 41 14Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M41 21L27 21C25.3431 21 24 22.3431 24 24C24 25.6569 25.3431 27 27 27L41 27" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="24" r="2" fill="currentColor"/><path d="M30 11C30 8.79086 28.2091 7 26 7H22C19.7909 7 18 8.79086 18 11" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 };
 
 /* ==========================================================================
@@ -108,6 +109,9 @@ export function buildTraceShell(state) {
           </button>
           <button class="trace-icon-btn trace-generate-btn" id="trace-schedule-generate-btn" aria-label="生成日程">
             ${ICONS.pen}
+          </button>
+          <button class="trace-icon-btn trace-generate-btn" id="trace-assets-generate-btn" aria-label="生成资产" style="display: none;">
+            ${ICONS.walletGenerate}
           </button>
         </div>
         <div class="trace-header-center">
@@ -368,11 +372,15 @@ function switchTab(container, state, tabName, context) {
     title.textContent = titleMap[tabName] || 'Trace';
   }
 
+  const assetsGenerateBtn = container.querySelector('#trace-assets-generate-btn');
+
   // 只有在日程页面才显示羽毛笔按钮、日期选择按钮、周视图
   const isSchedule = tabName === 'schedule';
+  const isAssets = tabName === 'assets';
   if (generateBtn) generateBtn.style.display = isSchedule ? 'flex' : 'none';
   if (dateBtn) dateBtn.style.display = isSchedule ? 'flex' : 'none';
   if (weekContainer) weekContainer.style.display = isSchedule ? 'block' : 'none';
+  if (assetsGenerateBtn) assetsGenerateBtn.style.display = isAssets ? 'flex' : 'none';
 
   // 根据 tab 渲染对应模块
   if (tabName === 'schedule') {
@@ -381,7 +389,8 @@ function switchTab(container, state, tabName, context) {
     if (context) bindScheduleEvents(container, body, state, context);
   } else if (tabName === 'assets') {
     renderAssets(body, state);
-    if (context) bindAssetsEvents(body, state, context);
+    // 把最外层 container 传进去，以便绑定顶部生成按钮
+    if (context) bindAssetsEvents(container, body, state, context);
   } else if (tabName === 'location') {
     renderLocation(body, state);
     if (context) bindLocationEvents(body, state, context);
