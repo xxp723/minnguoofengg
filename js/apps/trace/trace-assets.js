@@ -6,6 +6,42 @@ import { persistTraceData } from './trace-store.js';
 import { showApiErrorModal } from '../../core/ui/components/ApiErrorModal.js';
 
 /* ==========================================================================
+   [区域标注·本次需求·应用内轻量级提示弹窗]
+   ========================================================================== */
+function showToast(container, message) {
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(26, 26, 26, 0.9);
+    color: #ffffff;
+    padding: 14px 28px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 500;
+    z-index: 10000;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  `;
+  toast.textContent = message;
+  container.appendChild(toast);
+  
+  // 触发动画
+  requestAnimationFrame(() => {
+    toast.style.opacity = '1';
+  });
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 2500);
+}
+
+/* ==========================================================================
    [区域标注·本次需求·资产生成上下文提取与 API 工具]
    ========================================================================== */
 async function requestAssetsFromApi(profile, messages) {
@@ -233,8 +269,8 @@ export function bindAssetsEvents(shellContainer, container, state, context) {
       const schedulesText = schedulesContext.join('\n\n');
 
       // 4. 收集最近的关于送礼/转账的聊天记录（闲谈应用）
-      // 修正：闲谈消息存储键是以 "::" 分隔，而不是 "_"
-      const chatKey = `chat_messages::${state.activeMaskId}::${state.activeContactId}`;
+      // 修正：闲谈消息存储的真实键前缀是 "chat_msgs_"
+      const chatKey = `chat_msgs_${state.activeMaskId}_${state.activeContactId}`;
       const chatRecord = await context.db.get('appsData', chatKey);
       let chatRecordsRaw = [];
       if (chatRecord) {
@@ -277,6 +313,7 @@ ${chatLines || '暂无金钱往来聊天'}
 
 任务要求：
 1. 请仔细分析【档案设定】中你的社会地位、职业和性格。绝不能OOC！(例如：如果是穷学生，钱包不能有几百万；如果是霸总，不能只赚几千块)。
+2. 提取“转账流水(transfer)”时，必须【仅限】且【明确】是你（角色）与当前用户（面具）之间发生的资金往来。绝对不要脑补或生成你与其他家人、朋友、公司的虚构转账流水！如果没有相关的聊天记录或日志，则转账流水列表必须为空。
 2. 结合【过去一个月的收支日常记录】和【与用户关于金钱的对话记录】，在合理范围内总结出近期的开销、收入和对用户的专项消费。如果没有记录支持某项支出/收入，可根据人设合理虚构日常开销。
 3. 必须输出为 JSON 数组，每个对象代表一项资产条目。数组中的每个对象必须包含以下字段：
    - category: 类别。必须是以下之一: "wallet"(仅限1条，代表总可用余额), "income"(近期收入项目), "expense"(近期支出项目), "investment"(理财与投资情况), "special"(对用户的特定消费), "transfer"(转账流水，包括用户转给你的和你转给用户的金额，必须单列出来)。
@@ -309,13 +346,8 @@ ${chatLines || '暂无金钱往来聊天'}
       
       renderAssets(container, state);
 
-      // 生成成功提示弹窗
-      showApiErrorModal(shellContainer, { 
-        title: '生成成功', 
-        reason: '资产页面的 AI 数据已成功返回并渲染。',
-        solution: '你可以继续浏览资产页面或生成其它记录。',
-        message: '生成已完成。'
-      });
+      // 生成成功提示弹窗，改用轻量级 Toast 而不是报错组件
+      showToast(shellContainer, '生成完成');
 
     } catch (err) {
       console.error(err);
