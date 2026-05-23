@@ -108,17 +108,21 @@ export function renderAssets(container, state) {
   const renderGroup = (title, items, isWallet = false) => {
     if (!items || items.length === 0) return '';
     if (isWallet) {
-      return items.map(a => `
+      return items.map(a => {
+        // 防止 AI 返回的 amount 里自带了 ¥ 符号，导致双重显示
+        let amtStr = escapeHtml(a.amount || '0').trim();
+        if (amtStr.startsWith('¥')) amtStr = amtStr.substring(1).trim();
+        return `
         <div class="trace-wallet-card">
           <div class="trace-wallet-bg"></div>
           <div class="trace-wallet-content">
             <div class="trace-wallet-title">Total Balance</div>
-            <div class="trace-wallet-amount">¥ ${escapeHtml(a.amount || '0')}</div>
+            <div class="trace-wallet-amount">¥ ${amtStr}</div>
             <div class="trace-wallet-name">${escapeHtml(a.name || '账户余额')}</div>
             <div class="trace-wallet-desc">${escapeHtml(a.desc || '')}</div>
           </div>
         </div>
-      `).join('');
+      `}).join('');
     }
 
     return `
@@ -227,14 +231,24 @@ export function bindAssetsEvents(shellContainer, container, state, context) {
       const schedulesText = schedulesContext.join('\n\n');
 
       // 4. 收集最近的关于送礼/转账的聊天记录（闲谈应用）
+      // 注意：由于闲谈应用在保存聊天记录时可能是存储在 chat_messages_${maskId}_${contactId} 下（结构可能有不同），
+      // 也可能是存在不同的层级。按照全局记忆的模式，这里读取所有的消息并展开文本。
       const chatKey = `chat_messages_${state.activeMaskId}_${state.activeContactId}`;
       const chatRecord = await context.db.get('appsData', chatKey);
-      const chatRecordsRaw = chatRecord ? (chatRecord.data || chatRecord.value || []) : [];
+      let chatRecordsRaw = [];
+      if (chatRecord) {
+        // 如果存储结构是对象数组或是带有 messages 字段的对象
+        chatRecordsRaw = Array.isArray(chatRecord.data) ? chatRecord.data 
+                       : (chatRecord.data && Array.isArray(chatRecord.data.messages) ? chatRecord.data.messages 
+                       : (Array.isArray(chatRecord.value) ? chatRecord.value 
+                       : (chatRecord.value && Array.isArray(chatRecord.value.messages) ? chatRecord.value.messages : [])));
+      }
       
-      // 简单筛选带金额或礼物的消息
+      // 简单筛选带金额或礼物、收付款的消息（放宽正则匹配范围，并增加对 system 类型消息如系统转账提示的捕获）
       const financialChats = chatRecordsRaw.filter(msg => {
         const txt = msg.content || '';
-        return /转账|红包|送礼|买给|花费|给你.*钱/.test(txt);
+        // "红包", "转账" 在很多系统提示或用户动作中常见
+        return /转账|红包|送礼|买给|花费|给你.*钱|收到|支付|¥|元|块钱|礼物/.test(txt);
       }).slice(-30); // 取最近30条相关
       const chatLines = financialChats.map(msg => {
         const role = msg.role === 'user' ? '用户' : activeContact?.name || '角色';
@@ -291,6 +305,14 @@ ${chatLines || '暂无金钱往来聊天'}
       await persistTraceData(context.db, state, state.activeMaskId, state.activeContactId, state.selectedDate);
       
       renderAssets(container, state);
+
+      // 生成成功提示弹窗
+      showApiErrorModal(shellContainer, { 
+        title: '生成成功', 
+        reason: '资产页面的 AI 数据已成功返回并渲染。',
+        solution: '你可以继续浏览资产页面或生成其它记录。',
+        message: '生成已完成。'
+      });
 
     } catch (err) {
       console.error(err);
