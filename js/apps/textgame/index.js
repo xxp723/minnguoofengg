@@ -46,16 +46,24 @@ function removeTextGameCSS(id) {
    ========================================================================== */
 export async function mount(container, context) {
   // [修改标注·梦笺应用·优化加载速度]
-  // 1. 优先加载独立 CSS，确保隔离和隐藏全局样式，防止闪烁
-  await loadTextGameCSS('./js/apps/textgame/textgame.css', 'textgame-app-css');
-
+  
+  // 1. 在等待加载CSS之前，先清空可能由 Window.js 注入的 "应用加载中..." 字样
+  container.innerHTML = '';
+  
+  // 隐藏全局系统标题栏（强制让 windowContent 内容区覆盖整个窗口）
   const windowContent = container.closest('.window-content') || container.parentElement;
   if (windowContent) {
-    // 已经通过 app-window[data-app-id="textgame"] 覆盖，保留该类名如果以后还要用
     windowContent.classList.add('window-has-textgame');
+    const header = windowContent.parentElement.querySelector('.app-window__header');
+    if (header) {
+      header.style.display = 'none'; // 确保在 CSS 加载前就隐藏标题栏
+    }
   }
 
-  // 2. 注入骨架/基本框架
+  // 2. 优先加载独立 CSS，确保隔离和隐藏全局样式，防止闪烁
+  await loadTextGameCSS('./js/apps/textgame/textgame.css', 'textgame-app-css');
+
+  // 3. 注入骨架/基本框架
   container.innerHTML = `
     <div class="textgame-app-container" id="textgame-app-main-view">
       <div class="textgame-header">
