@@ -155,12 +155,14 @@ export function renderSchedule(container, state) {
               <div class="trace-card-title ${isPast ? 'is-completed' : ''}">
                 <span class="editable-text" data-field="title">${escapeHtml(s.title || '活动')}</span>
               </div>
+              <div class="trace-schedule-duration">
+                <span class="editable-text" data-field="time">${escapeHtml(s.time)}</span>
+              </div>
               <div class="trace-schedule-location">
                 📍 <span class="editable-text" data-field="location">${escapeHtml(s.location)}</span>
               </div>
               <div class="trace-card-desc">
                 <span class="editable-text" data-field="detail">${escapeHtml(s.detail || '')}</span>
-                <span class="trace-schedule-duration">${escapeHtml(s.time)}</span>
               </div>
             </div>
           </div>

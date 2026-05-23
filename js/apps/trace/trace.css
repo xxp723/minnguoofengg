@@ -395,9 +395,11 @@
 }
 
 .trace-schedule-duration {
-  font-size: 11px;
-  color: #999;
+  font-size: 12px;
+  color: #888;
   font-family: monospace;
+  text-align: center;
+  margin-bottom: 4px;
 }
 
 /* 状态颜色 (已完成、进行中、未经历) */
