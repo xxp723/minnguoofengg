@@ -2025,10 +2025,10 @@ function buildConversationRoundTimeline(history = [], maxRounds = 12, now = getC
       ? formatRelativeDurationForPrompt(now.getTime() - anchorTimestamp)
       : '无法计算';
     const crossedDayText = anchorTimestamp
-      ? (isDifferentShanghaiDate(new Date(anchorTimestamp), now) ? '是' : '否')
+      ? formatShanghaiDayDistanceForPrompt(anchorTimestamp, now)
       : '无法判断';
 
-    return `${index + 1}. 用户轮次时间：${userTimeText}；AI最后回复时间：${assistantTimeText}；距本轮请求：${distanceText}；是否跨自然日：${crossedDayText}；本轮话题：${userSummary}`;
+    return `${index + 1}. 用户轮次时间：${userTimeText}；AI最后回复时间：${assistantTimeText}；距本轮请求：${distanceText}；自然日=${crossedDayText}；本轮话题：${userSummary}`;
   });
 
   return lines.join('\n');
@@ -2229,7 +2229,7 @@ export function getTimeAwarenessPrompt({ enabled = false, context = {} } = {}) {
 
 # 时间感知规则
 1. 当前时间格式为“日期 星期 时间（时段）”；时段：凌晨00:00-05:59，早上06:00-08:59，上午09:00-11:29，中午11:30-13:29，下午13:30-17:59，晚上18:00-22:59，深夜23:00-23:59。
-2. “现在”只按当前真实时间；历史消息必须按各自时间锚点理解，不能当作刚发生；判断今天/昨天/前天/N天前优先看“自然日=...”，相差2天以上绝不能说成昨天。
+2. “现在”只按当前真实时间；历史消息必须按各自时间锚点理解，不能当作刚发生；判断今天/昨天/前天/N天前优先看“自然日=...”，严格区分隔日/多日，相差2天以上绝不能说成昨天或今天。
 3. 按当前星期和时段理解生活节奏：凌晨/深夜多为睡眠休息；早上多为起床、早饭、通勤、上学上班；上午多为学习工作；中午多为午饭午休；下午多为学习工作办事；晚上多为晚饭、休息、娱乐、聊天。工作日更偏上学/上班/通勤，周末更偏休息/娱乐；仍以用户设定和聊天内容为准。
 4. 用户说忘回、刚看到、失踪或隔了会儿才发消息等，优先使用“AI至本轮”的间隔和自然日，不要自行重算或改写起止时段；超过30分钟或跨自然日，禁止说刚才/刚刚。
 5. 历史里的昨天/明天/今晚/明早/过几天，先锚定到那条消息的发送日，再换算到现在；白天不要沿用昨晚/凌晨的劝睡语境。
