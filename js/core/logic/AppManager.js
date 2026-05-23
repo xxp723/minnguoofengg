@@ -107,6 +107,10 @@ export class AppManager {
         if (appId === 'memory') {
           await this.preloadStylesheet('./js/apps/memory/memory.css?v=20260519-grand-summary-dock-range-scroll', 'memory-app-css');
         }
+        
+        if (appId === 'textgame') {
+          await this.preloadStylesheet('./js/apps/textgame/textgame.css', 'textgame-app-css');
+        }
 
         if (appId === 'chat') {
           /* [区域标注·本次需求2·闲谈样式兜底预加载] 窗口显示前确保 chat.css 可用，避免无样式闪烁。 */
@@ -251,7 +255,8 @@ export class AppManager {
          ====================================================================== */
       this.preloadStylesheet('./js/apps/map/map.css', 'map-app-css'),
       this.preloadStylesheet('./js/apps/memory/memory.css?v=20260519-grand-summary-dock-range-scroll', 'memory-app-css'),
-      this.preloadStylesheet('./js/apps/trace/trace.css', 'trace-app-css')
+      this.preloadStylesheet('./js/apps/trace/trace.css', 'trace-app-css'),
+      this.preloadStylesheet('./js/apps/textgame/textgame.css', 'textgame-app-css')
     ];
 
     const moduleTasks = appIds
@@ -286,7 +291,7 @@ export class AppManager {
          说明：
          - 过滤掉已经在关键应用预热阶段加载过的应用。
          ========================================================================== */
-      const criticalAppIds = new Set(['settings', 'worldbook', 'archive', 'chat', 'map', 'memory', 'trace']);
+      const criticalAppIds = new Set(['settings', 'worldbook', 'archive', 'chat', 'map', 'memory', 'trace', 'textgame']);
       const apps = this.registry.getAll().filter((appMeta) => !criticalAppIds.has(appMeta.id));
       await Promise.allSettled(apps.map((appMeta) => this.loadModule(appMeta)));
     } catch (error) {
