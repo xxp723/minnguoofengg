@@ -59,16 +59,17 @@ export class WindowManager {
       </button>
     `;
 
-    if (appMeta.id === 'trace' || appMeta.id === 'map') {
+    if (appMeta.id === 'trace' || appMeta.id === 'map' || appMeta.id === 'textgame') {
       header.style.display = 'none';
     }
 
     const content = document.createElement('div');
     content.className = 'app-window__content';
     
-    if (appMeta.id === 'trace') {
+    if (appMeta.id === 'trace' || appMeta.id === 'textgame') {
       content.style.padding = '0';
       content.style.backgroundColor = '#fdfdfd';
+      // 避免注入 "应用加载中..." 文字，完全由应用自行处理加载状态和背景
     } else {
       content.innerHTML = '<div class="loading">应用加载中...</div>';
     }
