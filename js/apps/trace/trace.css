@@ -103,39 +103,67 @@
   height: 20px;
 }
 
-/* 当前联系人头像 */
-.trace-active-contact-avatar {
-  width: 36px;
-  height: 36px;
+/* 当前面具及联系人下拉折叠条组件 (Pill) */
+.trace-active-mask-pill,
+.trace-active-contact-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8f9fa;
+  border: 1px solid #eaeaea;
+  border-radius: 20px;
+  padding: 4px 12px 4px 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+  max-width: 160px;
+}
+
+.trace-active-mask-pill:active,
+.trace-active-contact-pill:active {
+  transform: scale(0.98);
+  background: #f0f0f0;
+}
+
+.trace-pill-avatar {
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  padding: 2px;
-  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+  flex-shrink: 0;
+  overflow: hidden;
+  background: #e0e0e0;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: transform 0.2s;
 }
 
-.trace-active-contact-avatar:active {
-  transform: scale(0.95);
-}
-
-.trace-active-contact-avatar img,
-.trace-active-contact-avatar span {
+.trace-pill-avatar img,
+.trace-pill-avatar span {
   width: 100%;
   height: 100%;
-  border-radius: 50%;
-  border: 2px solid #fff;
   object-fit: cover;
-  background: #f5f5f5;
+  font-size: 10px;
+  font-weight: 600;
+  color: #666;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+}
+
+.trace-pill-name {
+  flex: 1;
+  font-size: 12px;
   font-weight: 600;
-  color: #666;
-  box-sizing: border-box;
+  color: #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trace-pill-arrow {
+  font-size: 10px;
+  color: #999;
+  flex-shrink: 0;
 }
 
 /* 周视图样式 */
@@ -370,11 +398,20 @@
 }
 
 .trace-card-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: #1a1a1a;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   line-height: 1.3;
+  text-align: center;
+}
+
+.trace-schedule-location {
+  font-size: 13px;
+  color: #888;
+  text-align: center;
+  margin-bottom: 8px;
+  font-style: italic;
 }
 
 .trace-card-desc {
@@ -390,62 +427,53 @@
   font-size: 11px;
   color: #999;
   font-family: monospace;
+  text-align: center;
+  margin-top: 4px;
 }
 
 /* 状态颜色 (已完成、进行中、未经历) */
-/* 过去：浅灰蓝 */
+/* 过去：柔和灰 */
 .trace-status-past .trace-timeline-dot {
-  background: #a9b5bc;
+  background: #d0d0d0;
 }
 .trace-status-past .trace-card {
-  background: #D5DCDE;
-  color: #7f8a90;
+  background: #f5f5f5;
+  color: #a0a0a0;
 }
-.trace-status-past .is-completed {
+.trace-status-past .trace-card-title.is-completed {
   text-decoration: line-through;
-  color: #7f8a90;
-}
-.trace-status-past .trace-card-title {
-  color: #6C7A83;
+  color: #a0a0a0;
 }
 .trace-status-past .trace-schedule-location,
 .trace-status-past .trace-card-desc {
-  color: #7f8a90;
+  color: #b0b0b0;
 }
 
-/* 正在进行：柔和粉 */
+/* 正在进行：重点柔和橙/红 */
 .trace-status-current .trace-timeline-dot {
-  background: #E8B1B1;
-  box-shadow: 0 0 0 3px rgba(232, 177, 177, 0.3);
+  background: #ff7e67;
+  box-shadow: 0 0 0 3px rgba(255, 126, 103, 0.2);
 }
 .trace-status-current .trace-timeline-time {
-  color: #c98e8e;
+  color: #ff7e67;
   font-size: 13px;
 }
 .trace-status-current .trace-card {
-  background: #E8B1B1;
+  background: #ffebe6;
 }
 .trace-status-current .trace-card-title {
-  color: #a35b5b;
-}
-.trace-status-current .trace-schedule-location,
-.trace-status-current .trace-card-desc {
-  color: #945d5d;
+  color: #ff5c3d;
 }
 
-/* 未来：浅米白 */
+/* 未来：柔和蓝/黄/紫 等中等色 (随机一种主色调，这里采用柔和蓝) */
 .trace-status-future .trace-timeline-dot {
-  background: #6C7A83;
+  background: #80b3ff;
 }
 .trace-status-future .trace-card {
-  background: #FCF2E6;
+  background: #f0f7ff;
 }
 .trace-status-future .trace-card-title {
-  color: #6C7A83;
-}
-.trace-status-future .trace-schedule-location,
-.trace-status-future .trace-card-desc {
-  color: #8b99a3;
+  color: #4d8ce0;
 }
 
 /* 内联编辑输入框样式 */

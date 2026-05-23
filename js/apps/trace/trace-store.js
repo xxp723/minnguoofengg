@@ -61,7 +61,7 @@ export function normalizeTraceData(rawData) {
   const source = rawData && typeof rawData === 'object' ? rawData : {};
   return {
     hasInitialized: true,
-    schedules: Array.isArray(source.schedules) ? source.schedules : [],
+    schedules: Array.isArray(source.schedules) ? source.schedules : [], // 这里现在存储按天的数据对象数组：[{ date: 'YYYY-MM-DD', list: [...] }]
     assets: Array.isArray(source.assets) ? source.assets : [],
     locations: Array.isArray(source.locations) ? source.locations : []
   };

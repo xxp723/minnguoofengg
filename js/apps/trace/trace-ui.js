@@ -23,7 +23,7 @@ const ICONS = {
    [区域标注·本次需求·应用主骨架与面具/联系人切换]
    ========================================================================== */
 export function buildTraceShell(state) {
-  // 当前联系人头像（仅显示一个，点击后下拉列表）
+  // 标题栏联系人按钮：折叠条样式 (仅显示当前联系人头像和姓名)
   let activeContactHtml = '';
   let contactsDropdownHtml = '';
   
@@ -33,41 +33,54 @@ export function buildTraceShell(state) {
       const avatarSrc = activeContact.avatar || '';
       const avatarContent = avatarSrc ? `<img src="${escapeHtml(avatarSrc)}" alt="avatar">` : `<span>${escapeHtml((activeContact.name || 'U').charAt(0))}</span>`;
       activeContactHtml = `
-        <div class="trace-active-contact-avatar" id="trace-contact-switch-btn">
-          ${avatarContent}
+        <div class="trace-active-contact-pill" id="trace-contact-switch-btn">
+          <div class="trace-pill-avatar">${avatarContent}</div>
+          <div class="trace-pill-name">${escapeHtml(activeContact.name || '未命名')}</div>
+          <div class="trace-pill-arrow">▼</div>
         </div>
       `;
     }
     
-    contactsDropdownHtml = `<div class="trace-dropdown-grid">` + state.contacts.map(c => {
+    contactsDropdownHtml = state.contacts.map(c => {
       const isActive = String(c.id) === String(state.activeContactId) ? 'is-active' : '';
       const avatarSrc = c.avatar || '';
       const avatarContent = avatarSrc ? `<img src="${escapeHtml(avatarSrc)}" alt="avatar">` : `<span>${escapeHtml((c.name || 'U').charAt(0))}</span>`;
       return `
-        <div class="trace-dropdown-grid-item ${isActive}" data-contact-id="${escapeHtml(c.id)}">
+        <div class="trace-dropdown-item ${isActive}" data-contact-id="${escapeHtml(c.id)}">
           <div class="trace-dropdown-avatar">${avatarContent}</div>
           <div class="trace-dropdown-name">${escapeHtml(c.name || '未命名')}</div>
         </div>
       `;
-    }).join('') + `</div>`;
+    }).join('');
   } else {
     contactsDropdownHtml = `<div class="trace-dropdown-empty">当前面具暂无联系人</div>`;
   }
 
-  // 生成面具切换下拉列表（带头像/首字母）
-  let maskListHtml = '';
-  if (state.masks && state.masks.length > 0) {
-    maskListHtml = `<div class="trace-dropdown-grid">` + state.masks.map(m => {
-      const isActive = String(m.id) === String(state.activeMaskId) ? 'is-active' : '';
-      const avatarContent = m.avatar ? `<img src="${escapeHtml(m.avatar)}" alt="avatar">` : `<span>${escapeHtml((m.name || 'M').charAt(0))}</span>`;
-      return `
-        <div class="trace-dropdown-grid-item ${isActive}" data-mask-id="${escapeHtml(m.id)}">
-          <div class="trace-dropdown-avatar">${avatarContent}</div>
-          <div class="trace-dropdown-name">${escapeHtml(m.name || '未命名面具')}</div>
-        </div>
-      `;
-    }).join('') + `</div>`;
+  // 面具按钮：折叠条样式
+  let activeMaskHtml = '';
+  const activeMask = (state.masks || []).find(m => String(m.id) === String(state.activeMaskId));
+  if (activeMask) {
+    const avatarContent = activeMask.avatar ? `<img src="${escapeHtml(activeMask.avatar)}" alt="avatar">` : `<span>${escapeHtml((activeMask.name || 'M').charAt(0))}</span>`;
+    activeMaskHtml = `
+      <div class="trace-active-mask-pill" id="trace-mask-switch-btn">
+        <div class="trace-pill-avatar">${avatarContent}</div>
+        <div class="trace-pill-name">${escapeHtml(activeMask.name || '未命名面具')}</div>
+        <div class="trace-pill-arrow">▼</div>
+      </div>
+    `;
   }
+
+  // 生成面具切换下拉列表（带头像/首字母）
+  const maskListHtml = (state.masks || []).map(m => {
+    const isActive = String(m.id) === String(state.activeMaskId) ? 'is-active' : '';
+    const avatarContent = m.avatar ? `<img src="${escapeHtml(m.avatar)}" alt="avatar">` : `<span>${escapeHtml((m.name || 'M').charAt(0))}</span>`;
+    return `
+      <div class="trace-dropdown-item ${isActive}" data-mask-id="${escapeHtml(m.id)}">
+        <div class="trace-dropdown-avatar">${avatarContent}</div>
+        <div class="trace-dropdown-name">${escapeHtml(m.name || '未命名面具')}</div>
+      </div>
+    `;
+  }).join('');
 
   // 渲染横向日历条
   const renderWeekBar = () => {
@@ -117,10 +130,10 @@ export function buildTraceShell(state) {
           <h1 class="trace-title" id="trace-title-btn" data-action="go-home">Schedule</h1>
         </div>
         <div class="trace-header-right">
-          ${activeContactHtml}
-          <button class="trace-icon-btn trace-more-btn" id="trace-mask-switch-btn" aria-label="切换面具身份">
-            ${ICONS.more}
-          </button>
+          <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+            ${activeContactHtml}
+            ${activeMaskHtml}
+          </div>
         </div>
       </header>
 
@@ -173,7 +186,7 @@ export function buildTraceShell(state) {
       <template id="tpl-map-list">
         <div style="padding: 0 16px 16px;">
           <div class="trace-modal-label">为 AI 生成日程提供地点约束</div>
-          <div id="trace-map-list-container" class="trace-dropdown-list" style="max-height: 200px; overflow-y: auto;">
+          <div id="trace-map-list-container" class="trace-dropdown-list">
             <div style="text-align:center;color:#999;font-size:12px;padding:10px;">加载中...</div>
           </div>
           <div class="trace-modal-hint" id="trace-map-select-hint"></div>
