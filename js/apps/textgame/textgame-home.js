@@ -5,16 +5,16 @@
  * ==========================================================================
  */
 
-import { Icons } from './reader-ui.js';
+import { Icons } from './textgame-ui.js';
 
-export class ReaderHome {
+export class TextGameHome {
   constructor(container) {
     this.container = container;
   }
 
   render() {
     this.container.innerHTML = `
-      <div class="reader-empty-state">
+      <div class="textgame-empty-state">
         ${Icons.home}
         <p>梦笺主页<br>这里将用于展示阅读统计、推荐内容或动态</p>
       </div>

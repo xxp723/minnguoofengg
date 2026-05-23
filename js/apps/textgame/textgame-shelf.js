@@ -5,10 +5,10 @@
  * ==========================================================================
  */
 
-import { Icons, showModal } from './reader-ui.js';
-import { getBooks, addBook, deleteBook } from './reader-store.js';
+import { Icons, showModal } from './textgame-ui.js';
+import { getBooks, addBook, deleteBook } from './textgame-store.js';
 
-export class ReaderShelf {
+export class TextGameShelf {
   constructor(container) {
     this.container = container;
     this.fileInput = null;
@@ -16,13 +16,13 @@ export class ReaderShelf {
   }
 
   async render() {
-    this.container.innerHTML = `<div class="reader-shelf-grid" id="reader-shelf-grid"></div>`;
+    this.container.innerHTML = `<div class="textgame-shelf-grid" id="textgame-shelf-grid"></div>`;
     
     // 初始化隐藏的文件输入框
     this.fileInput = document.createElement('input');
     this.fileInput.type = 'file';
     this.fileInput.accept = '.txt';
-    this.fileInput.className = 'reader-hidden-file';
+    this.fileInput.className = 'textgame-hidden-file';
     this.container.appendChild(this.fileInput);
     
     this.fileInput.addEventListener('change', this.handleFileSelect.bind(this));
@@ -36,16 +36,16 @@ export class ReaderShelf {
   }
 
   renderGrid() {
-    const grid = this.container.querySelector('#reader-shelf-grid');
+    const grid = this.container.querySelector('#textgame-shelf-grid');
     if (!grid) return;
 
     if (this.books.length === 0) {
       grid.style.display = 'none';
       
-      let emptyState = this.container.querySelector('.reader-empty-state');
+      let emptyState = this.container.querySelector('.textgame-empty-state');
       if (!emptyState) {
         emptyState = document.createElement('div');
-        emptyState.className = 'reader-empty-state';
+        emptyState.className = 'textgame-empty-state';
         emptyState.innerHTML = `
           ${Icons.emptyFolder}
           <p>书架空空如也<br>点击右上角导入书籍</p>
@@ -56,20 +56,20 @@ export class ReaderShelf {
     }
 
     grid.style.display = 'grid';
-    const emptyState = this.container.querySelector('.reader-empty-state');
+    const emptyState = this.container.querySelector('.textgame-empty-state');
     if (emptyState) emptyState.remove();
 
     grid.innerHTML = this.books.map(book => `
-      <div class="reader-book-item" data-id="${book.id}">
-        <div class="reader-book-cover">
-          <div class="reader-book-cover-text">${book.coverText}</div>
+      <div class="textgame-book-item" data-id="${book.id}">
+        <div class="textgame-book-cover">
+          <div class="textgame-book-cover-text">${book.coverText}</div>
         </div>
-        <div class="reader-book-title">${book.name.replace('.txt', '')}</div>
+        <div class="textgame-book-title">${book.name.replace('.txt', '')}</div>
       </div>
     `).join('');
 
     // 绑定长按删除事件（由于暂无长按指令，此处简化为点击询问打开还是删除，实际可后续在手势库里补充）
-    const items = grid.querySelectorAll('.reader-book-item');
+    const items = grid.querySelectorAll('.textgame-book-item');
     items.forEach(item => {
       item.addEventListener('click', () => {
         const bookId = item.dataset.id;
@@ -121,11 +121,11 @@ export class ReaderShelf {
       return;
     }
 
-    const reader = new FileReader();
+    const textgame = new FileTextGame();
 
     // 探测编码（简单实现：尝试用 utf-8 读取，如果包含替换字符或乱码特征，重新用 gbk 读）
     // 为了更稳妥，这里直接读取为 ArrayBuffer，然后进行简单的编码判断
-    reader.onload = async (e) => {
+    textgame.onload = async (e) => {
       const buffer = e.target.result;
       const textDecoderUtf8 = new TextDecoder('utf-8', { fatal: true });
       let text = '';
@@ -155,10 +155,10 @@ export class ReaderShelf {
       }
     };
 
-    reader.onerror = () => {
+    textgame.onerror = () => {
       showModal({ title: '读取失败', content: '无法读取文件内容。' });
     };
 
-    reader.readAsArrayBuffer(file);
+    textgame.readAsArrayBuffer(file);
   }
 }

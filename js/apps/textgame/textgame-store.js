@@ -7,14 +7,14 @@
 
 import { DB } from '../../core/data/DB.js';
 
-const APP_ID = 'reader';
+const APP_ID = 'textgame';
 const DB_STORE_NAME = 'appsData';
 let dbInstance = new DB();
 
 /**
  * 获取梦笺应用的完整数据对象
  */
-async function getReaderData() {
+async function getTextGameData() {
   const data = await dbInstance.get(DB_STORE_NAME, APP_ID);
   if (!data) {
     return { id: APP_ID, books: [], settings: {} };
@@ -25,7 +25,7 @@ async function getReaderData() {
 /**
  * 保存梦笺应用的完整数据对象
  */
-async function saveReaderData(data) {
+async function saveTextGameData(data) {
   await dbInstance.put(DB_STORE_NAME, data);
 }
 
@@ -36,12 +36,12 @@ async function saveReaderData(data) {
  */
 
 export async function getBooks() {
-  const data = await getReaderData();
+  const data = await getTextGameData();
   return data.books || [];
 }
 
 export async function addBook(book) {
-  const data = await getReaderData();
+  const data = await getTextGameData();
   if (!data.books) data.books = [];
   
   // 简单去重：按名称和大小判断是否已存在
@@ -61,19 +61,19 @@ export async function addBook(book) {
   };
   
   data.books.push(newBook);
-  await saveReaderData(data);
+  await saveTextGameData(data);
   return newBook;
 }
 
 export async function deleteBook(bookId) {
-  const data = await getReaderData();
+  const data = await getTextGameData();
   if (data.books) {
     data.books = data.books.filter(b => b.id !== bookId);
-    await saveReaderData(data);
+    await saveTextGameData(data);
   }
 }
 
 export async function getBook(bookId) {
-  const data = await getReaderData();
+  const data = await getTextGameData();
   return data.books?.find(b => b.id === bookId) || null;
 }

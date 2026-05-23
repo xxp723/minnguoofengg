@@ -27,15 +27,15 @@ export const Icons = {
  */
 export function showModal({ title = '提示', content = '', showCancel = false, confirmText = '确定', cancelText = '取消', onConfirm, onCancel }) {
   const overlay = document.createElement('div');
-  overlay.className = 'reader-modal-overlay';
+  overlay.className = 'textgame-modal-overlay';
   
   overlay.innerHTML = `
-    <div class="reader-modal-container">
-      <div class="reader-modal-title">${title}</div>
-      <div class="reader-modal-content">${content}</div>
-      <div class="reader-modal-actions">
-        ${showCancel ? `<button class="reader-modal-btn reader-modal-btn-cancel">${cancelText}</button>` : ''}
-        <button class="reader-modal-btn reader-modal-btn-confirm">${confirmText}</button>
+    <div class="textgame-modal-container">
+      <div class="textgame-modal-title">${title}</div>
+      <div class="textgame-modal-content">${content}</div>
+      <div class="textgame-modal-actions">
+        ${showCancel ? `<button class="textgame-modal-btn textgame-modal-btn-cancel">${cancelText}</button>` : ''}
+        <button class="textgame-modal-btn textgame-modal-btn-confirm">${confirmText}</button>
       </div>
     </div>
   `;
@@ -52,14 +52,14 @@ export function showModal({ title = '提示', content = '', showCancel = false, 
     setTimeout(() => overlay.remove(), 300);
   };
 
-  const btnConfirm = overlay.querySelector('.reader-modal-btn-confirm');
+  const btnConfirm = overlay.querySelector('.textgame-modal-btn-confirm');
   btnConfirm.addEventListener('click', () => {
     close();
     if (onConfirm) onConfirm();
   });
 
   if (showCancel) {
-    const btnCancel = overlay.querySelector('.reader-modal-btn-cancel');
+    const btnCancel = overlay.querySelector('.textgame-modal-btn-cancel');
     btnCancel.addEventListener('click', () => {
       close();
       if (onCancel) onCancel();
@@ -75,9 +75,9 @@ export function showModal({ title = '提示', content = '', showCancel = false, 
  */
 export function renderSwitch(id, isChecked) {
   return `
-    <label class="reader-switch">
+    <label class="textgame-switch">
       <input type="checkbox" id="${id}" ${isChecked ? 'checked' : ''}>
-      <span class="reader-slider"></span>
+      <span class="textgame-slider"></span>
     </label>
   `;
 }

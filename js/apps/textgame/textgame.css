@@ -5,11 +5,11 @@
 
 /* 隐藏外层窗口的系统标题栏（假设应用挂载在 .window-content 中，需要隐藏其父级的 .window-header）
    注意：实际 DOM 结构如果不支持跨层，会在 JS 中操作 class 来隐藏 */
-.window-has-reader .window-header {
+.window-has-textgame .window-header {
   display: none !important;
 }
 
-.window-has-reader .window-content {
+.window-has-textgame .window-content {
   padding: 0 !important;
   height: 100% !important;
   display: flex !important;
@@ -19,7 +19,7 @@
 }
 
 /* 梦笺主容器 */
-.reader-app-container {
+.textgame-app-container {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -32,7 +32,7 @@
 }
 
 /* 顶部标题栏 */
-.reader-header {
+.textgame-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -45,7 +45,7 @@
 }
 
 /* 花体英文标题 */
-.reader-title {
+.textgame-title {
   font-family: "Georgia", "Times New Roman", serif; /* 衬线字体充当花体效果 */
   font-style: italic;
   font-size: 24px;
@@ -59,18 +59,18 @@
   user-select: none;
 }
 
-.reader-title:active {
+.textgame-title:active {
   opacity: 0.6;
 }
 
 /* 标题栏右侧操作区 */
-.reader-header-actions {
+.textgame-header-actions {
   display: flex;
   align-items: center;
   gap: 16px;
 }
 
-.reader-icon-btn {
+.textgame-icon-btn {
   background: transparent;
   border: none;
   padding: 8px;
@@ -84,12 +84,12 @@
   outline: none;
 }
 
-.reader-icon-btn:active {
+.textgame-icon-btn:active {
   opacity: 0.5;
 }
 
 /* 内容区 */
-.reader-content-wrapper {
+.textgame-content-wrapper {
   flex: 1;
   position: relative;
   overflow: hidden;
@@ -97,7 +97,7 @@
 }
 
 /* 页面切换容器 */
-.reader-page {
+.textgame-page {
   position: absolute;
   top: 0;
   left: 0;
@@ -111,14 +111,14 @@
   box-sizing: border-box;
 }
 
-.reader-page.active {
+.textgame-page.active {
   opacity: 1;
   pointer-events: auto;
   z-index: 1;
 }
 
 /* 底部悬浮 TAB 栏 */
-.reader-tab-bar {
+.textgame-tab-bar {
   display: flex;
   justify-content: space-around;
   align-items: center;
@@ -131,7 +131,7 @@
   z-index: 10;
 }
 
-.reader-tab-item {
+.textgame-tab-item {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -144,18 +144,18 @@
   padding: 8px 0;
 }
 
-.reader-tab-item.active {
+.textgame-tab-item.active {
   color: #1a1a1a;
 }
 
-.reader-tab-text {
+.textgame-tab-text {
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.5px;
 }
 
 /* 书架网格布局 */
-.reader-shelf-grid {
+.textgame-shelf-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 24px 16px;
@@ -163,7 +163,7 @@
   padding-bottom: 30px;
 }
 
-.reader-book-item {
+.textgame-book-item {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -171,11 +171,11 @@
   transition: transform 0.2s ease;
 }
 
-.reader-book-item:active {
+.textgame-book-item:active {
   transform: scale(0.96);
 }
 
-.reader-book-cover {
+.textgame-book-cover {
   width: 100%;
   aspect-ratio: 3 / 4;
   background: #fff;
@@ -190,7 +190,7 @@
   position: relative;
 }
 
-.reader-book-cover-text {
+.textgame-book-cover-text {
   font-family: "Georgia", serif;
   font-size: 18px;
   color: #8c8c8c;
@@ -204,7 +204,7 @@
   overflow: hidden;
 }
 
-.reader-book-title {
+.textgame-book-title {
   font-size: 12px;
   font-weight: 500;
   color: #1a1a1a;
@@ -216,7 +216,7 @@
 }
 
 /* 占位空状态提示 */
-.reader-empty-state {
+.textgame-empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -227,12 +227,12 @@
   padding: 0 20px;
 }
 
-.reader-empty-state svg {
+.textgame-empty-state svg {
   margin-bottom: 16px;
   opacity: 0.5;
 }
 
-.reader-empty-state p {
+.textgame-empty-state p {
   font-size: 14px;
   line-height: 1.6;
   letter-spacing: 1px;
@@ -241,7 +241,7 @@
 /* ========================================================================== 
    [区域标注·本次需求·梦笺样式·自定义弹窗 UI] 
    ========================================================================== */
-.reader-modal-overlay {
+.textgame-modal-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   background-color: rgba(0, 0, 0, 0.4);
@@ -254,11 +254,11 @@
   transition: opacity 0.2s ease;
 }
 
-.reader-modal-overlay.active {
+.textgame-modal-overlay.active {
   opacity: 1;
 }
 
-.reader-modal-container {
+.textgame-modal-container {
   background-color: #fff;
   width: 80%;
   max-width: 320px;
@@ -269,11 +269,11 @@
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.reader-modal-overlay.active .reader-modal-container {
+.textgame-modal-overlay.active .textgame-modal-container {
   transform: translateY(0) scale(1);
 }
 
-.reader-modal-title {
+.textgame-modal-title {
   font-size: 18px;
   font-weight: 600;
   color: #1a1a1a;
@@ -281,7 +281,7 @@
   text-align: center;
 }
 
-.reader-modal-content {
+.textgame-modal-content {
   font-size: 14px;
   color: #666;
   line-height: 1.5;
@@ -289,12 +289,12 @@
   margin-bottom: 24px;
 }
 
-.reader-modal-actions {
+.textgame-modal-actions {
   display: flex;
   gap: 12px;
 }
 
-.reader-modal-btn {
+.textgame-modal-btn {
   flex: 1;
   padding: 12px 0;
   border-radius: 8px;
@@ -305,16 +305,16 @@
   transition: background-color 0.2s, opacity 0.2s;
 }
 
-.reader-modal-btn:active {
+.textgame-modal-btn:active {
   opacity: 0.8;
 }
 
-.reader-modal-btn-cancel {
+.textgame-modal-btn-cancel {
   background-color: #f0f0f0;
   color: #666;
 }
 
-.reader-modal-btn-confirm {
+.textgame-modal-btn-confirm {
   background-color: #1a1a1a;
   color: #fff;
 }
@@ -322,20 +322,20 @@
 /* ========================================================================== 
    [区域标注·本次需求·梦笺样式·滑动开关] 
    ========================================================================== */
-.reader-switch {
+.textgame-switch {
   position: relative;
   display: inline-block;
   width: 50px;
   height: 30px;
 }
 
-.reader-switch input {
+.textgame-switch input {
   opacity: 0;
   width: 0;
   height: 0;
 }
 
-.reader-slider {
+.textgame-slider {
   position: absolute;
   cursor: pointer;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -344,7 +344,7 @@
   border-radius: 30px;
 }
 
-.reader-slider:before {
+.textgame-slider:before {
   position: absolute;
   content: "";
   height: 26px;
@@ -357,15 +357,15 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
-input:checked + .reader-slider {
+input:checked + .textgame-slider {
   background-color: #34c759; /* iOS 绿 */
 }
 
-input:checked + .reader-slider:before {
+input:checked + .textgame-slider:before {
   transform: translateX(20px);
 }
 
 /* 隐藏输入框的原生 file input，用我们自己的 UI 触发 */
-.reader-hidden-file {
+.textgame-hidden-file {
   display: none;
 }
