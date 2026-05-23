@@ -46,16 +46,18 @@ function removeTextGameCSS(id) {
    ========================================================================== */
 export async function mount(container, context) {
   // [修改标注·梦笺应用·优化加载速度]
-  // 1. 隐藏全局系统标题栏（不依赖 load 完毕，先占位和设定容器）
+  // 1. 优先加载独立 CSS，确保隔离和隐藏全局样式，防止闪烁
+  await loadTextGameCSS('./js/apps/textgame/textgame.css', 'textgame-app-css');
+
   const windowContent = container.closest('.window-content') || container.parentElement;
   if (windowContent) {
     // 已经通过 app-window[data-app-id="textgame"] 覆盖，保留该类名如果以后还要用
     windowContent.classList.add('window-has-textgame');
   }
 
-  // 2. 预先注入骨架/基本框架，防止等待 CSS 时白屏
+  // 2. 注入骨架/基本框架
   container.innerHTML = `
-    <div class="textgame-app-container" style="display: none;" id="textgame-app-main-view">
+    <div class="textgame-app-container" id="textgame-app-main-view">
       <div class="textgame-header">
         <h1 class="textgame-title">Bookshelf</h1>
         <div class="textgame-header-actions"></div>
@@ -81,13 +83,6 @@ export async function mount(container, context) {
       </div>
     </div>
   `;
-
-  // 3. 并行加载独立 CSS 与 子页面内容
-  await loadTextGameCSS('./js/apps/textgame/textgame.css', 'textgame-app-css');
-  
-  // CSS加载完毕后显示主视图，消除闪烁
-  const mainView = container.querySelector('#textgame-app-main-view');
-  if(mainView) mainView.style.display = 'flex';
 
   // 4. 实例化子页面模块
   const pageShelf = container.querySelector('#textgame-page-shelf');
@@ -147,8 +142,10 @@ export async function mount(container, context) {
 
   // 6. 绑定点击花体标题返回桌面
   titleEl.addEventListener('click', () => {
-    // 使用应用管理器关闭自己
-    if (context.appManager && context.appMeta && context.appMeta.id) {
+    // 使用事件总线通知桌面关闭应用
+    if (context.eventBus) {
+      context.eventBus.emit('app:close', { appId: context.appId || (context.appMeta && context.appMeta.id) });
+    } else if (context.appManager && context.appMeta && context.appMeta.id) {
       context.appManager.closeApp(context.appMeta.id);
     }
   });

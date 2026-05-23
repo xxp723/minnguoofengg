@@ -107,7 +107,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  padding: 16px 24px;
+  padding: 16px 24px 80px 24px; /* 增加底部 padding 防止被悬浮 Tab 遮挡 */
   box-sizing: border-box;
 }
 
@@ -117,41 +117,76 @@
   z-index: 1;
 }
 
-/* 底部悬浮 TAB 栏 */
+/* [修改标注·梦笺应用·丝滑底部悬浮 Tab 栏 UI]
+   类似闲谈应用的悬浮胶囊样式，选中态展开显示文字 */
 .textgame-tab-bar {
+  position: absolute;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  justify-content: space-around;
+  justify-content: center;
   align-items: center;
-  height: 60px;
-  background-color: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(15px);
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-  padding-bottom: env(safe-area-inset-bottom, 0);
-  flex-shrink: 0;
+  gap: 12px;
+  height: 52px;
+  padding: 0 16px;
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  border-radius: 26px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.6);
   z-index: 10;
 }
 
 .textgame-tab-item {
-  flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  color: #a0a0a0;
+  gap: 6px;
+  color: #8c8c8c;
   cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  height: 36px;
+  width: 36px; /* 未选中时为圆形 */
+  border-radius: 18px;
+  background-color: transparent;
+  overflow: hidden;
+}
+
+.textgame-tab-item svg {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
   transition: color 0.3s;
-  padding: 8px 0;
+}
+
+.textgame-tab-text {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  display: none; /* 默认隐藏文字 */
 }
 
 .textgame-tab-item.active {
   color: #1a1a1a;
+  background-color: rgba(0, 0, 0, 0.04);
+  width: auto; /* 选中时宽度自适应内容 */
+  padding: 0 16px;
 }
 
-.textgame-tab-text {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.5px;
+.textgame-tab-item.active .textgame-tab-text {
+  display: inline-block;
+  animation: fadeInText 0.3s forwards;
+}
+
+.textgame-tab-item:active {
+  transform: scale(0.94);
+}
+
+@keyframes fadeInText {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 /* 书架网格布局 */
