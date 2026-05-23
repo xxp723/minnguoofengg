@@ -3,19 +3,19 @@
    说明：独立应用样式，隐藏系统默认标题栏，定义极简线条与优雅排版
    ========================================================================== */
 
-/* 隐藏外层窗口的系统标题栏（假设应用挂载在 .window-content 中，需要隐藏其父级的 .window-header）
-   注意：实际 DOM 结构如果不支持跨层，会在 JS 中操作 class 来隐藏 */
-.window-has-textgame .window-header {
+/* [修改标注·梦笺应用·隐藏全局系统标题栏]
+   直接覆盖全局系统标题栏及清除内容区 padding，确保应用完全接管视图，彻底解决标题栏下方别扭的问题 */
+.app-window[data-app-id="textgame"] .app-window__header {
   display: none !important;
 }
 
-.window-has-textgame .window-content {
+.app-window[data-app-id="textgame"] .app-window__content {
   padding: 0 !important;
-  height: 100% !important;
-  display: flex !important;
-  flex-direction: column !important;
-  background-color: #faf9f7 !important; /* 杂志风米白色背景 */
-  border-radius: inherit !important;
+  background-color: #faf9f7;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
 /* 梦笺主容器 */

@@ -121,11 +121,11 @@ export class TextGameShelf {
       return;
     }
 
-    const textgame = new FileTextGame();
+    const reader = new FileReader();
 
     // 探测编码（简单实现：尝试用 utf-8 读取，如果包含替换字符或乱码特征，重新用 gbk 读）
     // 为了更稳妥，这里直接读取为 ArrayBuffer，然后进行简单的编码判断
-    textgame.onload = async (e) => {
+    reader.onload = async (e) => {
       const buffer = e.target.result;
       const textDecoderUtf8 = new TextDecoder('utf-8', { fatal: true });
       let text = '';
@@ -155,10 +155,10 @@ export class TextGameShelf {
       }
     };
 
-    textgame.onerror = () => {
+    reader.onerror = () => {
       showModal({ title: '读取失败', content: '无法读取文件内容。' });
     };
 
-    textgame.readAsArrayBuffer(file);
+    reader.readAsArrayBuffer(file);
   }
 }

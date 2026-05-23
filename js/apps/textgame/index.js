@@ -45,18 +45,17 @@ function removeTextGameCSS(id) {
    [区域标注·本次需求·梦笺主页挂载与框架渲染]
    ========================================================================== */
 export async function mount(container, context) {
-  // 1. 加载独立 CSS
-  await loadTextGameCSS('./js/apps/textgame/textgame.css', 'textgame-app-css');
-
-  // 2. 隐藏全局系统标题栏（通过向外层父容器添加专属 class）
+  // [修改标注·梦笺应用·优化加载速度]
+  // 1. 隐藏全局系统标题栏（不依赖 load 完毕，先占位和设定容器）
   const windowContent = container.closest('.window-content') || container.parentElement;
   if (windowContent) {
+    // 已经通过 app-window[data-app-id="textgame"] 覆盖，保留该类名如果以后还要用
     windowContent.classList.add('window-has-textgame');
   }
 
-  // 3. 渲染主框架
+  // 2. 预先注入骨架/基本框架，防止等待 CSS 时白屏
   container.innerHTML = `
-    <div class="textgame-app-container">
+    <div class="textgame-app-container" style="display: none;" id="textgame-app-main-view">
       <div class="textgame-header">
         <h1 class="textgame-title">Bookshelf</h1>
         <div class="textgame-header-actions"></div>
@@ -82,6 +81,13 @@ export async function mount(container, context) {
       </div>
     </div>
   `;
+
+  // 3. 并行加载独立 CSS 与 子页面内容
+  await loadTextGameCSS('./js/apps/textgame/textgame.css', 'textgame-app-css');
+  
+  // CSS加载完毕后显示主视图，消除闪烁
+  const mainView = container.querySelector('#textgame-app-main-view');
+  if(mainView) mainView.style.display = 'flex';
 
   // 4. 实例化子页面模块
   const pageShelf = container.querySelector('#textgame-page-shelf');
