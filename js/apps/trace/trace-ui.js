@@ -200,9 +200,19 @@ function escapeHtml(text) {
 /* ==========================================================================
    [区域标注·本次需求·模块调度与事件绑定]
    ========================================================================== */
+/* ==========================================================================
+   [区域标注·本次修改·保持当前标签页渲染]
+   说明：重新渲染时，不再强制跳转到日程标签，而是保持当前标签状态
+   ========================================================================== */
 export function renderTraceGrid(container, state, context) {
-  // 首次渲染默认展示日程模块
-  switchTab(container, state, 'schedule', context);
+  const targetTab = state.currentTab || 'schedule';
+  const tabs = container.querySelectorAll('.trace-tab-item');
+  tabs.forEach(t => t.classList.remove('is-active'));
+  const activeTab = Array.from(tabs).find(t => t.dataset.tab === targetTab);
+  if (activeTab) {
+    activeTab.classList.add('is-active');
+  }
+  switchTab(container, state, targetTab, context);
 }
 
 export function bindTraceEvents(container, state, context) {
@@ -313,20 +323,15 @@ export function bindTraceEvents(container, state, context) {
         closeDropdown();
         return;
       }
-      state.activeMaskId = maskId;
-      state.contacts = await getContactsByMask(context.db, maskId);
-      state.activeContactId = state.contacts.length > 0 ? String(state.contacts[0].id) : null;
       
-      if (state.activeContactId) {
-        await saveLastView(context.db, state.activeMaskId, state.activeContactId);
-      }
-      const newData = await loadTraceData(context.db, state.activeMaskId, state.activeContactId, state.selectedDate);
-      Object.assign(state, newData);
-      
+      /* ==========================================================================
+         [区域标注·本次修改·同步面具变更到全局]
+         说明：在轨迹内切换面具时，发送事件以同步给闲谈等其它应用。
+         由于在 index.js 中监听了该事件，UI 刷新将由监听器自动处理，
+         这里不需要手动刷新 UI。
+         ========================================================================== */
       closeDropdown();
-      container.innerHTML = buildTraceShell(state);
-      switchTab(container, state, state.currentTab || 'schedule', context);
-      bindTraceEvents(container, state, context);
+      context.eventBus?.emit('archive:active-mask-changed', { maskId });
       return;
     }
 

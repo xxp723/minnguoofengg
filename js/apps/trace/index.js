@@ -51,10 +51,13 @@ export async function mount(container, context) {
   const { masks, activeMaskId } = await getArchiveMasks(db);
   const lastView = await getLastView(db);
   
-  // 优先使用上次浏览的面具，否则使用全局激活的面具，再否则取第一个
-  let currentMaskId = lastView.maskId;
+  /* ==========================================================================
+     [区域标注·本次修改·面具优先级调整]
+     说明：轨迹应用必须优先强制跟随全局闲谈面具 activeMaskId，其次才是缓存。
+     ========================================================================== */
+  let currentMaskId = activeMaskId;
   if (!currentMaskId || !masks.some(m => String(m.id) === currentMaskId)) {
-    currentMaskId = activeMaskId || (masks.length > 0 ? String(masks[0].id) : null);
+    currentMaskId = masks.length > 0 ? String(masks[0].id) : null;
   }
   
   let contacts = [];
@@ -98,10 +101,45 @@ export async function mount(container, context) {
   // 5. 绑定交互事件
   bindTraceEvents(container, state, context);
 
+  /* ==========================================================================
+     [区域标注·本次修改·全局面具同步监听]
+     说明：监听闲谈应用等全局的面具切换事件，进行后台数据更新和 UI 重绘。
+     ========================================================================== */
+  const onActiveMaskChanged = async (payload) => {
+    if (state.destroyed) return;
+    const newMaskId = String(payload.maskId);
+    if (newMaskId === state.activeMaskId) return;
+
+    state.activeMaskId = newMaskId;
+    state.contacts = await getContactsByMask(db, newMaskId);
+    
+    // 尝试恢复该面具下的上次联系人
+    const updatedLastView = await getLastView(db);
+    let newContactId = updatedLastView.contactId;
+    if (!newContactId || !state.contacts.some(c => String(c.id) === newContactId)) {
+      newContactId = state.contacts.length > 0 ? String(state.contacts[0].id) : null;
+    }
+    state.activeContactId = newContactId;
+
+    if (state.activeMaskId && state.activeContactId) {
+      await saveLastView(db, state.activeMaskId, state.activeContactId);
+    }
+    
+    const newData = await loadTraceData(db, state.activeMaskId, state.activeContactId, state.selectedDate);
+    Object.assign(state, newData);
+    
+    container.innerHTML = buildTraceShell(state);
+    renderTraceGrid(container, state, context);
+    bindTraceEvents(container, state, context);
+  };
+
+  context.eventBus?.on('archive:active-mask-changed', onActiveMaskChanged);
+
   return {
     state,
     destroy() {
       state.destroyed = true;
+      context.eventBus?.off('archive:active-mask-changed', onActiveMaskChanged);
       removeTraceCSS('trace-app-css');
       container.innerHTML = '';
     }
