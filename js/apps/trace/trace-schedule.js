@@ -159,7 +159,8 @@ export function renderSchedule(container, state) {
                 <span class="editable-text" data-field="time">${escapeHtml(s.time)}</span>
               </div>
               <div class="trace-schedule-location">
-                📍 <span class="editable-text" data-field="location">${escapeHtml(s.location)}</span>
+                <svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 44C24 44 40 32 40 19C40 10.1634 32.8366 3 24 3C15.1634 3 8 10.1634 8 19C8 32 24 44 24 44Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="24" cy="19" r="6" fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>
+                <span class="editable-text" data-field="location">${escapeHtml(s.location)}</span>
               </div>
               <div class="trace-card-desc">
                 <span class="editable-text" data-field="detail">${escapeHtml(s.detail || '')}</span>

@@ -381,8 +381,16 @@
 .trace-schedule-location {
   font-size: 13px;
   color: #666;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   margin-bottom: 8px;
+}
+.trace-schedule-location svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .trace-card-desc {
