@@ -94,6 +94,7 @@ export function renderAssets(container, state) {
     expense: [],
     investment: [],
     special: [],
+    transfer: [],
     other: []
   };
 
@@ -156,6 +157,7 @@ export function renderAssets(container, state) {
   } else {
     contentHtml = `
       ${renderGroup('钱包', groups.wallet, true)}
+      ${renderGroup('转账流水', groups.transfer)}
       ${renderGroup('近期收入', groups.income)}
       ${renderGroup('近期支出', groups.expense)}
       ${renderGroup('理财与投资', groups.investment)}
@@ -231,9 +233,8 @@ export function bindAssetsEvents(shellContainer, container, state, context) {
       const schedulesText = schedulesContext.join('\n\n');
 
       // 4. 收集最近的关于送礼/转账的聊天记录（闲谈应用）
-      // 注意：由于闲谈应用在保存聊天记录时可能是存储在 chat_messages_${maskId}_${contactId} 下（结构可能有不同），
-      // 也可能是存在不同的层级。按照全局记忆的模式，这里读取所有的消息并展开文本。
-      const chatKey = `chat_messages_${state.activeMaskId}_${state.activeContactId}`;
+      // 修正：闲谈消息存储键是以 "::" 分隔，而不是 "_"
+      const chatKey = `chat_messages::${state.activeMaskId}::${state.activeContactId}`;
       const chatRecord = await context.db.get('appsData', chatKey);
       let chatRecordsRaw = [];
       if (chatRecord) {
@@ -246,13 +247,15 @@ export function bindAssetsEvents(shellContainer, container, state, context) {
       
       // 简单筛选带金额或礼物、收付款的消息（放宽正则匹配范围，并增加对 system 类型消息如系统转账提示的捕获）
       const financialChats = chatRecordsRaw.filter(msg => {
-        const txt = msg.content || '';
-        // "红包", "转账" 在很多系统提示或用户动作中常见
+        const txt = String(msg.content || msg.text || msg.html || '');
+        // "红包", "转账" 在很多系统提示或用户动作中常见（HTML 卡片也包含这些字眼）
         return /转账|红包|送礼|买给|花费|给你.*钱|收到|支付|¥|元|块钱|礼物/.test(txt);
       }).slice(-30); // 取最近30条相关
       const chatLines = financialChats.map(msg => {
         const role = msg.role === 'user' ? '用户' : activeContact?.name || '角色';
-        return `[${new Date(msg.timestamp).toLocaleString()}] ${role}: ${msg.content}`;
+        // HTML 卡片可能只有 html 字段没有 content 字段
+        const contentStr = String(msg.content || msg.html || '').replace(/<[^>]+>/g, ' '); // 简单剔除HTML标签
+        return `[${new Date(msg.timestamp || Date.now()).toLocaleString()}] ${role}: ${contentStr}`;
       }).join('\n');
 
       // 5. 拼装 Prompt
@@ -276,7 +279,7 @@ ${chatLines || '暂无金钱往来聊天'}
 1. 请仔细分析【档案设定】中你的社会地位、职业和性格。绝不能OOC！(例如：如果是穷学生，钱包不能有几百万；如果是霸总，不能只赚几千块)。
 2. 结合【过去一个月的收支日常记录】和【与用户关于金钱的对话记录】，在合理范围内总结出近期的开销、收入和对用户的专项消费。如果没有记录支持某项支出/收入，可根据人设合理虚构日常开销。
 3. 必须输出为 JSON 数组，每个对象代表一项资产条目。数组中的每个对象必须包含以下字段：
-   - category: 类别。必须是以下之一: "wallet"(仅限1条，代表总可用余额), "income"(近期收入项目), "expense"(近期支出项目), "investment"(理财与投资情况), "special"(对用户的特定消费)。
+   - category: 类别。必须是以下之一: "wallet"(仅限1条，代表总可用余额), "income"(近期收入项目), "expense"(近期支出项目), "investment"(理财与投资情况), "special"(对用户的特定消费), "transfer"(转账流水，包括用户转给你的和你转给用户的金额，必须单列出来)。
    - name: 项目名称（如 "工资", "买咖啡", "股票账户", "给用户买的项链"）。
    - amount: 金额（请带上货币符号或单位，如 "¥5000", "-¥30", "$1.2M", "浮亏20%"等。wallet类的必须是当前剩余总额）。
    - desc: 补充描述（20字以内）。
