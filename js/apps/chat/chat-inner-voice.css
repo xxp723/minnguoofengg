@@ -17,18 +17,18 @@
 /* ===== [已完成·花体字体导入] Google Fonts Dancing Script 加粗花体 ===== */
 @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
 
-/* ===== [已修改·遮罩层] 心声面板遮罩层 - 使用 root 变量 ===== */
+/* ===== [已修改·遮罩层] 心声面板遮罩层 - 修复闪屏问题 ===== */
 .iv-overlay {
   position: fixed;
   inset: 0;
   z-index: 8000;
-  background: rgba(74, 52, 42, 0.18);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(74, 52, 42, 0.4);
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.26s ease, visibility 0.26s ease;
   -webkit-tap-highlight-color: transparent;
+  transform: translateZ(0);
+  will-change: opacity;
 }
 .iv-overlay.is-open {
   opacity: 1;
@@ -56,6 +56,9 @@
   flex-direction: column;
   font-family: "Georgia", "PingFang SC", serif;
   color: #332b26;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform, opacity;
 }
 .iv-panel.is-open {
   opacity: 1;
@@ -496,15 +499,15 @@
   position: fixed;
   inset: 0;
   z-index: 9000;
-  background: rgba(74, 52, 42, 0.28);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(74, 52, 42, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.2s, visibility 0.2s;
+  transform: translateZ(0);
+  will-change: opacity;
 }
 .iv-confirm-overlay.is-open {
   opacity: 1;
