@@ -1,0 +1,370 @@
+/* ========================================================================== 
+   [区域标注·本次需求·梦笺样式·高级时尚杂志风格] 
+   说明：独立应用样式，隐藏系统默认标题栏，定义极简线条与优雅排版
+   ========================================================================== */
+
+/* 隐藏外层窗口的系统标题栏（假设应用挂载在 .window-content 中，需要隐藏其父级的 .window-header）
+   注意：实际 DOM 结构如果不支持跨层，会在 JS 中操作 class 来隐藏 */
+.window-has-reader .window-header {
+  display: none !important;
+}
+
+.window-has-reader .window-content {
+  padding: 0 !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background-color: #faf9f7 !important; /* 杂志风米白色背景 */
+  border-radius: inherit !important;
+}
+
+/* 梦笺主容器 */
+.reader-app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background-color: #faf9f7;
+  color: #2c2c2c; /* 深空灰文字 */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 顶部标题栏 */
+.reader-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px 10px;
+  background-color: rgba(250, 249, 247, 0.9);
+  backdrop-filter: blur(10px);
+  z-index: 10;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05); /* 极简线条 */
+  flex-shrink: 0;
+}
+
+/* 花体英文标题 */
+.reader-title {
+  font-family: "Georgia", "Times New Roman", serif; /* 衬线字体充当花体效果 */
+  font-style: italic;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1a1a1a;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  letter-spacing: 1px;
+  transition: opacity 0.2s ease;
+  user-select: none;
+}
+
+.reader-title:active {
+  opacity: 0.6;
+}
+
+/* 标题栏右侧操作区 */
+.reader-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.reader-icon-btn {
+  background: transparent;
+  border: none;
+  padding: 8px;
+  margin: -8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2c2c2c;
+  transition: opacity 0.2s;
+  outline: none;
+}
+
+.reader-icon-btn:active {
+  opacity: 0.5;
+}
+
+/* 内容区 */
+.reader-content-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background-color: #faf9f7;
+}
+
+/* 页面切换容器 */
+.reader-page {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  padding: 16px 24px;
+  box-sizing: border-box;
+}
+
+.reader-page.active {
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+/* 底部悬浮 TAB 栏 */
+.reader-tab-bar {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  height: 60px;
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(15px);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.reader-tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #a0a0a0;
+  cursor: pointer;
+  transition: color 0.3s;
+  padding: 8px 0;
+}
+
+.reader-tab-item.active {
+  color: #1a1a1a;
+}
+
+.reader-tab-text {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+/* 书架网格布局 */
+.reader-shelf-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px 16px;
+  padding-top: 10px;
+  padding-bottom: 30px;
+}
+
+.reader-book-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.reader-book-item:active {
+  transform: scale(0.96);
+}
+
+.reader-book-cover {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-bottom: 10px;
+  position: relative;
+}
+
+.reader-book-cover-text {
+  font-family: "Georgia", serif;
+  font-size: 18px;
+  color: #8c8c8c;
+  text-align: center;
+  padding: 10px;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.reader-book-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #1a1a1a;
+  text-align: center;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 占位空状态提示 */
+.reader-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #a0a0a0;
+  text-align: center;
+  padding: 0 20px;
+}
+
+.reader-empty-state svg {
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.reader-empty-state p {
+  font-size: 14px;
+  line-height: 1.6;
+  letter-spacing: 1px;
+}
+
+/* ========================================================================== 
+   [区域标注·本次需求·梦笺样式·自定义弹窗 UI] 
+   ========================================================================== */
+.reader-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.reader-modal-overlay.active {
+  opacity: 1;
+}
+
+.reader-modal-container {
+  background-color: #fff;
+  width: 80%;
+  max-width: 320px;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  transform: translateY(20px) scale(0.95);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.reader-modal-overlay.active .reader-modal-container {
+  transform: translateY(0) scale(1);
+}
+
+.reader-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.reader-modal-content {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.5;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.reader-modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.reader-modal-btn {
+  flex: 1;
+  padding: 12px 0;
+  border-radius: 8px;
+  border: none;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, opacity 0.2s;
+}
+
+.reader-modal-btn:active {
+  opacity: 0.8;
+}
+
+.reader-modal-btn-cancel {
+  background-color: #f0f0f0;
+  color: #666;
+}
+
+.reader-modal-btn-confirm {
+  background-color: #1a1a1a;
+  color: #fff;
+}
+
+/* ========================================================================== 
+   [区域标注·本次需求·梦笺样式·滑动开关] 
+   ========================================================================== */
+.reader-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 30px;
+}
+
+.reader-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.reader-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #e5e5ea;
+  transition: .4s;
+  border-radius: 30px;
+}
+
+.reader-slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+input:checked + .reader-slider {
+  background-color: #34c759; /* iOS 绿 */
+}
+
+input:checked + .reader-slider:before {
+  transform: translateX(20px);
+}
+
+/* 隐藏输入框的原生 file input，用我们自己的 UI 触发 */
+.reader-hidden-file {
+  display: none;
+}
