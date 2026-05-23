@@ -197,7 +197,7 @@ export function renderAssets(container, state) {
       ${renderGroup('近期收入', groups.income)}
       ${renderGroup('近期支出', groups.expense)}
       ${renderGroup('理财与投资', groups.investment)}
-      ${renderGroup('对“我”的特定消费', groups.special)}
+      ${renderGroup('特殊消费', groups.special)}
       ${renderGroup('其它', groups.other)}
     `;
   }
@@ -316,7 +316,7 @@ ${chatLines || '暂无金钱往来聊天'}
 2. 提取“转账流水(transfer)”时，必须【仅限】且【明确】是你（角色）与当前用户（面具）之间发生的资金往来。绝对不要脑补或生成你与其他家人、朋友、公司的虚构转账流水！如果没有相关的聊天记录或日志，则转账流水列表必须为空。
 2. 结合【过去一个月的收支日常记录】和【与用户关于金钱的对话记录】，在合理范围内总结出近期的开销、收入和对用户的专项消费。如果没有记录支持某项支出/收入，可根据人设合理虚构日常开销。
 3. 必须输出为 JSON 数组，每个对象代表一项资产条目。数组中的每个对象必须包含以下字段：
-   - category: 类别。必须是以下之一: "wallet"(仅限1条，代表总可用余额), "income"(近期收入项目), "expense"(近期支出项目), "investment"(理财与投资情况), "special"(对用户的特定消费), "transfer"(转账流水，包括用户转给你的和你转给用户的金额，必须单列出来)。
+   - category: 类别。必须是以下之一: "wallet"(仅限1条，代表总可用余额), "income"(近期收入项目), "expense"(近期支出项目), "investment"(理财与投资情况), "special"(对用户的特殊消费), "transfer"(转账流水，包括用户转给你的和你转给用户的金额，必须单列出来)。
    - name: 项目名称（如 "工资", "买咖啡", "股票账户", "给用户买的项链"）。
    - amount: 金额（请带上货币符号或单位，如 "¥5000", "-¥30", "$1.2M", "浮亏20%"等。wallet类的必须是当前剩余总额）。
    - desc: 补充描述（20字以内）。
