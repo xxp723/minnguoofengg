@@ -421,21 +421,21 @@ export class TextGameReader {
         sampleText = [...head, ...mid, ...tail].map(c => `【${c.title}】\n${makeSnippet(c.content, 1500)}`).join('\n\n...\n\n');
       }
       
-      // 修改提示词：不再强制要求 JSON，而是采用特殊分割符的方式，让任何智障模型都能输出。
+      // 修改提示词：使用英文字母与特殊符号的强制定界符，防止大模型魔改中文标题导致正则失效。
       const prompt = `请根据以下小说的抽样章节片段，提取并归纳本书的设定信息。
 请严格按照以下格式输出你的结果，不要输出任何多余的废话和 markdown 标记！
 
-[世界观档案开始]
+<<<WORLDVIEW_START>>>
 在这里写下小说的背景设定、力量体系、时代背景等宏观世界观介绍...
-[世界观档案结束]
+<<<WORLDVIEW_END>>>
 
-[章节提要开始]
+<<<SUMMARY_START>>>
 在这里写下从已提供的片段中归纳出的剧情主线和早期冲突...
-[章节提要结束]
+<<<SUMMARY_END>>>
 
-[登场人物开始]
+<<<CHARACTERS_START>>>
 在这里罗列片段中出现的重要角色及其身份特征（如：姓名 - 身份 - 性格）...
-[登场人物结束]
+<<<CHARACTERS_END>>>
 
 小说名：《${this.book.name}》
 抽样内容：
@@ -444,22 +444,40 @@ ${sampleText}`;
       // 调用基础的统一 LLM 接口
       const response = await sendTextGameAiMessage([{ role: 'user', content: prompt }]);
       
-      // 使用正则提取标记块中的内容
-      const worldviewMatch = response.match(/\[世界观档案开始\]([\s\S]*?)\[世界观档案结束\]/);
-      const summaryMatch = response.match(/\[章节提要开始\]([\s\S]*?)\[章节提要结束\]/);
-      const charactersMatch = response.match(/\[登场人物开始\]([\s\S]*?)\[登场人物结束\]/);
-      
-      let parsed = {
-        worldview: worldviewMatch ? worldviewMatch[1].trim() : '',
-        chaptersSummary: summaryMatch ? summaryMatch[1].trim() : '',
-        characters: charactersMatch ? charactersMatch[1].trim() : ''
+      // 提取函数：优先使用严谨定界符；若大模型未遵循，则降级使用中文正则或按顺序切分。
+      const extractField = (responseStr, enStart, enEnd, cnKeywords) => {
+        const enMatch = responseStr.match(new RegExp(`${enStart}([\\s\\S]*?)${enEnd}`, 'i'));
+        if (enMatch && enMatch[1].trim()) return enMatch[1].trim();
+        
+        // 降级：匹配大模型可能擅自使用的中文标题（如 "【世界观】", "### 登场人物" 等）
+        const keywordPattern = cnKeywords.join('|');
+        const cnMatch = responseStr.match(new RegExp(`(?:^|\\n)[#\\s\\*\\[【「]*(?:${keywordPattern})[\\s\\]】」]*[：:]?\\s*\\n([\\s\\S]*?)(?=(?:\\n[#\\s\\*\\[【「]*(?:世界观|章节|剧情|登场|人物))|$)`, 'i'));
+        if (cnMatch && cnMatch[1].trim()) return cnMatch[1].trim();
+        
+        return '';
       };
       
+      let parsed = {
+        worldview: extractField(response, '<<<WORLDVIEW_START>>>', '<<<WORLDVIEW_END>>>', ['世界观档案', '世界观', '背景设定']),
+        chaptersSummary: extractField(response, '<<<SUMMARY_START>>>', '<<<SUMMARY_END>>>', ['章节提要', '剧情主线', '章节概要', '剧情摘要']),
+        characters: extractField(response, '<<<CHARACTERS_START>>>', '<<<CHARACTERS_END>>>', ['登场人物', '重要角色', '角色介绍'])
+      };
+      
+      // 极限兜底：如果三个字段都没提取到任何东西，说明大模型输出了一大段毫无排版的纯文本
       if (!parsed.worldview && !parsed.chaptersSummary && !parsed.characters) {
-         // 如果连分割符都没有，就直接把大模型回复当做世界观（兜底方案）
          parsed.worldview = response.trim();
-         parsed.chaptersSummary = '（未提取到相关信息）';
-         parsed.characters = '（未提取到相关信息）';
+         parsed.chaptersSummary = '（未提取到符合格式的相关信息，请参考上方原始返回文本）';
+         parsed.characters = '（未提取到符合格式的相关信息，请参考上方原始返回文本）';
+      } else {
+         // 部分缺失的补充
+         if (!parsed.worldview) parsed.worldview = '（未提取到专属世界观段落，大模型可能合并输出了信息）';
+         if (!parsed.chaptersSummary) parsed.chaptersSummary = '（未提取到专属章节提要段落）';
+         if (!parsed.characters) parsed.characters = '（未提取到专属登场人物段落）';
+      }
+      
+      // 最后再加一层防守：如果连大模型都没有返回任何实质内容（极小概率）
+      if (!response.trim()) {
+        throw new Error('大模型返回了空数据。');
       }
       
       await saveBookSettings(this.book.id, {
