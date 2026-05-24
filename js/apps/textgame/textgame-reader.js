@@ -16,13 +16,16 @@ import {
   getTextGameSettings,
   getStoryRunsByBookAndMask,
   setReaderSettings,
-  setTravelWordCount
+  setTravelWordCount,
+  getBookSettings,
+  saveBookSettings
 } from './textgame-store.js';
 import {
   loadArchiveProfilesForTextGame,
   loadCompanionCandidatesForTextGame,
   loadCompanionMemoryForTextGame
 } from './textgame-bridge.js';
+import { callLLM } from './textgame-api.js';
 
 /* ==========================================================================
    [区域标注·已完成·梦笺多格式章节目录解析]
@@ -115,12 +118,19 @@ export class TextGameReader {
 
     const chapter = this.chapters[this.chapterIndex] || this.chapters[0];
     const progressPercent = this.getProgressPercent();
+    
+    // 如果存在进行中的穿书，拦截显示
+    if (this.activeRunId) {
+       this.renderActiveRunMode();
+       return;
+    }
 
     this.container.innerHTML = `
       <!-- [区域标注·已完成·梦笺沉浸式阅读页] 顶栏/底栏默认隐藏，点击正文中心显示；顶栏含书名与当前小说存档抽屉入口。 -->
       <div class="textgame-reader ${this.readerControlsVisible ? 'controls-visible' : ''}" data-role="reader-shell" style="--reader-bg:${escapeHtml(this.readerSettings.background)};--reader-color:${escapeHtml(this.readerSettings.color)};--reader-font-size:${this.readerSettings.fontSize}px;">
         <div class="textgame-reader-toolbar" data-role="reader-topbar">
           <button class="textgame-reader-back" data-action="back" aria-label="返回书架">${Icons.back}</button>
+          <button class="textgame-reader-book-btn" data-action="open-book-setting" aria-label="书籍设定">${Icons.book}</button>
           <div class="textgame-reader-title-box" title="${escapeHtml(this.book?.name || '未命名小说')}">${escapeHtml(String(this.book?.name || '未命名小说').replace(/\.txt$/i, ''))}</div>
           <button class="textgame-reader-more" data-action="open-run-drawer" aria-label="查看存档节点">${Icons.moreVertical}</button>
         </div>
@@ -297,6 +307,162 @@ export class TextGameReader {
     this.container.querySelector('[data-action="open-toc"]')?.addEventListener('click', () => this.openTocModal());
     this.container.querySelector('[data-action="open-reader-settings"]')?.addEventListener('click', () => this.openReaderSettingsModal());
     this.container.querySelector('[data-action="open-run-drawer"]')?.addEventListener('click', () => this.openRunDrawer());
+    this.container.querySelector('[data-action="open-book-setting"]')?.addEventListener('click', () => this.openBookSettingModal());
+  }
+
+  async openBookSettingModal() {
+    /* ==========================================================================
+       [区域标注·已完成·梦笺高级杂志风格设定页]
+       说明：
+       1. 独立全屏或大尺寸模态框展示小说的世界观、章节摘要、重要角色。
+       2. 包含“生成设定”入口，调用大模型提取（待实现具体逻辑）。
+       ========================================================================== */
+    const existing = document.querySelector('.textgame-book-setting-overlay');
+    if (existing) existing.remove();
+    
+    // 拉取并渲染已有的设定数据
+    const settings = await getBookSettings(this.book.id);
+    const worldviewStr = settings?.worldview ? escapeHtml(settings.worldview).replace(/\n/g, '<br>') : '<p style="color: var(--theme-color-secondary); font-style: italic; text-align: center;">暂无世界观设定。点击右上角“AI 提取”自动生成。</p>';
+    const summaryStr = settings?.chaptersSummary ? escapeHtml(settings.chaptersSummary).replace(/\n/g, '<br>') : '<p style="color: var(--theme-color-secondary); font-style: italic; text-align: center;">暂无章节提要。需先执行 AI 提取。</p>';
+    const charactersStr = settings?.characters ? escapeHtml(settings.characters).replace(/\n/g, '<br>') : '<p style="color: var(--theme-color-secondary); font-style: italic; text-align: center;">暂无人物情报。需先执行 AI 提取。</p>';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'textgame-modal-overlay textgame-book-setting-overlay active';
+    overlay.innerHTML = `
+      <div class="textgame-modal-container textgame-book-setting-container" style="width: 90vw; height: 85vh; max-width: 600px; display: flex; flex-direction: column; padding: 0;">
+        <div class="textgame-travel-modal-head" style="padding: 16px;">
+          <div class="textgame-section-title">${Icons.book}<span>书籍设定</span></div>
+          <button class="textgame-travel-modal-close" data-action="close-book-setting" title="关闭">${Icons.back}</button>
+        </div>
+        <div class="textgame-book-setting-content" style="flex: 1; overflow-y: auto; padding: 0 16px 24px;">
+          
+          <div class="textgame-book-setting-magazine-header" style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid var(--theme-color-primary); padding-bottom: 20px;">
+            <h1 style="font-size: 28px; font-weight: bold; font-family: serif; margin-bottom: 8px; color: var(--theme-color-primary);">${escapeHtml(this.book?.name || '未命名小说')}</h1>
+            <p style="font-size: 14px; color: var(--theme-color-secondary); letter-spacing: 2px;">WORLD SETTINGS & ARCHIVES</p>
+          </div>
+
+          <div class="textgame-book-setting-section" style="margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="font-size: 18px; font-weight: 600; border-left: 4px solid var(--theme-color-primary); padding-left: 8px;">世界观档案</h3>
+              <button class="textgame-reader-tool-card" style="width: auto; padding: 4px 12px; min-height: 32px;" data-action="generate-worldview">${Icons.sparkle}<span>AI 提取</span></button>
+            </div>
+            <div class="textgame-book-setting-card" data-role="view-worldview" style="background: var(--theme-color-divider); padding: 16px; border-radius: 12px; font-size: 14px; line-height: 1.6;">
+              ${worldviewStr}
+            </div>
+          </div>
+
+          <div class="textgame-book-setting-section" style="margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="font-size: 18px; font-weight: 600; border-left: 4px solid var(--theme-color-primary); padding-left: 8px;">章节提要</h3>
+            </div>
+            <div class="textgame-book-setting-card" data-role="view-summary" style="background: var(--theme-color-divider); padding: 16px; border-radius: 12px; font-size: 14px; line-height: 1.6;">
+               ${summaryStr}
+            </div>
+          </div>
+
+          <div class="textgame-book-setting-section" style="margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="font-size: 18px; font-weight: 600; border-left: 4px solid var(--theme-color-primary); padding-left: 8px;">登场人物</h3>
+            </div>
+            <div class="textgame-book-setting-card" data-role="view-characters" style="background: var(--theme-color-divider); padding: 16px; border-radius: 12px; font-size: 14px; line-height: 1.6;">
+               ${charactersStr}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const close = () => {
+      overlay.classList.remove('active');
+      setTimeout(() => overlay.remove(), 240);
+    };
+
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) close();
+    });
+    
+    overlay.querySelector('.textgame-book-setting-container')?.addEventListener('click', (event) => event.stopPropagation());
+    overlay.querySelector('[data-action="close-book-setting"]')?.addEventListener('click', close);
+    
+    const generateBtn = overlay.querySelector('[data-action="generate-worldview"]');
+    generateBtn?.addEventListener('click', async () => {
+      const confirmStr = settings ? '覆盖重新提取会消耗较多 Token，确认要重新分析本书吗？' : '即将使用当前 API 预设分析全书，提取世界观与重要角色。可能需要数分钟且消耗较多 Token。是否继续？';
+      showModal({
+        title: 'AI 全书设定提取',
+        content: confirmStr,
+        showCancel: true,
+        confirmText: '开始提取',
+        onConfirm: () => this.executeAIWorldviewExtraction(overlay, generateBtn)
+      });
+    });
+  }
+  
+  async executeAIWorldviewExtraction(overlay, btnNode) {
+    try {
+      btnNode.innerHTML = `<span style="animation: spin 1s linear infinite; display: inline-block;">↻</span><span>分析中...</span>`;
+      btnNode.style.pointerEvents = 'none';
+      btnNode.style.opacity = '0.7';
+      
+      const appSettings = await getTextGameSettings();
+      if (!appSettings?.apiProfile) throw new Error('请先在梦笺主页的 [设置] 中配置 API 预设。');
+      
+      // 抽样前文：取前中后各截取一段组合（Token 控制在合理范围内，约前2章、中间2章、末尾2章摘要）
+      let sampleText = '';
+      if (this.chapters.length <= 6) {
+        sampleText = this.chapters.map(c => `【${c.title}】\n${makeSnippet(c.content, 2000)}`).join('\n\n');
+      } else {
+        const head = [this.chapters[0], this.chapters[1]];
+        const midIdx = Math.floor(this.chapters.length / 2);
+        const mid = [this.chapters[midIdx], this.chapters[midIdx + 1]];
+        const tail = [this.chapters[this.chapters.length - 2], this.chapters[this.chapters.length - 1]];
+        sampleText = [...head, ...mid, ...tail].map(c => `【${c.title}】\n${makeSnippet(c.content, 1500)}`).join('\n\n...\n\n');
+      }
+      
+      const prompt = `请根据以下小说的抽样章节片段，提取并归纳本书的设定信息。
+请严格输出为 JSON 格式，包含以下三个字段：
+- "worldview" (字符串)：小说的背景设定、力量体系、时代背景等宏观世界观介绍。
+- "chaptersSummary" (字符串)：从已提供的片段中归纳出的剧情主线和早期冲突。
+- "characters" (字符串)：罗列片段中出现的重要角色及其身份特征（如：姓名 - 身份 - 性格）。
+
+小说名：《${this.book.name}》
+抽样内容：
+${sampleText}
+
+请直接输出包含这3个字段的合法JSON对象，不要有其它多余的回答或 Markdown 标记。`;
+      
+      // 调用基础的统一 LLM 接口
+      const response = await callLLM(prompt, appSettings.apiProfile);
+      
+      // 提取 JSON
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('AI 返回的数据格式无法解析');
+      const parsed = JSON.parse(jsonMatch[0]);
+      
+      await saveBookSettings(this.book.id, {
+        worldview: parsed.worldview || '无',
+        chaptersSummary: parsed.chaptersSummary || '无',
+        characters: parsed.characters || '无'
+      });
+      
+      // 更新视图
+      const newSettings = await getBookSettings(this.book.id);
+      overlay.querySelector('[data-role="view-worldview"]').innerHTML = escapeHtml(newSettings.worldview).replace(/\n/g, '<br>');
+      overlay.querySelector('[data-role="view-summary"]').innerHTML = escapeHtml(newSettings.chaptersSummary).replace(/\n/g, '<br>');
+      overlay.querySelector('[data-role="view-characters"]').innerHTML = escapeHtml(newSettings.characters).replace(/\n/g, '<br>');
+      
+      showModal({ title: '提取成功', content: '书籍设定已更新并保存。' });
+      
+    } catch (err) {
+      console.error(err);
+      showModal({ title: '提取失败', content: err.message });
+    } finally {
+      btnNode.innerHTML = `${Icons.sparkle}<span>重新提取</span>`;
+      btnNode.style.pointerEvents = 'auto';
+      btnNode.style.opacity = '1';
+    }
   }
 
   async goToChapter(index) {
@@ -640,21 +806,163 @@ export class TextGameReader {
         },
         memorySummaries: memories
       } : null,
-      openingPrompt: this.buildOpeningPrompt(chapter, companion, memories, customChoice)
+      openingPrompt: this.buildOpeningPrompt(chapter, companion, memories, customChoice),
+      chatHistory: [] // 留着存放后续生成的全新剧情
     });
 
     this.closeTravelModal(activeOverlay);
+    
+    // 直接进入沉浸式截断阅读模式
+    this.activeRunId = run.id;
+    this.activeRunData = run;
+    await this.render();
+    
+    // 自动发起第一轮请求，AI 会顺着 openingPrompt 直接续写
+    this.advanceRunPlot('【系统】梦境连接已建立，剧情开始推演...');
+  }
+  
+  /* ==========================================================================
+     [区域标注·已完成·梦笺沉浸式截断阅读与结算导出]
+     说明：
+     1. 从当前节点开始隐藏原版正文，显示独立的新剧情和对话。
+     2. 底部带有选项生成面板。
+     3. 结束穿越后提供结算弹窗，保存为全新的 TXT 同人小说。
+     ========================================================================== */
+  renderActiveRunMode() {
+    // 将整个聊天记录拼接渲染
+    const historyHtml = (this.activeRunData.chatHistory || []).map(msg => {
+      if (msg.role === 'user') {
+        return `<div style="text-align: right; margin-bottom: 12px;"><span style="display: inline-block; background: var(--theme-color-primary); color: #fff; padding: 8px 12px; border-radius: 12px 12px 0 12px;">${escapeHtml(msg.content)}</span></div>`;
+      }
+      return `<div style="text-align: left; margin-bottom: 12px;"><span style="display: inline-block; background: var(--theme-color-divider); color: var(--reader-color); padding: 8px 12px; border-radius: 12px 12px 12px 0; line-height: 1.6;">${escapeHtml(msg.content).replace(/\n/g, '<br>')}</span></div>`;
+    }).join('');
 
-    showModal({
-      title: '穿书存档已保存',
-      content: `
-        <div class="textgame-run-created">
-          <p>已从《${escapeHtml(this.book.name)}》「${escapeHtml(chapter.title)}」保存穿书存档。</p>
-          <p>路线：${this.selectedPlotMode === 'canon' ? '走原著' : '改写线'} / ${this.selectedTravelMode === 'soul' ? '魂穿' : '身穿'}</p>
-          <p>身份：${escapeHtml(this.activeMask?.name || '未命名面具')}</p>
-          <p>存档号：${escapeHtml(run.id)}</p>
+    this.container.innerHTML = `
+      <div class="textgame-reader" style="--reader-bg:${escapeHtml(this.readerSettings.background)};--reader-color:${escapeHtml(this.readerSettings.color)};--reader-font-size:${this.readerSettings.fontSize}px; display: flex; flex-direction: column;">
+        <div class="textgame-reader-toolbar" style="transform: translateY(0); display: flex; justify-content: space-between; position: relative;">
+          <button class="textgame-reader-back" data-action="exit-run" aria-label="退出并结算">${Icons.close}<span>结束穿越</span></button>
+          <div class="textgame-reader-title-box" style="flex: 1; text-align: center;">正在体验《${escapeHtml(this.book?.name?.replace(/\.txt$/i, ''))}》</div>
+          <div style="width: 48px;"></div>
         </div>
-      `
+        
+        <article class="textgame-reader-paper" style="flex: 1; overflow-y: auto; padding-bottom: 80px;" data-role="run-history">
+          ${historyHtml || '<div style="text-align: center; color: var(--theme-color-secondary); margin-top: 40px; font-style: italic;">剧情生成中，请稍候...</div>'}
+        </article>
+        
+        <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: var(--reader-bg); padding: 12px; border-top: 1px solid var(--theme-color-divider); display: flex; gap: 8px; box-sizing: border-box;">
+           <input type="text" data-role="run-input" placeholder="输入你想做的事..." style="flex: 1; height: 36px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--theme-color-divider); background: transparent; color: var(--reader-color);">
+           <button class="textgame-reader-tool-card" style="width: auto; padding: 0 16px; border-radius: 18px;" data-action="run-send">${Icons.play}</button>
+        </div>
+      </div>
+    `;
+    
+    // 自动滚动到底部
+    const paper = this.container.querySelector('[data-role="run-history"]');
+    if (paper) paper.scrollTop = paper.scrollHeight;
+    
+    this.container.querySelector('[data-action="exit-run"]')?.addEventListener('click', () => this.settleRun());
+    
+    const sendBtn = this.container.querySelector('[data-action="run-send"]');
+    const input = this.container.querySelector('[data-role="run-input"]');
+    
+    const handleSend = () => {
+      const val = String(input.value || '').trim();
+      if (!val) return;
+      input.value = '';
+      this.advanceRunPlot(val);
+    };
+    
+    sendBtn?.addEventListener('click', handleSend);
+    input?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    });
+  }
+  
+  async advanceRunPlot(userAction) {
+    if (!this.activeRunData) return;
+    
+    // 追加用户消息并渲染
+    if (userAction !== '【系统】梦境连接已建立，剧情开始推演...') {
+      this.activeRunData.chatHistory.push({ role: 'user', content: userAction });
+      this.renderActiveRunMode();
+    }
+    
+    const sendBtn = this.container.querySelector('[data-action="run-send"]');
+    if (sendBtn) sendBtn.style.opacity = '0.5', sendBtn.style.pointerEvents = 'none';
+    
+    try {
+      const appSettings = await getTextGameSettings();
+      if (!appSettings?.apiProfile) throw new Error('未配置 API 预设');
+      
+      const prompt = `
+【上下文背景】
+${this.activeRunData.openingPrompt}
+
+【历史对话】
+${this.activeRunData.chatHistory.map(m => `${m.role === 'user' ? '用户：' : 'AI：'}${m.content}`).join('\n')}
+
+${userAction === '【系统】梦境连接已建立，剧情开始推演...' ? '请直接输出第一段开场剧情和3个行动选项。' : `用户刚才执行了：${userAction}。请根据上下文，续写这一段剧情反应并给出接下来的3个选项。`}
+`;
+      
+      const response = await callLLM(prompt, appSettings.apiProfile);
+      
+      this.activeRunData.chatHistory.push({ role: 'assistant', content: response });
+      
+      // 持久化到穿书存档
+      await saveStoryRun(this.activeRunData);
+      
+      this.renderActiveRunMode();
+      
+    } catch (err) {
+      console.error(err);
+      showModal({ title: '剧情生成失败', content: err.message });
+    } finally {
+      const btn = this.container.querySelector('[data-action="run-send"]');
+      if (btn) btn.style.opacity = '1', btn.style.pointerEvents = 'auto';
+    }
+  }
+  
+  async settleRun() {
+    showModal({
+      title: '结束穿越并结算',
+      content: '确认要结束当前的沉浸式穿越吗？结束之后，系统将自动把这段由你创造的独立剧情打包成一本新的同人小说供你下载。',
+      showCancel: true,
+      confirmText: '结束穿越',
+      onConfirm: async () => {
+        if (!this.activeRunData) return;
+        
+        // 组装文本
+        const rawContent = (this.activeRunData.chatHistory || [])
+          .filter(m => m.role === 'assistant')
+          .map(m => m.content)
+          .join('\n\n=================================\n\n');
+          
+        const filename = `[同人]《${this.book.name.replace(/\.txt$/i, '')}》${this.activeMask ? this.activeMask.name : '未知'}的穿越篇章.txt`;
+        
+        // 纯前端下载 Blob
+        const blob = new Blob([rawContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 100);
+        
+        // 清理状态并返回正常阅读模式
+        this.activeRunId = null;
+        this.activeRunData = null;
+        this.readerControlsVisible = true;
+        await this.render();
+      }
     });
   }
 

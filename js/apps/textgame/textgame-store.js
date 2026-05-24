@@ -37,6 +37,7 @@ function normalizeTextGameData(raw) {
     appId: APP_ID,
     books: Array.isArray(source.books) ? source.books : [],
     storyRuns: Array.isArray(source.storyRuns) ? source.storyRuns : [],
+    bookSettings: Array.isArray(source.bookSettings) ? source.bookSettings : [],
     settings: {
       activeMaskId: String(source?.settings?.activeMaskId || ''),
       globalTravelPrompt: String(source?.settings?.globalTravelPrompt || ''),
@@ -227,6 +228,43 @@ export async function renameBook(bookId, name) {
 
   await saveTextGameData(data);
   return updatedBook;
+}
+
+/* ==========================================================================
+   [区域标注·已完成·梦笺图书 AI 设定持久化]
+   说明：独立保存某本小说的世界观、提要、人物等 AI 提取数据。
+   ========================================================================== */
+export async function getBookSettings(bookId) {
+  const data = await getTextGameData();
+  return (data.bookSettings || []).find((s) => s.bookId === bookId) || null;
+}
+
+export async function saveBookSettings(bookId, settingsPatch) {
+  const data = await getTextGameData();
+  if (!data.bookSettings) data.bookSettings = [];
+  
+  let existingIndex = data.bookSettings.findIndex((s) => s.bookId === bookId);
+  if (existingIndex >= 0) {
+    data.bookSettings[existingIndex] = {
+      ...data.bookSettings[existingIndex],
+      ...settingsPatch,
+      updatedAt: nowIso()
+    };
+  } else {
+    data.bookSettings.push({
+      id: uid('bkset'),
+      bookId,
+      worldview: '',
+      chaptersSummary: '',
+      characters: '',
+      ...settingsPatch,
+      createdAt: nowIso(),
+      updatedAt: nowIso()
+    });
+  }
+  
+  await saveTextGameData(data);
+  return getBookSettings(bookId);
 }
 
 export async function deleteBook(bookId) {
