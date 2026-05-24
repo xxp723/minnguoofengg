@@ -14,6 +14,7 @@ import { TextGameShelf } from './textgame-shelf.js';
 import { TextGameArchive } from './textgame-archive.js';
 import { TextGameHome } from './textgame-home.js';
 import { TextGameReader } from './textgame-reader.js';
+import { getBook } from './textgame-store.js';
 
 /* ==========================================================================
    [区域标注·已完成·梦笺应用加载 CSS 工具函数]
@@ -143,7 +144,7 @@ export async function mount(container, context) {
     }
   };
 
-  const openReader = async (book) => {
+  const openReader = async (book, runToLoad = null) => {
     currentTab = 'reader';
     appView?.classList.add('textgame-reader-mode');
     tabs.forEach(tab => tab.classList.remove('active'));
@@ -156,11 +157,23 @@ export async function mount(container, context) {
         await switchTab('shelf');
       }
     });
-    await readerInstance.render();
+    
+    if (runToLoad) {
+      await readerInstance.loadRun(runToLoad);
+    } else {
+      await readerInstance.render();
+    }
   };
 
   const shelfInstance = new TextGameShelf(pageShelf, { onOpenBook: openReader });
-  const archiveInstance = new TextGameArchive(pageArchive);
+  const archiveInstance = new TextGameArchive(pageArchive, {
+    onLoadRun: async (run) => {
+      const book = await getBook(run.bookId);
+      if (book) {
+        await openReader(book, run);
+      }
+    }
+  });
   const homeInstance = new TextGameHome(pageHome);
 
   await shelfInstance.render();

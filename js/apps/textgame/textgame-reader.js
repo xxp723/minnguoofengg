@@ -1203,7 +1203,7 @@ ${sampleText}`;
   renderActiveRunMode() {
     const historyHtml = (this.activeRunData.chatHistory || []).map(msg => {
       if (msg.role === 'user') {
-        return `<div style="text-align: right; margin-bottom: 12px;"><span style="display: inline-block; background: var(--theme-color-primary); color: #fff; padding: 8px 12px; border-radius: 12px 12px 0 12px;">${escapeHtml(msg.content)}</span></div>`;
+        return `<div style="text-align: right; margin-bottom: 12px;"><span style="display: inline-block; background: var(--theme-color-divider); color: var(--reader-color); padding: 8px 12px; border-radius: 12px 12px 0 12px;">${escapeHtml(msg.content)}</span></div>`;
       }
       
       let mainText = msg.content;

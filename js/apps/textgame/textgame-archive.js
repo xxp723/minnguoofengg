@@ -12,9 +12,10 @@ import { Icons, escapeHtml, showModal } from './textgame-ui.js';
 import { getTextGameSettings, getStoryRunsByMask, deleteStoryRun } from './textgame-store.js';
 
 export class TextGameArchive {
-  constructor(container) {
+  constructor(container, { onLoadRun } = {}) {
     this.container = container;
     this.runs = [];
+    this.onLoadRun = onLoadRun;
   }
 
   async render() {
@@ -97,6 +98,27 @@ export class TextGameArchive {
           onConfirm: async () => {
             await deleteStoryRun(runId);
             await this.render();
+          }
+        });
+      });
+    });
+
+    this.container.querySelectorAll('.textgame-archive-card').forEach((card) => {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.textgame-archive-delete')) return;
+        
+        const runId = card.dataset.runId || '';
+        const run = this.runs.find((item) => item.id === runId);
+        if (!run) return;
+        
+        showModal({
+          title: '读取存档',
+          content: `确定要读取《${escapeHtml(run.bookName || '未命名小说')}》的这个穿越进度吗？`,
+          showCancel: true,
+          confirmText: '读取',
+          cancelText: '取消',
+          onConfirm: () => {
+            if (this.onLoadRun) this.onLoadRun(run);
           }
         });
       });
