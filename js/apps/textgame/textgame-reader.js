@@ -1204,6 +1204,14 @@ ${sampleText}`;
     const totalTokens = this.activeRunData.totalTokens || 0;
     const lastTokens = this.activeRunData.lastTokens || 0;
 
+    const loadingHtml = this.isGeneratingRun ? `
+      <div style="text-align: left; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        <div style="display: inline-block; background: transparent; color: var(--theme-color-secondary); padding: 8px 12px; border-radius: 12px; line-height: 1.6; font-style: italic; font-size: 14px;">
+          <span style="display: inline-block; animation: spin 1s linear infinite; margin-right: 6px;">✨</span>剧情推演中，请稍候...
+        </div>
+      </div>
+    ` : '';
+
     this.container.innerHTML = `
       <div class="textgame-reader ${this.readerControlsVisible ? 'controls-visible' : ''}" data-role="reader-shell" style="--reader-bg:${escapeHtml(this.readerSettings.background)};--reader-color:${escapeHtml(this.readerSettings.color)};--reader-font-size:${this.readerSettings.fontSize}px; display: flex; flex-direction: column;">
         <div class="textgame-reader-toolbar" data-role="reader-topbar" style="display: flex; justify-content: space-between; align-items: center; padding: 0 12px;">
@@ -1219,7 +1227,8 @@ ${sampleText}`;
         </div>
         
         <article class="textgame-reader-paper" style="flex: 1; overflow-y: auto; padding-bottom: 20px;" data-role="run-history">
-          ${historyHtml || '<div style="text-align: center; color: var(--theme-color-secondary); margin-top: 40px; font-style: italic;">剧情推演中，请稍候...</div>'}
+          ${historyHtml || (this.isGeneratingRun ? '' : '<div style="text-align: center; color: var(--theme-color-secondary); margin-top: 40px; font-style: italic;">梦境连接已建立，等待选项...</div>')}
+          ${loadingHtml}
         </article>
         
         <div class="textgame-reader-actions textgame-reader-control-panel" data-role="reader-bottombar">
@@ -1274,7 +1283,7 @@ ${sampleText}`;
     const overlay = document.createElement('div');
     overlay.className = 'textgame-modal-overlay active';
     overlay.innerHTML = `
-      <div class="textgame-modal-container" style="width: 90vw; max-width: 500px; padding: 0; display: flex; flex-direction: column;">
+      <div class="textgame-modal-container" style="width: 90vw; max-width: 400px; max-height: 85vh; padding: 0; display: flex; flex-direction: column;">
         <div class="textgame-travel-modal-head" style="padding: 16px; border-bottom: 1px solid var(--theme-color-divider);">
           <div style="display: flex; flex-direction: column;">
              <span style="font-weight: bold; font-size: 16px;">第 ${runCount} 轮推进</span>
@@ -1288,9 +1297,9 @@ ${sampleText}`;
           
           <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
             ${parsedOptions.map((opt, i) => `
-              <button class="textgame-choice-card" data-action="select-option" data-option-val="${escapeHtml(opt)}" style="text-align: left; padding: 12px; height: auto; display: flex; align-items: flex-start; gap: 8px;">
-                 <span style="font-weight: bold; color: var(--theme-color-primary); flex-shrink: 0;">${i+1}.</span>
-                 <span style="font-size: 14px; line-height: 1.5; color: var(--theme-color-text);">${escapeHtml(opt)}</span>
+              <button class="textgame-choice-card" data-action="select-option" data-option-val="${escapeHtml(opt)}" style="text-align: left; padding: 12px; height: auto; display: flex; align-items: flex-start; gap: 8px; transition: all 0.2s;">
+                 <span style="font-weight: bold; color: inherit; flex-shrink: 0;">${i+1}.</span>
+                 <span style="font-size: 14px; line-height: 1.5; color: inherit;">${escapeHtml(opt)}</span>
               </button>
             `).join('')}
           </div>
@@ -1302,7 +1311,7 @@ ${sampleText}`;
         </div>
         
         <div style="padding: 16px; border-top: 1px solid var(--theme-color-divider);">
-          <button class="textgame-reader-tool-card" data-action="send-custom" style="width: 100%; background: #1a1a1a; color: #fff; border-radius: 24px; padding: 12px; font-weight: bold; font-size: 15px;">生成后续剧情</button>
+          <button class="textgame-reader-tool-card" data-action="send-custom" style="width: 100%; background: #1a1a1a; color: #fff; border-radius: 24px; padding: 12px; font-weight: bold; font-size: 15px;">生成剧情</button>
         </div>
       </div>
     `;
@@ -1317,22 +1326,37 @@ ${sampleText}`;
     overlay.querySelector('[data-action="close"]')?.addEventListener('click', close);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     
-    overlay.querySelectorAll('[data-action="select-option"]').forEach(btn => {
+    let selectedVal = '';
+    const optionBtns = overlay.querySelectorAll('[data-action="select-option"]');
+    const customInput = overlay.querySelector('[data-role="custom-input"]');
+    
+    optionBtns.forEach(btn => {
        btn.addEventListener('click', () => {
-          const val = btn.dataset.optionVal;
-          close();
-          this.advanceRunPlot(val);
+          optionBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          selectedVal = btn.dataset.optionVal;
+          if (customInput) customInput.value = '';
        });
     });
     
+    if (customInput) {
+       customInput.addEventListener('input', () => {
+          if (customInput.value.trim() !== '') {
+             optionBtns.forEach(b => b.classList.remove('active'));
+             selectedVal = '';
+          }
+       });
+    }
+    
     overlay.querySelector('[data-action="send-custom"]')?.addEventListener('click', () => {
-       const val = overlay.querySelector('[data-role="custom-input"]')?.value?.trim();
-       if (!val) {
-          showModal({ title: '提示', content: '请输入自定义剧情走向。' });
+       const customVal = customInput?.value?.trim();
+       const finalVal = customVal || selectedVal;
+       if (!finalVal) {
+          showModal({ title: '提示', content: '请先选择一个行动选项或输入自定义剧情走向。' });
           return;
        }
        close();
-       this.advanceRunPlot(val);
+       this.advanceRunPlot(finalVal);
     });
   }
   
@@ -1342,11 +1366,10 @@ ${sampleText}`;
     // 追加用户消息并渲染
     if (userAction !== '【系统】梦境连接已建立，剧情开始推演...') {
       this.activeRunData.chatHistory.push({ role: 'user', content: userAction });
-      this.renderActiveRunMode();
     }
     
-    const sendBtn = this.container.querySelector('[data-action="run-send"]');
-    if (sendBtn) sendBtn.style.opacity = '0.5', sendBtn.style.pointerEvents = 'none';
+    this.isGeneratingRun = true;
+    this.renderActiveRunMode();
     
     try {
       const appSettings = await getTextGameSettings();
@@ -1435,8 +1458,8 @@ ${actionPrompt}
       console.error(err);
       showModal({ title: '剧情生成失败', content: err.message });
     } finally {
-      const btn = this.container.querySelector('[data-action="run-send"]');
-      if (btn) btn.style.opacity = '1', btn.style.pointerEvents = 'auto';
+      this.isGeneratingRun = false;
+      this.renderActiveRunMode();
     }
   }
   
