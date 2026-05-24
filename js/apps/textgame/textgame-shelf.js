@@ -2,7 +2,7 @@
  * ==========================================================================
  * [区域标注·已完成·梦笺书架页面]
  * 说明：
- * 1. 负责 3x3 书架网格渲染、本地 TXT 文件导入与解析（已完成：自动识别 BOM / UTF-8 / GBK-ANSI，降低乱码概率）。
+ * 1. 负责 3x3 书架网格渲染、本地 TXT 文件导入与解析（已完成：优先严格识别 UTF-8，再回退 GB18030/GBK，避免简体中文 TXT 误判乱码）。
  * 2. 点击书籍进入 TXT 阅读器；删除使用梦笺自定义弹窗，不使用浏览器原生弹窗。
  * 3. 书籍正文完整写入 textgame-store.js → DB.js / IndexedDB，不做长文本过滤，不写浏览器存储兜底。
  * ==========================================================================
@@ -15,7 +15,7 @@ import { getBooks, addBook, deleteBook } from './textgame-store.js';
    [区域标注·已完成·梦笺 TXT 编码识别]
    说明：
    1. 仅负责导入阶段的 ArrayBuffer 解码，不涉及任何持久化存储。
-   2. 优先识别 UTF BOM；无 BOM 时在 UTF-8 与 GBK/ANSI 之间按乱码评分择优。
+   2. 优先识别 UTF BOM；无 BOM 时先用 strict UTF-8，成功即采用，失败再回退 GB18030/GBK。
    3. 不使用 localStorage/sessionStorage，不过滤长文本，解码后的完整正文继续交给 IndexedDB 存储链路。
    ========================================================================== */
 function decodeTextFileBuffer(buffer) {
@@ -33,43 +33,23 @@ function decodeTextFileBuffer(buffer) {
     return new TextDecoder('utf-16be').decode(bytes.slice(2));
   }
 
-  const candidates = [];
   try {
-    candidates.push({
-      encoding: 'utf-8',
-      text: new TextDecoder('utf-8', { fatal: true }).decode(buffer)
-    });
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
   } catch (err) {
-    candidates.push({
-      encoding: 'utf-8',
-      text: new TextDecoder('utf-8').decode(buffer)
-    });
+    return decodeLegacyChineseText(buffer);
   }
-
-  candidates.push({
-    encoding: 'gbk',
-    text: new TextDecoder('gbk').decode(buffer)
-  });
-
-  return candidates
-    .map((candidate) => ({ ...candidate, score: scoreDecodedText(candidate.text, candidate.encoding) }))
-    .sort((a, b) => a.score - b.score)[0]?.text || '';
 }
 
-function scoreDecodedText(text, encoding) {
-  const value = String(text || '');
-  const replacementCount = (value.match(/\uFFFD/g) || []).length;
-  const suspiciousCount = (value.match(/[锟斤拷]/g) || []).length;
-  const cjkCount = (value.match(/[\u4e00-\u9fff]/g) || []).length;
-  const mojibakeCount = (value.match(/[ÃÂÐÑ]/g) || []).length;
-  const controlCount = (value.match(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g) || []).length;
-
-  return replacementCount * 80
-    + suspiciousCount * 25
-    + mojibakeCount * 12
-    + controlCount * 30
-    - cjkCount * 0.18
-    + (encoding === 'utf-8' ? 0 : 1);
+function decodeLegacyChineseText(buffer) {
+  const legacyEncodings = ['gb18030', 'gbk'];
+  for (const encoding of legacyEncodings) {
+    try {
+      return new TextDecoder(encoding).decode(buffer);
+    } catch (err) {
+      // 继续尝试下一个中文编码标签，避免某些浏览器不支持特定 label。
+    }
+  }
+  return new TextDecoder('utf-8').decode(buffer);
 }
 
 export class TextGameShelf {
