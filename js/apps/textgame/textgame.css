@@ -1249,10 +1249,13 @@
 }
 
 .textgame-choice-card b,
-.textgame-choice-card em,
-.textgame-companion-card b,
-.textgame-companion-card em {
+.textgame-choice-card em {
   display: block;
+}
+
+.textgame-companion-card b {
+  display: block;
+  font-size: 14px;
 }
 
 .textgame-choice-card b {
@@ -1260,8 +1263,7 @@
   margin-bottom: 5px;
 }
 
-.textgame-choice-card em,
-.textgame-companion-card em {
+.textgame-choice-card em {
   font-style: normal;
   font-size: 11px;
   line-height: 1.45;
@@ -1275,23 +1277,22 @@
 }
 
 .textgame-companion-card {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  gap: 4px 16px;
+  display: flex;
   align-items: center;
+  gap: 12px;
 }
 
 .textgame-companion-card span {
-  grid-row: span 2;
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
   display: grid;
   place-items: center;
 }
 
 .textgame-companion-card svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
 }
 
 .textgame-option-grid {

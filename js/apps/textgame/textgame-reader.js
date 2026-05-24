@@ -247,7 +247,7 @@ export class TextGameReader {
 
     return this.companions.map((item) => `
       <button class="textgame-companion-card ${item.id === this.selectedCompanionId ? 'active' : ''}" data-companion-id="${escapeHtml(item.id)}">
-        <span class="textgame-companion-avatar" style="border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; background-color: var(--theme-color-divider);">
+        <span class="textgame-companion-avatar" style="border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background-color: var(--theme-color-divider);">
           ${item.avatar ? `<img src="${escapeHtml(item.avatar)}" alt="" style="width:100%;height:100%;object-fit:cover;">` : Icons.user}
         </span>
         <b>${escapeHtml(item.contactName || item.name)}</b>
