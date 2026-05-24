@@ -2,9 +2,9 @@
  * ==========================================================================
  * [区域标注·已完成·梦笺主页]
  * 说明：
- * 1. 主页用于梦笺独立选择“穿书时的用户面具身份”。
- * 2. 选择结果只写入梦笺 textgame 记录，不修改闲谈/档案当前面具。
- * 3. 所有持久化统一走 textgame-store.js → DB.js / IndexedDB。
+ * 1. 已完成：主页身份切换改为头像 + 姓名的主页身份卡。
+ * 2. 已完成：移除“梦笺会使用……”说明文字与“可行性方案”区域。
+ * 3. 选择结果只写入梦笺 textgame 记录，不修改闲谈/档案当前面具；持久化统一走 DB.js / IndexedDB。
  * ==========================================================================
  */
 
@@ -29,32 +29,49 @@ export class TextGameHome {
       await setTextGameActiveMask(this.activeMaskId);
     }
 
+    const activeMask = this.masks.find((mask) => mask.id === this.activeMaskId) || this.masks[0] || null;
+
     this.container.innerHTML = `
       <div class="textgame-home-panel">
         <div class="textgame-section-title">
           ${Icons.user}
-          <span>穿书身份</span>
+          <span>主页身份</span>
         </div>
-        <div class="textgame-home-desc">
-          梦笺会使用这里独立选择的面具作为“你”进入小说，不会影响闲谈当前用户主页面具。
-        </div>
+        ${this.renderHomeAvatar(activeMask)}
         <div class="textgame-mask-list">
           ${this.renderMaskCards()}
-        </div>
-        <div class="textgame-plan-card">
-          <div class="textgame-plan-title">${Icons.magic}<span>可行性方案</span></div>
-          <ol>
-            <li>导入 TXT 小说后，梦笺按章节/片段切分文本，并保存阅读进度。</li>
-            <li>在阅读器中选择故事点、穿越方式、原著跟随度与同行联系人。</li>
-            <li>同行联系人只从“当前梦笺面具绑定角色 + 已加入闲谈通讯录”的候选中读取。</li>
-            <li>生成穿书存档时写入小说片段、用户面具快照、同行角色必要设定与旧事记忆摘要。</li>
-            <li>文游选项支持系统建议选项与用户自定义输入，可选择走原著或改写剧情。</li>
-          </ol>
         </div>
       </div>
     `;
 
     this.bindEvents();
+  }
+
+  /* ==========================================================================
+     [区域标注·已完成·梦笺主页头像身份卡]
+     说明：
+     1. 主页仅显示当前面具头像与姓名，作为梦笺内的身份入口。
+     2. 下方候选面具用于切换身份；结果只保存到梦笺 IndexedDB 设置。
+     3. 原说明文字与“可行性方案”区域已移除，避免误认为尚未修改。
+     ========================================================================== */
+  renderHomeAvatar(mask) {
+    if (!mask) {
+      return `
+        <div class="textgame-home-avatar-card empty">
+          <span class="textgame-home-avatar-main">${Icons.user}</span>
+          <strong>未选择身份</strong>
+        </div>
+      `;
+    }
+
+    return `
+      <button class="textgame-home-avatar-card" data-mask-id="${escapeHtml(mask.id)}" title="当前主页身份">
+        <span class="textgame-home-avatar-main">
+          ${mask.avatar ? `<img src="${escapeHtml(mask.avatar)}" alt="">` : Icons.user}
+        </span>
+        <strong>${escapeHtml(mask.name || '未命名面具')}</strong>
+      </button>
+    `;
   }
 
   renderMaskCards() {
@@ -73,8 +90,7 @@ export class TextGameHome {
           ${mask.avatar ? `<img src="${escapeHtml(mask.avatar)}" alt="">` : Icons.user}
         </span>
         <span class="textgame-mask-main">
-          <b>${escapeHtml(mask.name)}</b>
-          <em>${escapeHtml(mask.identity || mask.signature || '未填写身份说明')}</em>
+          <b>${escapeHtml(mask.name || '未命名面具')}</b>
         </span>
         <span class="textgame-mask-check">${mask.id === this.activeMaskId ? Icons.check : ''}</span>
       </button>
@@ -82,7 +98,7 @@ export class TextGameHome {
   }
 
   bindEvents() {
-    this.container.querySelectorAll('.textgame-mask-card').forEach((button) => {
+    this.container.querySelectorAll('.textgame-mask-card, .textgame-home-avatar-card[data-mask-id]').forEach((button) => {
       button.addEventListener('click', async () => {
         const maskId = button.dataset.maskId || '';
         this.activeMaskId = maskId;
@@ -90,7 +106,7 @@ export class TextGameHome {
         await this.render();
         showModal({
           title: '身份已切换',
-          content: '梦笺穿书身份已更新。这个选择不会同步修改闲谈或档案应用的当前面具。'
+          content: '梦笺主页身份已更新。'
         });
       });
     });

@@ -3,7 +3,7 @@
  * [区域标注·已完成·梦笺 TXT 阅读器与穿书文游]
  * 说明：
  * 1. 支持 TXT 小说阅读、章节切分、阅读进度保存。
- * 2. 支持从当前故事点发起“穿书配置”，选择身穿/魂穿、原著/改写、同行联系人、自定义行动。
+ * 2. 已完成：点击“从此处穿书”后以梦笺应用内弹窗展示穿书配置，不再滑到页面底部面板。
  * 3. 穿书存档只写入梦笺自身 textgame 记录；只读联动档案/闲谈/旧事。
  * 4. 不使用 localStorage/sessionStorage，不使用浏览器原生弹窗或原生选择器。
  * ==========================================================================
@@ -76,10 +76,6 @@ export class TextGameReader {
           <button class="textgame-pill-btn" data-action="prev">${Icons.back}<span>上一章</span></button>
           <button class="textgame-pill-btn primary" data-action="travel">${Icons.magic}<span>从此处穿书</span></button>
           <button class="textgame-pill-btn" data-action="next"><span>下一章</span>${Icons.play}</button>
-        </div>
-
-        <div class="textgame-travel-panel" data-role="travel-panel">
-          ${this.renderTravelPanel()}
         </div>
       </div>
     `;
@@ -183,7 +179,7 @@ export class TextGameReader {
       await this.render();
     });
     this.container.querySelector('[data-action="travel"]')?.addEventListener('click', () => {
-      this.container.querySelector('[data-role="travel-panel"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      this.openTravelModal();
     });
 
     this.container.querySelectorAll('[data-choice-group]').forEach((button) => {
@@ -214,11 +210,87 @@ export class TextGameReader {
     this.container.querySelector('[data-action="start-run"]')?.addEventListener('click', () => this.startStoryRun());
   }
 
-  renderTravelConfigOnly() {
-    const panel = this.container.querySelector('[data-role="travel-panel"]');
+  /* ==========================================================================
+     [区域标注·已完成·从此处穿书弹窗]
+     说明：
+     1. 点击阅读页“从此处穿书”后打开梦笺自定义弹窗，不再滚动到页面底部配置面板。
+     2. 弹窗内仍复用 IconPark 图标、选择卡片、联系人卡片和生成存档逻辑。
+     3. 不使用浏览器原生弹窗/选择器，不涉及 localStorage/sessionStorage。
+     ========================================================================== */
+  openTravelModal() {
+    const existing = document.querySelector('.textgame-travel-modal-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'textgame-modal-overlay textgame-travel-modal-overlay';
+    overlay.innerHTML = `
+      <div class="textgame-modal-container textgame-travel-modal-container">
+        <div class="textgame-travel-modal-head">
+          <div class="textgame-section-title">${Icons.magic}<span>穿书配置</span></div>
+          <button class="textgame-travel-modal-close" data-action="close-travel-modal" title="关闭">${Icons.back}</button>
+        </div>
+        <div class="textgame-travel-panel" data-role="travel-panel">
+          ${this.renderTravelPanel()}
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
+    this.bindTravelModalEvents(overlay);
+  }
+
+  closeTravelModal(overlay = document.querySelector('.textgame-travel-modal-overlay')) {
+    if (!overlay) return;
+    overlay.classList.remove('active');
+    setTimeout(() => overlay.remove(), 240);
+  }
+
+  bindTravelModalEvents(overlay) {
+    overlay.querySelector('[data-action="close-travel-modal"]')?.addEventListener('click', () => {
+      this.customChoice = overlay.querySelector('[data-role="custom-choice"]')?.value || '';
+      this.closeTravelModal(overlay);
+    });
+
+    overlay.querySelectorAll('[data-choice-group]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const group = button.dataset.choiceGroup;
+        if (group === 'travel') this.selectedTravelMode = button.dataset.choiceId || 'soul';
+        if (group === 'plot') this.selectedPlotMode = button.dataset.choiceId || 'canon';
+        this.customChoice = overlay.querySelector('[data-role="custom-choice"]')?.value || '';
+        this.renderTravelConfigOnly(overlay);
+      });
+    });
+
+    overlay.querySelectorAll('[data-companion-id]').forEach((button) => {
+      button.addEventListener('click', () => {
+        this.selectedCompanionId = button.dataset.companionId || '';
+        this.customChoice = overlay.querySelector('[data-role="custom-choice"]')?.value || '';
+        this.renderTravelConfigOnly(overlay);
+      });
+    });
+
+    overlay.querySelectorAll('[data-option]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const input = overlay.querySelector('[data-role="custom-choice"]');
+        if (input) {
+          input.value = button.dataset.option || '';
+          this.customChoice = input.value;
+        }
+      });
+    });
+
+    overlay.querySelector('[data-action="start-run"]')?.addEventListener('click', async () => {
+      this.customChoice = overlay.querySelector('[data-role="custom-choice"]')?.value || '';
+      await this.startStoryRun(overlay);
+    });
+  }
+
+  renderTravelConfigOnly(overlay = document.querySelector('.textgame-travel-modal-overlay')) {
+    const panel = overlay?.querySelector('[data-role="travel-panel"]');
     if (!panel) return;
     panel.innerHTML = this.renderTravelPanel();
-    this.bindEvents();
+    this.bindTravelModalEvents(overlay);
   }
 
   async persistProgress() {
@@ -229,11 +301,11 @@ export class TextGameReader {
     });
   }
 
-  async startStoryRun() {
+  async startStoryRun(activeOverlay = null) {
     const chapter = this.chapters[this.chapterIndex] || this.chapters[0];
     const companion = this.companions.find((item) => item.id === this.selectedCompanionId) || null;
     const memories = companion ? await loadCompanionMemoryForTextGame(companion.id) : [];
-    const input = this.container.querySelector('[data-role="custom-choice"]');
+    const input = activeOverlay?.querySelector('[data-role="custom-choice"]') || this.container.querySelector('[data-role="custom-choice"]');
     const customChoice = String(input?.value || '').trim();
 
     const run = await saveStoryRun({
@@ -267,6 +339,8 @@ export class TextGameReader {
       } : null,
       openingPrompt: this.buildOpeningPrompt(chapter, companion, memories, customChoice)
     });
+
+    this.closeTravelModal(activeOverlay);
 
     showModal({
       title: '穿书存档已生成',
