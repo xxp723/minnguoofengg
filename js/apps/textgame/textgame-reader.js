@@ -18,7 +18,8 @@ import {
   setReaderSettings,
   setTravelWordCount,
   getBookSettings,
-  saveBookSettings
+  saveBookSettings,
+  setTravelSettings
 } from './textgame-store.js';
 import {
   loadArchiveProfilesForTextGame,
@@ -112,6 +113,8 @@ export class TextGameReader {
     };
     this.withCompanionMemory = true;
     this.travelWordCount = [600, 1000];
+    this.selectedPronoun = 'second';
+    this.actionOptions = [];
   }
 
   async render() {
@@ -129,11 +132,15 @@ export class TextGameReader {
     this.container.innerHTML = `
       <!-- [区域标注·已完成·梦笺沉浸式阅读页] 顶栏/底栏默认隐藏，点击正文中心显示；顶栏含书名与当前小说存档抽屉入口。 -->
       <div class="textgame-reader ${this.readerControlsVisible ? 'controls-visible' : ''}" data-role="reader-shell" style="--reader-bg:${escapeHtml(this.readerSettings.background)};--reader-color:${escapeHtml(this.readerSettings.color)};--reader-font-size:${this.readerSettings.fontSize}px;">
-        <div class="textgame-reader-toolbar" data-role="reader-topbar">
-          <button class="textgame-reader-back" data-action="back" aria-label="返回书架">${Icons.back}</button>
-          <button class="textgame-reader-book-btn" data-action="open-book-setting" aria-label="书籍设定">${Icons.book}</button>
-          <div class="textgame-reader-title-box" title="${escapeHtml(this.book?.name || '未命名小说')}">${escapeHtml(String(this.book?.name || '未命名小说').replace(/\.txt$/i, ''))}</div>
-          <button class="textgame-reader-more" data-action="open-run-drawer" aria-label="查看存档节点">${Icons.moreVertical}</button>
+        <div class="textgame-reader-toolbar" data-role="reader-topbar" style="display: flex; justify-content: space-between; align-items: center; padding: 0 12px;">
+          <div style="display: flex; gap: 8px;">
+            <button class="textgame-reader-back" data-action="back" aria-label="返回书架" style="width: 32px; height: 32px; padding: 6px;">${Icons.back}</button>
+            <button class="textgame-reader-book-btn" data-action="open-book-setting" aria-label="书籍设定" style="width: 32px; height: 32px; padding: 6px;">${Icons.book}</button>
+          </div>
+          <button class="textgame-reader-tool-card" data-action="start-travel-now" style="width: 40px; height: 40px; border-radius: 50%; background: var(--theme-color-primary); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: none; padding: 0; margin: 0 auto; flex-shrink: 0;" aria-label="开始穿越">
+            ${Icons.play}
+          </button>
+          <button class="textgame-reader-more" data-action="open-run-drawer" aria-label="查看存档节点" style="width: 32px; height: 32px; padding: 6px;">${Icons.moreVertical}</button>
         </div>
 
         <article class="textgame-reader-paper" data-role="reader-paper">
@@ -174,6 +181,19 @@ export class TextGameReader {
     }
     if (settings && settings.travelWordCount) {
       this.travelWordCount = settings.travelWordCount;
+    }
+    if (settings && settings.pronoun) {
+      this.selectedPronoun = settings.pronoun;
+    }
+    if (settings && settings.actionOptions) {
+      this.actionOptions = settings.actionOptions;
+    } else {
+      this.actionOptions = [
+        { title: '【推剧情】', content: 'user的行为和回应必须紧扣当前剧情主线，主动推进故事发展，不拖沓、不闲聊，严格读取并贴合user人设，绝对不能出现OOC情况，确保每一个回应都能让剧情自然向下延伸。' },
+        { title: '【造转折】', content: 'user的行为和回应必须制造合理且符合逻辑的剧情转折，打破当前对话的平稳节奏，同时严格贴合user的性格、身份与过往设定，绝对不能OOC，让剧情进入全新的发展方向，提升故事张力。' },
+        { title: '【暧昧升温】', content: 'user的行为和回应必须用含蓄、细节感拉满的暧昧方式拉近与对方的距离，贴合user人设不OOC，通过氛围营造、眼神/动作/语言的细节描写，推动感情线升温，不直白、不突兀。' },
+        { title: '【自定义】', content: '在这里输入你想要的行动要求...' }
+      ];
     }
     
     const profiles = await loadArchiveProfilesForTextGame();
@@ -252,13 +272,27 @@ export class TextGameReader {
       </div>
 
       <div class="textgame-config-block">
-        <div class="textgame-config-label">文游行动选项</div>
-        <div class="textgame-option-grid">
-          <button class="textgame-option-chip" data-option="观察原著情节走向">观察原著情节走向</button>
-          <button class="textgame-option-chip" data-option="主动接近关键人物">主动接近关键人物</button>
-          <button class="textgame-option-chip" data-option="先隐藏身份收集线索">先隐藏身份收集线索</button>
+        <div class="textgame-config-label">人称选择</div>
+        <div class="textgame-choice-row">
+          <button class="textgame-choice-card ${this.selectedPronoun === 'second' ? 'active' : ''}" data-choice-group="pronoun" data-choice-id="second">
+            <b>第二人称</b><em>用“你”描写用户，同行联系人用第三人称</em>
+          </button>
+          <button class="textgame-choice-card ${this.selectedPronoun === 'third' ? 'active' : ''}" data-choice-group="pronoun" data-choice-id="third">
+            <b>第三人称</b><em>用第三人称描写用户，同行联系人用第三人称</em>
+          </button>
         </div>
-        <textarea class="textgame-custom-choice" data-role="custom-choice" placeholder="也可以输入自定义选项，例如：我想立刻阻止这一幕发生。">${escapeHtml(this.customChoice)}</textarea>
+      </div>
+
+      <div class="textgame-config-block">
+        <div class="textgame-config-label">文游行动选项生成规则 (点击可直接编辑)</div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          ${this.actionOptions.map((opt, i) => `
+            <div style="border: 1px solid rgba(36, 30, 24, 0.1); border-radius: 12px; padding: 10px; background: rgba(255, 255, 255, 0.68);">
+              <input type="text" data-action-index="${i}" data-action-field="title" value="${escapeHtml(opt.title)}" style="width: 100%; font-weight: bold; border: none; background: transparent; outline: none; margin-bottom: 6px; font-size: 14px; color: #1f1b18;" placeholder="选项标题">
+              <textarea data-action-index="${i}" data-action-field="content" style="width: 100%; min-height: 60px; border: none; background: transparent; outline: none; font-size: 12px; color: #6f655a; resize: vertical;" placeholder="选项内容要求...">${escapeHtml(opt.content)}</textarea>
+            </div>
+          `).join('')}
+        </div>
       </div>
     `;
   }
@@ -309,6 +343,224 @@ export class TextGameReader {
     this.container.querySelector('[data-action="open-reader-settings"]')?.addEventListener('click', () => this.openReaderSettingsModal());
     this.container.querySelector('[data-action="open-run-drawer"]')?.addEventListener('click', () => this.openRunDrawer());
     this.container.querySelector('[data-action="open-book-setting"]')?.addEventListener('click', () => this.openBookSettingModal());
+    this.container.querySelector('[data-action="start-travel-now"]')?.addEventListener('click', () => this.openStartTravelModal());
+  }
+
+  async openStartTravelModal() {
+    if (!this.activeMask) {
+      showModal({ title: '无法穿越', content: '请先在梦笺主页选择用户面具身份。' });
+      return;
+    }
+
+    const appSettings = await getTextGameSettings();
+    if (!appSettings?.apiProfile) {
+      showModal({ title: '无法穿越', content: '请先在梦笺主页的 [设置] 中配置 API 预设。' });
+      return;
+    }
+
+    const chapter = this.chapters[this.chapterIndex] || this.chapters[0];
+    const isSoulTravel = this.selectedTravelMode === 'soul';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'textgame-modal-overlay active';
+    overlay.innerHTML = `
+      <div class="textgame-modal-container" style="width: 90vw; max-width: 400px; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 16px;">
+          <h3 style="margin: 0; font-size: 18px; color: var(--theme-color-text);">${isSoulTravel ? '角色提取中...' : '剧情节点提取中...'}</h3>
+          <p style="margin: 8px 0 0; font-size: 13px; color: var(--theme-color-secondary);">正在呼叫 AI 分析本章内容，请稍候</p>
+        </div>
+        <div style="display: flex; justify-content: center; padding: 20px 0;">
+          <div style="width: 32px; height: 32px; border: 3px solid var(--theme-color-divider); border-top-color: var(--theme-color-primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    try {
+      let analysisResult = null;
+      if (isSoulTravel) {
+         analysisResult = await this.extractSoulTravelCharacters(chapter);
+      } else {
+         analysisResult = await this.extractBodyTravelNodes(chapter);
+      }
+
+      if (!analysisResult || analysisResult.length === 0) {
+        throw new Error('未能从本章中提取出有效信息，请尝试更换章节或重试。');
+      }
+
+      this.renderTravelSelectionModal(overlay, analysisResult, isSoulTravel);
+
+    } catch (err) {
+      console.error(err);
+      overlay.remove();
+      showModal({ title: '提取失败', content: err.message });
+    }
+  }
+
+  async extractSoulTravelCharacters(chapter) {
+    const globalWbEntries = await loadGlobalWorldbookEntriesForTextGame();
+    const bookSettings = await getBookSettings(this.book.id);
+    
+    let contextStr = '';
+    if (globalWbEntries && globalWbEntries.length > 0) {
+      contextStr += '【全局设定】\n' + globalWbEntries.map(e => `[${e.name}]：${e.content}`).join('\n') + '\n\n';
+    }
+    if (bookSettings) {
+      contextStr += '【书籍设定】\n';
+      if (bookSettings.worldview) contextStr += `[世界观]：\n${bookSettings.worldview}\n`;
+      if (bookSettings.characters) contextStr += `[已知角色]：\n${bookSettings.characters}\n`;
+      contextStr += '\n';
+    }
+
+    const prompt = `${contextStr}请分析以下小说章节，提取出本章中出场或被提及的关键人物（必须大于2个）。
+请严格按照以下 JSON 数组格式输出，不要输出任何多余内容或 markdown 标记：
+[
+  {
+    "name": "角色姓名",
+    "roleTag": "主角/配角/反派等",
+    "identity": "具体身份背景",
+    "corePlot": "该角色在本章的核心剧情或处境",
+    "dilemma": "接下来面临的抉择或危机"
+  }
+]
+
+小说名：《${this.book.name}》
+本章内容片段：
+${makeSnippet(chapter.content, 5000)}`;
+
+    const response = await sendTextGameAiMessage([{ role: 'user', content: prompt }], { temperature: 0.3, maxTokens: 2000 });
+    
+    try {
+      const match = response.match(/\[[\s\S]*\]/);
+      if (!match) throw new Error('无法解析 AI 返回的 JSON 格式');
+      return JSON.parse(match[0]);
+    } catch (e) {
+      throw new Error(`解析失败：${e.message}\nAI返回内容：${response.slice(0, 100)}...`);
+    }
+  }
+
+  async extractBodyTravelNodes(chapter) {
+    const globalWbEntries = await loadGlobalWorldbookEntriesForTextGame();
+    const bookSettings = await getBookSettings(this.book.id);
+    
+    let contextStr = '';
+    if (globalWbEntries && globalWbEntries.length > 0) {
+      contextStr += '【全局设定】\n' + globalWbEntries.map(e => `[${e.name}]：${e.content}`).join('\n') + '\n\n';
+    }
+    if (bookSettings) {
+      contextStr += '【书籍设定】\n';
+      if (bookSettings.worldview) contextStr += `[世界观]：\n${bookSettings.worldview}\n`;
+      if (bookSettings.chaptersSummary) contextStr += `[剧情主线]：\n${bookSettings.chaptersSummary}\n`;
+      contextStr += '\n';
+    }
+
+    const prompt = `${contextStr}请分析以下小说章节，提取出 3 到 5 个最关键的剧情节点（可以切入的转折点或名场面）。
+请严格按照以下 JSON 数组格式输出，不要输出任何多余内容或 markdown 标记：
+[
+  {
+    "title": "节点短标题（如：初遇刺客、争夺灵宝）",
+    "description": "该节点的剧情详情",
+    "keyCharacters": "牵涉的关键人物",
+    "entryPoint": "适合作为外部穿越者（身穿）突然降临或介入的契机"
+  }
+]
+
+小说名：《${this.book.name}》
+本章内容片段：
+${makeSnippet(chapter.content, 5000)}`;
+
+    const response = await sendTextGameAiMessage([{ role: 'user', content: prompt }], { temperature: 0.3, maxTokens: 2000 });
+    
+    try {
+      const match = response.match(/\[[\s\S]*\]/);
+      if (!match) throw new Error('无法解析 AI 返回的 JSON 格式');
+      return JSON.parse(match[0]);
+    } catch (e) {
+      throw new Error(`解析失败：${e.message}\nAI返回内容：${response.slice(0, 100)}...`);
+    }
+  }
+
+  renderTravelSelectionModal(overlay, list, isSoulTravel) {
+    const close = () => {
+      overlay.classList.remove('active');
+      setTimeout(() => overlay.remove(), 240);
+    };
+
+    let itemsHtml = '';
+    if (isSoulTravel) {
+      itemsHtml = list.map((item, i) => `
+        <div class="textgame-choice-card" style="width: 100%; text-align: left; margin-bottom: 12px; padding: 12px; height: auto;" data-select-index="${i}">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+            <b style="font-size: 16px;">${escapeHtml(item.name)}</b>
+            <span style="font-size: 12px; color: #fff; background: var(--theme-color-primary); padding: 2px 6px; border-radius: 4px;">${escapeHtml(item.roleTag)}</span>
+          </div>
+          <div style="font-size: 13px; color: var(--theme-color-text); margin-bottom: 4px;"><strong>身份：</strong>${escapeHtml(item.identity)}</div>
+          <div style="font-size: 13px; color: var(--theme-color-secondary); margin-bottom: 4px;"><strong>处境：</strong>${escapeHtml(item.corePlot)}</div>
+          <div style="font-size: 13px; color: #e65100;"><strong>抉择：</strong>${escapeHtml(item.dilemma)}</div>
+        </div>
+      `).join('');
+    } else {
+      itemsHtml = list.map((item, i) => `
+        <div class="textgame-choice-card" style="width: 100%; text-align: left; margin-bottom: 12px; padding: 12px; height: auto;" data-select-index="${i}">
+          <div style="margin-bottom: 8px;">
+            <b style="font-size: 16px; border-left: 3px solid var(--theme-color-primary); padding-left: 8px;">${escapeHtml(item.title)}</b>
+          </div>
+          <div style="font-size: 13px; color: var(--theme-color-text); margin-bottom: 4px;"><strong>牵涉：</strong>${escapeHtml(item.keyCharacters)}</div>
+          <div style="font-size: 13px; color: var(--theme-color-secondary); margin-bottom: 4px;"><strong>详情：</strong>${escapeHtml(item.description)}</div>
+          <div style="font-size: 13px; color: #e65100;"><strong>切入点：</strong>${escapeHtml(item.entryPoint)}</div>
+        </div>
+      `).join('');
+    }
+
+    overlay.innerHTML = `
+      <div class="textgame-modal-container" style="width: 90vw; max-width: 500px; max-height: 85vh; display: flex; flex-direction: column; padding: 0;">
+        <div class="textgame-travel-modal-head" style="padding: 16px;">
+          <div class="textgame-section-title">${Icons.magic}<span>${isSoulTravel ? '选择魂穿对象' : '选择降临节点'}</span></div>
+          <button class="textgame-travel-modal-close" data-action="close" title="关闭">${Icons.back}</button>
+        </div>
+        <div style="flex: 1; overflow-y: auto; padding: 0 16px 16px; background: rgba(0,0,0,0.02);">
+          <div style="margin: 12px 0;">
+             ${itemsHtml}
+          </div>
+        </div>
+        <div style="padding: 16px; border-top: 1px solid var(--theme-color-divider); text-align: center; background: #fff;">
+           <button class="textgame-reader-tool-card" data-action="confirm" style="width: 100%; max-width: 200px; margin: 0 auto; background: var(--theme-color-primary); color: #fff; padding: 12px; border-radius: 24px; font-weight: bold; opacity: 0.5; pointer-events: none;">生成剧情</button>
+        </div>
+      </div>
+    `;
+
+    overlay.querySelector('[data-action="close"]')?.addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+    let selectedData = null;
+    let selectedType = isSoulTravel ? 'soul' : 'body';
+    
+    const confirmBtn = overlay.querySelector('[data-action="confirm"]');
+
+    overlay.querySelectorAll('[data-select-index]').forEach((card) => {
+      card.addEventListener('click', () => {
+        overlay.querySelectorAll('[data-select-index]').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        selectedData = list[Number(card.dataset.selectIndex)];
+        confirmBtn.style.opacity = '1';
+        confirmBtn.style.pointerEvents = 'auto';
+      });
+    });
+
+    confirmBtn.addEventListener('click', async () => {
+      if (!selectedData) return;
+      
+      let finalCustomChoice = '';
+      if (selectedType === 'soul') {
+         finalCustomChoice = `(系统强制指令：用户决定魂穿成为【${selectedData.name}】。该角色当前身份是【${selectedData.identity}】，处境是【${selectedData.corePlot}】，面临的抉择是【${selectedData.dilemma}】。请直接以用户的视角接管该角色，展开后续剧情。)`;
+      } else {
+         finalCustomChoice = `(系统强制指令：用户决定以本体身穿降临到【${selectedData.title}】这一剧情节点。该节点详情：【${selectedData.description}】。切入契机：【${selectedData.entryPoint}】。请直接描写用户降临现场引发的变故，展开后续剧情。)`;
+      }
+      
+      this.customChoice = finalCustomChoice;
+      close();
+      await this.startStoryRun();
+    });
   }
 
   async openBookSettingModal() {
@@ -716,16 +968,19 @@ ${sampleText}`;
 
   bindTravelModalEvents(overlay) {
     const closeWithDraft = async () => {
-      this.customChoice = overlay.querySelector('[data-role="custom-choice"]')?.value || '';
-      
       const minInput = overlay.querySelector('[data-role="travel-word-min"]');
       const maxInput = overlay.querySelector('[data-role="travel-word-max"]');
       if (minInput && maxInput) {
         const min = Math.max(10, Number(minInput.value) || 600);
         const max = Math.max(min, Number(maxInput.value) || 1000);
         this.travelWordCount = [min, max];
-        await setTravelWordCount(min, max);
       }
+      
+      await setTravelSettings({
+        pronoun: this.selectedPronoun,
+        actionOptions: this.actionOptions,
+        travelWordCount: this.travelWordCount
+      });
       
       this.closeTravelModal(overlay);
     };
@@ -743,7 +998,7 @@ ${sampleText}`;
         const group = button.dataset.choiceGroup;
         if (group === 'travel') this.selectedTravelMode = button.dataset.choiceId || 'soul';
         if (group === 'plot') this.selectedPlotMode = button.dataset.choiceId || 'canon';
-        this.customChoice = overlay.querySelector('[data-role="custom-choice"]')?.value || '';
+        if (group === 'pronoun') this.selectedPronoun = button.dataset.choiceId || 'second';
         this.renderTravelConfigOnly(overlay);
       });
     });
@@ -752,23 +1007,21 @@ ${sampleText}`;
       button.addEventListener('click', () => {
         const id = button.dataset.companionId || '';
         this.selectedCompanionId = this.selectedCompanionId === id ? '' : id;
-        this.customChoice = overlay.querySelector('[data-role="custom-choice"]')?.value || '';
         this.renderTravelConfigOnly(overlay);
       });
     });
 
     overlay.querySelector('[data-action="toggle-companion-memory"]')?.addEventListener('click', () => {
       this.withCompanionMemory = !this.withCompanionMemory;
-      this.customChoice = overlay.querySelector('[data-role="custom-choice"]')?.value || '';
       this.renderTravelConfigOnly(overlay);
     });
 
-    overlay.querySelectorAll('[data-option]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const input = overlay.querySelector('[data-role="custom-choice"]');
-        if (input) {
-          input.value = button.dataset.option || '';
-          this.customChoice = input.value;
+    overlay.querySelectorAll('[data-action-index]').forEach((el) => {
+      el.addEventListener('change', (e) => {
+        const index = Number(e.target.dataset.actionIndex);
+        const field = e.target.dataset.actionField;
+        if (this.actionOptions[index]) {
+          this.actionOptions[index][field] = e.target.value;
         }
       });
     });
@@ -901,7 +1154,6 @@ ${sampleText}`;
      3. 结束穿越后提供结算弹窗，保存为全新的 TXT 同人小说。
      ========================================================================== */
   renderActiveRunMode() {
-    // 将整个聊天记录拼接渲染
     const historyHtml = (this.activeRunData.chatHistory || []).map(msg => {
       if (msg.role === 'user') {
         return `<div style="text-align: right; margin-bottom: 12px;"><span style="display: inline-block; background: var(--theme-color-primary); color: #fff; padding: 8px 12px; border-radius: 12px 12px 0 12px;">${escapeHtml(msg.content)}</span></div>`;
@@ -910,7 +1162,6 @@ ${sampleText}`;
       let mainText = msg.content;
       let summaryHtml = '';
       
-      // 提取 AI 生成的摘要并转为折叠条
       const summaryMatch = mainText.match(/<<<SUMMARY_START>>>([\s\S]*?)<<<SUMMARY_END>>>/i);
       if (summaryMatch) {
         mainText = mainText.replace(summaryMatch[0], '').trim();
@@ -929,6 +1180,15 @@ ${sampleText}`;
         }
       }
       
+      // 提取 AI 生成的 4 个选项，不再正文中显示，改为弹窗或底部显示
+      // 为防止正则过于严格导致匹配失败，此处直接用简单匹配并去除
+      const optionsMatch = mainText.match(/<<<OPTIONS_START>>>([\s\S]*?)<<<OPTIONS_END>>>/i);
+      if (optionsMatch) {
+        mainText = mainText.replace(optionsMatch[0], '').trim();
+        // 如果提取到了选项，将它们保存到 runData 中，用于顶部按钮点击时展示
+        this.activeRunData.currentOptionsHtml = optionsMatch[1].trim();
+      }
+      
       return `<div style="text-align: left; margin-bottom: 12px;">
         <div style="display: inline-block; background: var(--theme-color-divider); color: var(--reader-color); padding: 8px 12px; border-radius: 12px 12px 12px 0; line-height: 1.6; max-width: 95%;">
           ${escapeHtml(mainText).replace(/\n/g, '<br>')}
@@ -937,47 +1197,118 @@ ${sampleText}`;
       </div>`;
     }).join('');
 
+    const runCount = this.activeRunData.roundCount || 1;
+    const totalTokens = this.activeRunData.totalTokens || 0;
+    const lastTokens = this.activeRunData.lastTokens || 0;
+
     this.container.innerHTML = `
       <div class="textgame-reader" style="--reader-bg:${escapeHtml(this.readerSettings.background)};--reader-color:${escapeHtml(this.readerSettings.color)};--reader-font-size:${this.readerSettings.fontSize}px; display: flex; flex-direction: column;">
-        <div class="textgame-reader-toolbar" style="transform: translateY(0); display: flex; justify-content: space-between; position: relative;">
-          <button class="textgame-reader-back" data-action="exit-run" aria-label="退出并结算">${Icons.close}<span>结束穿越</span></button>
-          <div class="textgame-reader-title-box" style="flex: 1; text-align: center;">正在体验《${escapeHtml(this.book?.name?.replace(/\.txt$/i, ''))}》</div>
-          <div style="width: 48px;"></div>
+        <div class="textgame-reader-toolbar" style="transform: translateY(0); display: flex; justify-content: space-between; align-items: center; padding: 0 12px;">
+          <button class="textgame-reader-back" data-action="exit-run" aria-label="退出并结算" style="width: 32px; height: 32px; padding: 6px;">${Icons.close}</button>
+          
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            <div class="textgame-reader-title-box" style="font-size: 14px; max-width: 150px; text-align: center;">《${escapeHtml(this.book?.name?.replace(/\.txt$/i, ''))}》</div>
+          </div>
+          
+          <button class="textgame-reader-tool-card" data-action="open-run-options" style="width: 32px; height: 32px; border-radius: 50%; background: var(--theme-color-primary); color: #fff; display: flex; align-items: center; justify-content: center; border: none; padding: 0;" aria-label="生成选项">
+            ${Icons.list}
+          </button>
         </div>
         
-        <article class="textgame-reader-paper" style="flex: 1; overflow-y: auto; padding-bottom: 80px;" data-role="run-history">
-          ${historyHtml || '<div style="text-align: center; color: var(--theme-color-secondary); margin-top: 40px; font-style: italic;">剧情生成中，请稍候...</div>'}
+        <article class="textgame-reader-paper" style="flex: 1; overflow-y: auto; padding-bottom: 20px;" data-role="run-history">
+          ${historyHtml || '<div style="text-align: center; color: var(--theme-color-secondary); margin-top: 40px; font-style: italic;">剧情推演中，请稍候...</div>'}
         </article>
         
-        <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: var(--reader-bg); padding: 12px; border-top: 1px solid var(--theme-color-divider); display: flex; gap: 8px; box-sizing: border-box;">
-           <input type="text" data-role="run-input" placeholder="输入你想做的事..." style="flex: 1; height: 36px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--theme-color-divider); background: transparent; color: var(--reader-color);">
-           <button class="textgame-reader-tool-card" style="width: auto; padding: 0 16px; border-radius: 18px;" data-action="run-send">${Icons.play}</button>
-        </div>
       </div>
     `;
     
-    // 自动滚动到底部
     const paper = this.container.querySelector('[data-role="run-history"]');
     if (paper) paper.scrollTop = paper.scrollHeight;
     
     this.container.querySelector('[data-action="exit-run"]')?.addEventListener('click', () => this.settleRun());
+    this.container.querySelector('[data-action="open-run-options"]')?.addEventListener('click', () => this.openRunOptionsModal());
+  }
+  
+  openRunOptionsModal() {
+    if (!this.activeRunData) return;
     
-    const sendBtn = this.container.querySelector('[data-action="run-send"]');
-    const input = this.container.querySelector('[data-role="run-input"]');
+    const runCount = this.activeRunData.roundCount || 1;
+    const totalTokens = this.activeRunData.totalTokens || 0;
+    const lastTokens = this.activeRunData.lastTokens || 0;
     
-    const handleSend = () => {
-      const val = String(input.value || '').trim();
-      if (!val) return;
-      input.value = '';
-      this.advanceRunPlot(val);
+    // 解析 optionsHtml
+    let parsedOptions = [];
+    if (this.activeRunData.currentOptionsHtml) {
+       // 尝试按数字或特定分隔符切分
+       const rawArr = this.activeRunData.currentOptionsHtml.split(/\n(?:[1-4]\.|【选项[1-4]】|-)\s*/).filter(s => s.trim());
+       parsedOptions = rawArr.map(s => s.trim().replace(/^[:：]/, '').trim());
+    }
+    // 兜底补齐或截断
+    while(parsedOptions.length < 4) parsedOptions.push('（无明确选项建议，请使用底部自定义输入）');
+    if (parsedOptions.length > 4) parsedOptions = parsedOptions.slice(0, 4);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'textgame-modal-overlay active';
+    overlay.innerHTML = `
+      <div class="textgame-modal-container" style="width: 90vw; max-width: 500px; padding: 0; display: flex; flex-direction: column;">
+        <div class="textgame-travel-modal-head" style="padding: 16px; border-bottom: 1px solid var(--theme-color-divider);">
+          <div style="display: flex; flex-direction: column;">
+             <span style="font-weight: bold; font-size: 16px;">第 ${runCount} 轮推进</span>
+             <span style="font-size: 12px; color: var(--theme-color-secondary);">当前累计耗费 ${totalTokens} Tokens (本轮 ${lastTokens})</span>
+          </div>
+          <button class="textgame-travel-modal-close" data-action="close" title="关闭">${Icons.back}</button>
+        </div>
+        
+        <div style="padding: 16px; flex: 1; overflow-y: auto;">
+          <div style="font-size: 14px; font-weight: bold; margin-bottom: 12px;">请选择接下来的行动：</div>
+          
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+            ${parsedOptions.map((opt, i) => `
+              <button class="textgame-choice-card" data-action="select-option" data-option-val="${escapeHtml(opt)}" style="text-align: left; padding: 12px; height: auto; display: flex; align-items: flex-start; gap: 8px;">
+                 <span style="font-weight: bold; color: var(--theme-color-primary); flex-shrink: 0;">${i+1}.</span>
+                 <span style="font-size: 14px; line-height: 1.5; color: var(--theme-color-text);">${escapeHtml(opt)}</span>
+              </button>
+            `).join('')}
+          </div>
+          
+          <div style="border-top: 1px dashed var(--theme-color-divider); padding-top: 16px;">
+            <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px;">或输入自定义走向：</div>
+            <textarea data-role="custom-input" placeholder="例如：拔剑指向对方，质问他的目的。" style="width: 100%; min-height: 80px; padding: 12px; border: 1px solid var(--theme-color-divider); border-radius: 12px; background: rgba(0,0,0,0.02); resize: vertical; outline: none; font-size: 14px; color: var(--theme-color-text);"></textarea>
+          </div>
+        </div>
+        
+        <div style="padding: 16px; border-top: 1px solid var(--theme-color-divider);">
+          <button class="textgame-reader-tool-card" data-action="send-custom" style="width: 100%; background: var(--theme-color-primary); color: #fff; border-radius: 24px; padding: 12px; font-weight: bold; font-size: 15px;">生成后续剧情</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+
+    const close = () => {
+      overlay.classList.remove('active');
+      setTimeout(() => overlay.remove(), 240);
     };
+
+    overlay.querySelector('[data-action="close"]')?.addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     
-    sendBtn?.addEventListener('click', handleSend);
-    input?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
+    overlay.querySelectorAll('[data-action="select-option"]').forEach(btn => {
+       btn.addEventListener('click', () => {
+          const val = btn.dataset.optionVal;
+          close();
+          this.advanceRunPlot(val);
+       });
+    });
+    
+    overlay.querySelector('[data-action="send-custom"]')?.addEventListener('click', () => {
+       const val = overlay.querySelector('[data-role="custom-input"]')?.value?.trim();
+       if (!val) {
+          showModal({ title: '提示', content: '请输入自定义剧情走向。' });
+          return;
+       }
+       close();
+       this.advanceRunPlot(val);
     });
   }
   
@@ -1026,9 +1357,12 @@ ${sampleText}`;
         return `${m.role === 'user' ? '用户：' : '系统推演：'}${cleanText}`;
       }).join('\n\n');
 
+      // 组装选项生成规则
+      const optionsRuleStr = this.actionOptions.map((opt, i) => `选项${i+1} [${opt.title}]：${opt.content}`).join('\n');
+      
       const actionPrompt = userAction === '【系统】梦境连接已建立，剧情开始推演...' 
-        ? '这是开局。请根据全局背景与本章原文，直接推演并输出第一段开场剧情。并给出接下来的 3 个行动选项。' 
-        : `用户刚才执行了：${userAction}。请严格根据前情提要和最近对话的发展逻辑，续写剧情反应。并给出接下来的 3 个行动选项。`;
+        ? `这是开局。请根据全局背景与本章原文，直接推演并输出第一段开场剧情。然后，严格按照以下规则生成 4 个行动选项：\n${optionsRuleStr}` 
+        : `用户刚才执行了：${userAction}。请严格根据前情提要和最近对话的发展逻辑，续写剧情反应。然后，严格按照以下规则生成 4 个行动选项：\n${optionsRuleStr}`;
 
       const prompt = `
 【全局与底层上下文背景】
@@ -1041,18 +1375,32 @@ ${recentContext}
 ${actionPrompt}
 
 【强制输出格式要求】
-1. 前面部分自由输出剧情正文及选项。
-2. 在输出的**绝对末尾**，你必须用 <<<SUMMARY_START>>> 和 <<<SUMMARY_END>>> 标签，将【你本次推演的这段剧情】用一句话总结成精简摘要。
-例如：
-(你的剧情和选项...)
+1. 前面部分自由输出剧情正文。
+2. 随后，使用 <<<OPTIONS_START>>> 和 <<<OPTIONS_END>>> 标签包裹生成的 4 个行动选项内容。
+3. 在输出的**绝对末尾**，你必须用 <<<SUMMARY_START>>> 和 <<<SUMMARY_END>>> 标签，将【你本次推演的这段剧情】用一句话总结成精简摘要。
+
+输出格式示例：
+(你的剧情正文...)
+<<<OPTIONS_START>>>
+1. 【推剧情】...
+2. 【造转折】...
+3. 【暧昧升温】...
+4. 【自定义要求对应的行动】...
+<<<OPTIONS_END>>>
 <<<SUMMARY_START>>>
 主角尝试隐藏身份潜入，但不慎引起了守卫的怀疑。
 <<<SUMMARY_END>>>
 `;
       
-      const response = await sendTextGameAiMessage([{ role: 'user', content: prompt }], { temperature: 0.7, maxTokens: 4000 });
+      const aiResponseObj = await sendTextGameAiMessage([{ role: 'user', content: prompt }], { temperature: 0.7, maxTokens: 4000 }, true);
+      const response = aiResponseObj.content || aiResponseObj;
+      const usage = aiResponseObj.usage || { total_tokens: 0 };
       
       this.activeRunData.chatHistory.push({ role: 'assistant', content: response });
+      
+      this.activeRunData.roundCount = (this.activeRunData.roundCount || 1) + 1;
+      this.activeRunData.lastTokens = usage.total_tokens || 0;
+      this.activeRunData.totalTokens = (this.activeRunData.totalTokens || 0) + (usage.total_tokens || 0);
       
       // 持久化到穿书存档
       await saveStoryRun(this.activeRunData);
@@ -1175,6 +1523,10 @@ ${actionPrompt}
     const travelInstruction = this.selectedTravelMode === 'soul'
       ? '用户选择魂穿：让用户穿成当前情节中的某个合适人物，以该人物身份、处境和社会关系继续。'
       : '用户选择身穿：让用户以梦笺主页选择的面具本体进入小说现场，并处理身份暴露风险。';
+      
+    const pronounInstruction = this.selectedPronoun === 'second'
+      ? '【人称要求】：在描写剧情时，必须使用第二人称“你”来称呼和描写用户的行为与心理。同行联系人始终使用第三人称描写。'
+      : '【人称要求】：在描写剧情时，必须使用第三人称来称呼和描写用户的行为与心理（使用用户的名字或代词）。同行联系人始终使用第三人称描写。';
 
     const lines = [];
     
@@ -1209,7 +1561,8 @@ ${actionPrompt}
     lines.push(
       customChoice ? `用户自定义行动：${customChoice}` : '用户自定义行动：未填写',
       `字数要求：生成的剧情及行动选项总字数需控制在 ${this.travelWordCount[0]} 到 ${this.travelWordCount[1]} 字之间。`,
-      '请以文游方式推进：先叙事，再给出 3 个可选行动，并允许用户自定义输入。'
+      pronounInstruction,
+      '请以文游方式推进：先叙事，再按规则生成 4 个可选行动。'
     );
     
     return lines.join('\n');

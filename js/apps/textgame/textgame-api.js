@@ -64,7 +64,7 @@ export async function getSettingsPrimaryApiPresetsForTextGame() {
    [区域标注·已完成·梦笺 AI 请求发送]
    说明：发送前只读取梦笺 settings.apiProfile；没有梦笺配置时抛出 TEXTGAME_API_NOT_CONFIGURED。
    ========================================================================== */
-export async function sendTextGameAiMessage(messages, { temperature = 0.7, maxTokens = 900 } = {}) {
+export async function sendTextGameAiMessage(messages, { temperature = 0.7, maxTokens = 900 } = {}, returnFullObject = false) {
   const settings = await getTextGameSettings();
   const profile = settings?.apiProfile;
 
@@ -76,16 +76,25 @@ export async function sendTextGameAiMessage(messages, { temperature = 0.7, maxTo
 
   const providerId = normalizeProviderId(profile.provider);
 
+  let result;
   switch (providerId) {
     case 'gemini':
-      return requestGemini(profile, messages, temperature, maxTokens);
+      result = await requestGemini(profile, messages, temperature, maxTokens);
+      break;
     case 'claude':
-      return requestClaude(profile, messages, temperature, maxTokens);
+      result = await requestClaude(profile, messages, temperature, maxTokens);
+      break;
     case 'deepseek':
     case 'openai':
     default:
-      return requestOpenAiLike(profile, messages, temperature, maxTokens);
+      result = await requestOpenAiLike(profile, messages, temperature, maxTokens);
+      break;
   }
+  
+  if (returnFullObject) {
+    return result;
+  }
+  return result.content || '';
 }
 
 async function requestOpenAiLike(profile, messages, temperature, maxTokens) {
@@ -109,7 +118,10 @@ async function requestOpenAiLike(profile, messages, temperature, maxTokens) {
     throw new Error(extractApiErrorMessage(payload, `HTTP ${response.status}`));
   }
 
-  return payload?.choices?.[0]?.message?.content || '';
+  return {
+    content: payload?.choices?.[0]?.message?.content || '',
+    usage: payload?.usage || { total_tokens: 0 }
+  };
 }
 
 async function requestGemini(profile, messages, temperature, maxTokens) {
@@ -139,7 +151,10 @@ async function requestGemini(profile, messages, temperature, maxTokens) {
     throw new Error(extractApiErrorMessage(payload, `HTTP ${response.status}`));
   }
 
-  return payload?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return {
+    content: payload?.candidates?.[0]?.content?.parts?.[0]?.text || '',
+    usage: payload?.usageMetadata || { total_tokens: payload?.usageMetadata?.totalTokenCount || 0 }
+  };
 }
 
 async function requestClaude(profile, messages, temperature, maxTokens) {
@@ -172,9 +187,15 @@ async function requestClaude(profile, messages, temperature, maxTokens) {
     throw new Error(extractApiErrorMessage(payload, `HTTP ${response.status}`));
   }
 
-  return (
-    payload?.content?.find?.((item) => item?.type === 'text')?.text ||
-    payload?.content?.[0]?.text ||
-    ''
-  );
+  const content = payload?.content?.find?.((item) => item?.type === 'text')?.text ||
+                  payload?.content?.[0]?.text || '';
+                  
+  const usage = {
+    total_tokens: (payload?.usage?.input_tokens || 0) + (payload?.usage?.output_tokens || 0)
+  };
+
+  return {
+    content,
+    usage
+  };
 }

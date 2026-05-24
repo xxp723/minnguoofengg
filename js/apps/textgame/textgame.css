@@ -1112,9 +1112,9 @@
 
 .textgame-reader-back,
 .textgame-reader-book-btn {
-  width: 42px;
-  height: 42px;
-  padding: 0;
+  width: 32px;
+  height: 32px;
+  padding: 6px;
 }
 
 .textgame-reader-back svg,
@@ -1734,11 +1734,11 @@
 }
 
 .textgame-reader-more {
-  width: 42px;
-  height: 42px;
-  padding: 0;
+  width: 32px;
+  height: 32px;
+  padding: 6px;
   border: 1px solid rgba(36, 30, 24, 0.08);
-  border-radius: 21px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.82);
   color: #1f1b18;
   display: grid;
@@ -1749,8 +1749,8 @@
 }
 
 .textgame-reader-more svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
 }
 
 .textgame-reader-paper {

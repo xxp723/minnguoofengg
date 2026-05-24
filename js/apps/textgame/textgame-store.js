@@ -42,6 +42,13 @@ function normalizeTextGameData(raw) {
       activeMaskId: String(source?.settings?.activeMaskId || ''),
       globalTravelPrompt: String(source?.settings?.globalTravelPrompt || ''),
       travelWordCount: Array.isArray(source?.settings?.travelWordCount) ? source.settings.travelWordCount : [600, 1000],
+      pronoun: String(source?.settings?.pronoun || 'second'),
+      actionOptions: Array.isArray(source?.settings?.actionOptions) && source.settings.actionOptions.length > 0 ? source.settings.actionOptions : [
+        { title: '【推剧情】', content: 'user的行为和回应必须紧扣当前剧情主线，主动推进故事发展，不拖沓、不闲聊，严格读取并贴合user人设，绝对不能出现OOC情况，确保每一个回应都能让剧情自然向下延伸。' },
+        { title: '【造转折】', content: 'user的行为和回应必须制造合理且符合逻辑的剧情转折，打破当前对话的平稳节奏，同时严格贴合user的性格、身份与过往设定，绝对不能OOC，让剧情进入全新的发展方向，提升故事张力。' },
+        { title: '【暧昧升温】', content: 'user的行为和回应必须用含蓄、细节感拉满的暧昧方式拉近与对方的距离，贴合user人设不OOC，通过氛围营造、眼神/动作/语言的细节描写，推动感情线升温，不直白、不突兀。' },
+        { title: '【自定义】', content: '在这里输入你想要的行动要求...' }
+      ],
       readerSettings: {
         background: String(source?.settings?.readerSettings?.background || '#faf9f7'),
         color: String(source?.settings?.readerSettings?.color || '#302923'),
@@ -80,6 +87,15 @@ export async function saveTextGameData(data) {
   normalized.updatedAt = Date.now();
   await dbInstance.put(DB_STORE_NAME, normalized);
   return normalized;
+}
+
+export async function setTravelSettings(patch) {
+  const data = await getTextGameData();
+  if (patch.pronoun) data.settings.pronoun = patch.pronoun;
+  if (patch.actionOptions) data.settings.actionOptions = patch.actionOptions;
+  if (patch.travelWordCount) data.settings.travelWordCount = patch.travelWordCount;
+  await saveTextGameData(data);
+  return data.settings;
 }
 
 /* ==========================================================================
@@ -329,6 +345,10 @@ export async function saveStoryRun(run) {
   const safeRun = {
     ...run,
     id: run.id || uid('run'),
+    roundCount: run.roundCount || 1,
+    totalTokens: run.totalTokens || 0,
+    lastTokens: run.lastTokens || 0,
+    currentOptions: Array.isArray(run.currentOptions) ? run.currentOptions : [],
     updatedAt: nowIso(),
     createdAt: run.createdAt || nowIso()
   };
