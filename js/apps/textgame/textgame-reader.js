@@ -526,7 +526,8 @@ ${makeSnippet(chapter.content, 5000)}`;
              ${itemsHtml}
           </div>
         </div>
-        <div style="padding: 16px; border-top: 1px solid var(--theme-color-divider); text-align: center; background: #fff;">
+        <!-- [区域标注·已完成·梦笺修复魂穿弹窗底部圆角] 说明：增加底部圆角样式防止遮盖 -->
+        <div style="padding: 16px; border-top: 1px solid var(--theme-color-divider); text-align: center; background: #fff; border-bottom-left-radius: 20px; border-bottom-right-radius: 20px;">
            <button class="textgame-reader-tool-card" data-action="confirm" style="width: 100%; max-width: 200px; margin: 0 auto; background: #1a1a1a; color: #fff; padding: 12px; border-radius: 24px; font-weight: bold; opacity: 0.5; pointer-events: none;">生成剧情</button>
         </div>
       </div>
@@ -1051,6 +1052,7 @@ ${sampleText}`;
      1. 底栏“存档”只保存穿书文游存档，不创建阅读存档/书签。
      2. 保存前使用梦笺应用内确认弹窗；保存后写入 storyRuns 并按当前用户面具身份隔离展示。
      3. 不使用浏览器原生 confirm，不使用 localStorage/sessionStorage。
+     4. 修改：点击确认存档仅保存配置至 IndexedDB 数据库中，并弹出保存成功提示，不再自动开启生成剧情流程。
      ========================================================================== */
   openSaveRunConfirmModal() {
     if (!this.activeMask) {
@@ -1077,7 +1079,49 @@ ${sampleText}`;
       confirmText: '确认存档',
       cancelText: '取消',
       onConfirm: async () => {
-        await this.startStoryRun();
+        try {
+          const memories = (companion && this.withCompanionMemory) ? await loadCompanionMemoryForTextGame(companion.id) : [];
+          const globalWbEntries = await loadGlobalWorldbookEntriesForTextGame();
+          const bookSettings = await getBookSettings(this.book.id);
+          
+          await saveStoryRun({
+            bookId: this.book.id,
+            bookName: this.book.name,
+            chapterIndex: this.chapterIndex,
+            chapterTitle: chapter.title,
+            storyPoint: makeSnippet(chapter.content),
+            travelMode: this.selectedTravelMode,
+            plotMode: this.selectedPlotMode,
+            customChoice: String(this.customChoice || '').trim(),
+            activeMaskSnapshot: this.activeMask ? {
+              id: this.activeMask.id,
+              name: this.activeMask.name,
+              identity: this.activeMask.identity,
+              signature: this.activeMask.signature
+            } : null,
+            companion: companion ? {
+              roleId: companion.id,
+              name: companion.name,
+              identity: companion.identity,
+              roleArchive: {
+                id: companion.roleArchive.id,
+                name: companion.roleArchive.name,
+                identity: companion.roleArchive.identity,
+                personality: companion.roleArchive.personality,
+                background: companion.roleArchive.background,
+                prompt: companion.roleArchive.prompt
+              },
+              memorySummaries: memories
+            } : null,
+            openingPrompt: this.buildOpeningPrompt(chapter, companion, memories, String(this.customChoice || '').trim(), globalWbEntries, bookSettings),
+            chatHistory: []
+          });
+
+          showModal({ title: '存档成功', content: '穿书节点已成功保存，可在右侧抽屉中查看。' });
+        } catch (error) {
+          console.error(error);
+          showModal({ title: '存档失败', content: error.message });
+        }
       }
     });
   }
