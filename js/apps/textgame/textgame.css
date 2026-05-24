@@ -1091,6 +1091,7 @@
 }
 
 .textgame-reader-back,
+.textgame-reader-book-btn,
 .textgame-pill-btn,
 .textgame-start-run-btn {
   border: 1px solid rgba(36, 30, 24, 0.08);
@@ -1109,7 +1110,8 @@
   -webkit-backdrop-filter: blur(18px);
 }
 
-.textgame-reader-back {
+.textgame-reader-back,
+.textgame-reader-book-btn {
   width: 42px;
   height: 42px;
   padding: 0;

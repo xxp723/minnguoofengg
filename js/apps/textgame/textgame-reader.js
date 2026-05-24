@@ -436,10 +436,27 @@ ${sampleText}
       // 调用基础的统一 LLM 接口
       const response = await sendTextGameAiMessage([{ role: 'user', content: prompt }]);
       
-      // 提取 JSON
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('AI 返回的数据格式无法解析');
-      const parsed = JSON.parse(jsonMatch[0]);
+      // 提取 JSON：处理可能存在的 Markdown 代码块或前后多余文本
+      let jsonStr = response;
+      const jsonMatch = response.match(/```json\s*(\{[\s\S]*?\})\s*```/) || response.match(/\{[\s\S]*\}/);
+      if (jsonMatch && jsonMatch[1]) {
+        jsonStr = jsonMatch[1];
+      } else if (jsonMatch && jsonMatch[0]) {
+        jsonStr = jsonMatch[0];
+      }
+      
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonStr);
+      } catch (e) {
+        // 如果标准的解析失败，尝试简单修复一下常见的 JSON 问题（如末尾逗号等）
+        const fixedStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
+        try {
+          parsed = JSON.parse(fixedStr);
+        } catch (e2) {
+          throw new Error('AI 返回的数据格式无法解析:\n' + String(e2.message));
+        }
+      }
       
       await saveBookSettings(this.book.id, {
         worldview: parsed.worldview || '无',
