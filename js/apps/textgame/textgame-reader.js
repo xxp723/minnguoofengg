@@ -15,7 +15,8 @@ import {
   saveStoryRun,
   getTextGameSettings,
   getStoryRunsByBookAndMask,
-  setReaderSettings
+  setReaderSettings,
+  setTravelWordCount
 } from './textgame-store.js';
 import {
   loadArchiveProfilesForTextGame,
@@ -106,6 +107,7 @@ export class TextGameReader {
       fontSize: 16
     };
     this.withCompanionMemory = true;
+    this.travelWordCount = [600, 1000];
   }
 
   async render() {
@@ -159,6 +161,9 @@ export class TextGameReader {
     if (settings && settings.readerSettings) {
       this.readerSettings = { ...this.readerSettings, ...settings.readerSettings };
     }
+    if (settings && settings.travelWordCount) {
+      this.travelWordCount = settings.travelWordCount;
+    }
     
     const profiles = await loadArchiveProfilesForTextGame();
     this.activeMask = settings.activeMaskId
@@ -185,7 +190,7 @@ export class TextGameReader {
     ];
 
     return `
-      <div class="textgame-section-title">${Icons.magic}<span>穿书配置</span></div>
+      <div class="textgame-section-title">${Icons.magic}<span>穿越设置</span></div>
       <div class="textgame-config-block">
         <div class="textgame-config-label">穿越方式</div>
         <div class="textgame-choice-row">
@@ -222,6 +227,17 @@ export class TextGameReader {
             </label>
           </div>
         ` : ''}
+      </div>
+
+      <!-- [区域标注·已完成·梦笺穿越字数设置] -->
+      <div class="textgame-config-block">
+        <div class="textgame-config-label">字数设置 (建议 600-1000)</div>
+        <div class="textgame-word-count-row" style="display: flex; gap: 8px; align-items: center; margin-top: 8px;">
+          <input type="number" data-role="travel-word-min" class="textgame-custom-choice" style="width: 80px; min-height: 36px; height: 36px; padding: 4px 12px; text-align: center; border-radius: 20px;" value="${this.travelWordCount[0]}" min="100" max="3000" step="100">
+          <span style="color: var(--theme-color-secondary);">至</span>
+          <input type="number" data-role="travel-word-max" class="textgame-custom-choice" style="width: 80px; min-height: 36px; height: 36px; padding: 4px 12px; text-align: center; border-radius: 20px;" value="${this.travelWordCount[1]}" min="100" max="3000" step="100">
+          <span style="color: var(--theme-color-secondary);">字</span>
+        </div>
       </div>
 
       <div class="textgame-config-block">
@@ -443,7 +459,7 @@ export class TextGameReader {
     overlay.innerHTML = `
       <div class="textgame-modal-container textgame-travel-modal-container">
         <div class="textgame-travel-modal-head">
-          <div class="textgame-section-title">${Icons.magic}<span>穿书配置</span></div>
+          <div class="textgame-section-title">${Icons.magic}<span>穿越设置</span></div>
           <button class="textgame-travel-modal-close" data-action="close-travel-modal" title="关闭">${Icons.back}</button>
         </div>
         <div class="textgame-travel-panel" data-role="travel-panel">
@@ -463,8 +479,18 @@ export class TextGameReader {
   }
 
   bindTravelModalEvents(overlay) {
-    const closeWithDraft = () => {
+    const closeWithDraft = async () => {
       this.customChoice = overlay.querySelector('[data-role="custom-choice"]')?.value || '';
+      
+      const minInput = overlay.querySelector('[data-role="travel-word-min"]');
+      const maxInput = overlay.querySelector('[data-role="travel-word-max"]');
+      if (minInput && maxInput) {
+        const min = Math.max(10, Number(minInput.value) || 600);
+        const max = Math.max(min, Number(maxInput.value) || 1000);
+        this.travelWordCount = [min, max];
+        await setTravelWordCount(min, max);
+      }
+      
       this.closeTravelModal(overlay);
     };
 
@@ -568,9 +594,22 @@ export class TextGameReader {
     const chapter = this.chapters[this.chapterIndex] || this.chapters[0];
     const companion = this.companions.find((item) => item.id === this.selectedCompanionId) || null;
     const memories = (companion && this.withCompanionMemory) ? await loadCompanionMemoryForTextGame(companion.id) : [];
-    const input = activeOverlay?.querySelector('[data-role="custom-choice"]') || document.querySelector('.textgame-travel-modal-overlay [data-role="custom-choice"]');
+    
+    const overlayRef = activeOverlay || document.querySelector('.textgame-travel-modal-overlay');
+    const input = overlayRef?.querySelector('[data-role="custom-choice"]');
     const customChoice = String(input?.value || this.customChoice || '').trim();
     this.customChoice = customChoice;
+
+    if (overlayRef) {
+      const minInput = overlayRef.querySelector('[data-role="travel-word-min"]');
+      const maxInput = overlayRef.querySelector('[data-role="travel-word-max"]');
+      if (minInput && maxInput) {
+        const min = Math.max(10, Number(minInput.value) || 600);
+        const max = Math.max(min, Number(maxInput.value) || 1000);
+        this.travelWordCount = [min, max];
+        await setTravelWordCount(min, max);
+      }
+    }
 
     const run = await saveStoryRun({
       bookId: this.book.id,
@@ -702,6 +741,7 @@ export class TextGameReader {
     
     lines.push(
       customChoice ? `用户自定义行动：${customChoice}` : '用户自定义行动：未填写',
+      `字数要求：生成的剧情及行动选项总字数需控制在 ${this.travelWordCount[0]} 到 ${this.travelWordCount[1]} 字之间。`,
       '请以文游方式推进：先叙事，再给出 3 个可选行动，并允许用户自定义输入。'
     );
     

@@ -40,6 +40,7 @@ function normalizeTextGameData(raw) {
     settings: {
       activeMaskId: String(source?.settings?.activeMaskId || ''),
       globalTravelPrompt: String(source?.settings?.globalTravelPrompt || ''),
+      travelWordCount: Array.isArray(source?.settings?.travelWordCount) ? source.settings.travelWordCount : [600, 1000],
       readerSettings: {
         background: String(source?.settings?.readerSettings?.background || '#faf9f7'),
         color: String(source?.settings?.readerSettings?.color || '#302923'),
@@ -103,6 +104,19 @@ export async function setGlobalTravelPrompt(prompt) {
   data.settings.globalTravelPrompt = String(prompt || '');
   await saveTextGameData(data);
   return data.settings.globalTravelPrompt;
+}
+
+/* ==========================================================================
+   [区域标注·已完成·梦笺字数设置持久化]
+   说明：
+   1. 保存穿越字数设置，使用 db.js (IndexedDB)。
+   2. 不使用 localStorage/sessionStorage。
+   ========================================================================== */
+export async function setTravelWordCount(min, max) {
+  const data = await getTextGameData();
+  data.settings.travelWordCount = [Number(min || 600), Number(max || 1000)];
+  await saveTextGameData(data);
+  return data.settings.travelWordCount;
 }
 
 export async function setReaderSettings(settings) {
