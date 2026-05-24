@@ -421,47 +421,51 @@ export class TextGameReader {
         sampleText = [...head, ...mid, ...tail].map(c => `【${c.title}】\n${makeSnippet(c.content, 1500)}`).join('\n\n...\n\n');
       }
       
+      // 修改提示词：不再强制要求 JSON，而是采用特殊分割符的方式，让任何智障模型都能输出。
       const prompt = `请根据以下小说的抽样章节片段，提取并归纳本书的设定信息。
-请严格输出为 JSON 格式，包含以下三个字段：
-- "worldview" (字符串)：小说的背景设定、力量体系、时代背景等宏观世界观介绍。
-- "chaptersSummary" (字符串)：从已提供的片段中归纳出的剧情主线和早期冲突。
-- "characters" (字符串)：罗列片段中出现的重要角色及其身份特征（如：姓名 - 身份 - 性格）。
+请严格按照以下格式输出你的结果，不要输出任何多余的废话和 markdown 标记！
+
+[世界观档案开始]
+在这里写下小说的背景设定、力量体系、时代背景等宏观世界观介绍...
+[世界观档案结束]
+
+[章节提要开始]
+在这里写下从已提供的片段中归纳出的剧情主线和早期冲突...
+[章节提要结束]
+
+[登场人物开始]
+在这里罗列片段中出现的重要角色及其身份特征（如：姓名 - 身份 - 性格）...
+[登场人物结束]
 
 小说名：《${this.book.name}》
 抽样内容：
-${sampleText}
-
-请直接输出包含这3个字段的合法JSON对象，不要有其它多余的回答或 Markdown 标记。`;
+${sampleText}`;
       
       // 调用基础的统一 LLM 接口
       const response = await sendTextGameAiMessage([{ role: 'user', content: prompt }]);
       
-      // 提取 JSON：处理可能存在的 Markdown 代码块或前后多余文本
-      let jsonStr = response;
-      const jsonMatch = response.match(/```json\s*(\{[\s\S]*?\})\s*```/) || response.match(/\{[\s\S]*\}/);
-      if (jsonMatch && jsonMatch[1]) {
-        jsonStr = jsonMatch[1];
-      } else if (jsonMatch && jsonMatch[0]) {
-        jsonStr = jsonMatch[0];
-      }
+      // 使用正则提取标记块中的内容
+      const worldviewMatch = response.match(/\[世界观档案开始\]([\s\S]*?)\[世界观档案结束\]/);
+      const summaryMatch = response.match(/\[章节提要开始\]([\s\S]*?)\[章节提要结束\]/);
+      const charactersMatch = response.match(/\[登场人物开始\]([\s\S]*?)\[登场人物结束\]/);
       
-      let parsed;
-      try {
-        parsed = JSON.parse(jsonStr);
-      } catch (e) {
-        // 如果标准的解析失败，尝试简单修复一下常见的 JSON 问题（如末尾逗号等）
-        const fixedStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
-        try {
-          parsed = JSON.parse(fixedStr);
-        } catch (e2) {
-          throw new Error('AI 返回的数据格式无法解析:\n' + String(e2.message));
-        }
+      let parsed = {
+        worldview: worldviewMatch ? worldviewMatch[1].trim() : '',
+        chaptersSummary: summaryMatch ? summaryMatch[1].trim() : '',
+        characters: charactersMatch ? charactersMatch[1].trim() : ''
+      };
+      
+      if (!parsed.worldview && !parsed.chaptersSummary && !parsed.characters) {
+         // 如果连分割符都没有，就直接把大模型回复当做世界观（兜底方案）
+         parsed.worldview = response.trim();
+         parsed.chaptersSummary = '（未提取到相关信息）';
+         parsed.characters = '（未提取到相关信息）';
       }
       
       await saveBookSettings(this.book.id, {
-        worldview: parsed.worldview || '无',
-        chaptersSummary: parsed.chaptersSummary || '无',
-        characters: parsed.characters || '无'
+        worldview: parsed.worldview,
+        chaptersSummary: parsed.chaptersSummary,
+        characters: parsed.characters
       });
       
       // 更新视图
