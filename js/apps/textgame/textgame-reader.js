@@ -130,17 +130,18 @@ export class TextGameReader {
     }
 
     this.container.innerHTML = `
-      <!-- [区域标注·已完成·梦笺沉浸式阅读页] 顶栏/底栏默认隐藏，点击正文中心显示；顶栏含书名与当前小说存档抽屉入口。 -->
+      <!-- [区域标注·已完成·梦笺沉浸式阅读页] 顶栏/底栏默认隐藏，点击正文中心显示；顶栏已移除书名框，中间统一为开始穿越和生成选项两个圆形按钮。 -->
       <div class="textgame-reader ${this.readerControlsVisible ? 'controls-visible' : ''}" data-role="reader-shell" style="--reader-bg:${escapeHtml(this.readerSettings.background)};--reader-color:${escapeHtml(this.readerSettings.color)};--reader-font-size:${this.readerSettings.fontSize}px;">
         <div class="textgame-reader-toolbar" data-role="reader-topbar" style="display: flex; justify-content: space-between; align-items: center; padding: 0 12px;">
           <div style="display: flex; gap: 8px;">
-            <button class="textgame-reader-back" data-action="back" aria-label="返回书架" style="width: 32px; height: 32px; padding: 6px;">${Icons.back}</button>
-            <button class="textgame-reader-book-btn" data-action="open-book-setting" aria-label="书籍设定" style="width: 32px; height: 32px; padding: 6px;">${Icons.book}</button>
+            <button class="textgame-reader-back" data-action="back" aria-label="返回书架">${Icons.back}</button>
+            <button class="textgame-reader-book-btn" data-action="open-book-setting" aria-label="书籍设定">${Icons.book}</button>
           </div>
-          <button class="textgame-reader-tool-card" data-action="start-travel-now" style="width: 40px; height: 40px; border-radius: 50%; background: var(--theme-color-primary); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: none; padding: 0; margin: 0 auto; flex-shrink: 0;" aria-label="开始穿越">
-            ${Icons.play}
-          </button>
-          <button class="textgame-reader-more" data-action="open-run-drawer" aria-label="查看存档节点" style="width: 32px; height: 32px; padding: 6px;">${Icons.moreVertical}</button>
+          <div style="display: flex; gap: 8px; position: absolute; left: 50%; transform: translateX(-50%);">
+            <button class="textgame-reader-more" data-action="start-travel-now" aria-label="开始穿越">${Icons.play}</button>
+            <button class="textgame-reader-more" data-action="open-run-options" aria-label="生成选项">${Icons.list}</button>
+          </div>
+          <button class="textgame-reader-more" data-action="open-run-drawer" aria-label="查看存档节点">${Icons.moreVertical}</button>
         </div>
 
         <article class="textgame-reader-paper" data-role="reader-paper">
@@ -332,6 +333,7 @@ export class TextGameReader {
     });
 
     this.container.querySelector('[data-action="back"]')?.addEventListener('click', () => this.onBack?.());
+    this.container.querySelector('[data-action="exit-run"]')?.addEventListener('click', () => this.settleRun());
     this.container.querySelector('[data-action="prev"]')?.addEventListener('click', () => this.goToChapter(this.chapterIndex - 1));
     this.container.querySelector('[data-action="next"]')?.addEventListener('click', () => this.goToChapter(this.chapterIndex + 1));
     this.container.querySelector('[data-action="jump-progress"]')?.addEventListener('change', (event) => {
@@ -344,6 +346,7 @@ export class TextGameReader {
     this.container.querySelector('[data-action="open-run-drawer"]')?.addEventListener('click', () => this.openRunDrawer());
     this.container.querySelector('[data-action="open-book-setting"]')?.addEventListener('click', () => this.openBookSettingModal());
     this.container.querySelector('[data-action="start-travel-now"]')?.addEventListener('click', () => this.openStartTravelModal());
+    this.container.querySelector('[data-action="open-run-options"]')?.addEventListener('click', () => this.openRunOptionsModal());
   }
 
   async openStartTravelModal() {
@@ -524,7 +527,7 @@ ${makeSnippet(chapter.content, 5000)}`;
           </div>
         </div>
         <div style="padding: 16px; border-top: 1px solid var(--theme-color-divider); text-align: center; background: #fff;">
-           <button class="textgame-reader-tool-card" data-action="confirm" style="width: 100%; max-width: 200px; margin: 0 auto; background: var(--theme-color-primary); color: #fff; padding: 12px; border-radius: 24px; font-weight: bold; opacity: 0.5; pointer-events: none;">生成剧情</button>
+           <button class="textgame-reader-tool-card" data-action="confirm" style="width: 100%; max-width: 200px; margin: 0 auto; background: #1a1a1a; color: #fff; padding: 12px; border-radius: 24px; font-weight: bold; opacity: 0.5; pointer-events: none;">生成剧情</button>
         </div>
       </div>
     `;
@@ -1149,8 +1152,8 @@ ${sampleText}`;
   /* ==========================================================================
      [区域标注·已完成·梦笺沉浸式截断阅读与结算导出]
      说明：
-     1. 从当前节点开始隐藏原版正文，显示独立的新剧情和对话。
-     2. 底部带有选项生成面板。
+     1. 修复点击唤出顶栏底栏交互：已为正文区域绑定点击事件，可顺畅切换 controls-visible 状态。
+     2. 统一顶栏样式：移除标题框，中间呈现统一的“开始生成”和“选项剧情”两个圆形按钮。
      3. 结束穿越后提供结算弹窗，保存为全新的 TXT 同人小说。
      ========================================================================== */
   renderActiveRunMode() {
@@ -1202,35 +1205,56 @@ ${sampleText}`;
     const lastTokens = this.activeRunData.lastTokens || 0;
 
     this.container.innerHTML = `
-      <div class="textgame-reader" style="--reader-bg:${escapeHtml(this.readerSettings.background)};--reader-color:${escapeHtml(this.readerSettings.color)};--reader-font-size:${this.readerSettings.fontSize}px; display: flex; flex-direction: column;">
-        <div class="textgame-reader-toolbar" style="transform: translateY(0); display: flex; justify-content: space-between; align-items: center; padding: 0 12px;">
-          <button class="textgame-reader-back" data-action="exit-run" aria-label="退出并结算" style="width: 32px; height: 32px; padding: 6px;">${Icons.close}</button>
-          
-          <div style="display: flex; flex-direction: column; align-items: center;">
-            <div class="textgame-reader-title-box" style="font-size: 14px; max-width: 150px; text-align: center;">《${escapeHtml(this.book?.name?.replace(/\.txt$/i, ''))}》</div>
+      <div class="textgame-reader ${this.readerControlsVisible ? 'controls-visible' : ''}" data-role="reader-shell" style="--reader-bg:${escapeHtml(this.readerSettings.background)};--reader-color:${escapeHtml(this.readerSettings.color)};--reader-font-size:${this.readerSettings.fontSize}px; display: flex; flex-direction: column;">
+        <div class="textgame-reader-toolbar" data-role="reader-topbar" style="display: flex; justify-content: space-between; align-items: center; padding: 0 12px;">
+          <div style="display: flex; gap: 8px;">
+            <button class="textgame-reader-back" data-action="exit-run" aria-label="退出并结算">${Icons.back}</button>
+            <button class="textgame-reader-book-btn" data-action="open-book-setting" aria-label="书籍设定">${Icons.book}</button>
           </div>
-          
-          <button class="textgame-reader-tool-card" data-action="open-run-options" style="width: 32px; height: 32px; border-radius: 50%; background: var(--theme-color-primary); color: #fff; display: flex; align-items: center; justify-content: center; border: none; padding: 0;" aria-label="生成选项">
-            ${Icons.list}
-          </button>
+          <div style="display: flex; gap: 8px; position: absolute; left: 50%; transform: translateX(-50%);">
+            <button class="textgame-reader-more" data-action="start-travel-now" aria-label="开始穿越">${Icons.play}</button>
+            <button class="textgame-reader-more" data-action="open-run-options" aria-label="生成选项">${Icons.list}</button>
+          </div>
+          <button class="textgame-reader-more" data-action="open-run-drawer" aria-label="查看存档节点">${Icons.moreVertical}</button>
         </div>
         
         <article class="textgame-reader-paper" style="flex: 1; overflow-y: auto; padding-bottom: 20px;" data-role="run-history">
           ${historyHtml || '<div style="text-align: center; color: var(--theme-color-secondary); margin-top: 40px; font-style: italic;">剧情推演中，请稍候...</div>'}
         </article>
         
+        <div class="textgame-reader-actions textgame-reader-control-panel" data-role="reader-bottombar">
+          <div class="textgame-reader-progress-head">
+            <button class="textgame-reader-step-btn" data-action="prev" aria-label="上一章">${Icons.back}</button>
+            <div class="textgame-reader-progress-main">
+              <div class="textgame-reader-progress-label">
+                <span>${escapeHtml(this.chapters[this.chapterIndex]?.title || '正文')}</span>
+                <em>${this.getProgressPercent()}%</em>
+              </div>
+              <input class="textgame-reader-progress-range" data-action="jump-progress" type="range" min="0" max="${Math.max(this.chapters.length - 1, 0)}" step="1" value="${this.chapterIndex}">
+            </div>
+            <button class="textgame-reader-step-btn" data-action="next" aria-label="下一章">${Icons.next}</button>
+          </div>
+          <div class="textgame-reader-tool-grid">
+            <button class="textgame-reader-tool-card" data-action="open-toc">${Icons.list}<span>目录</span></button>
+            <button class="textgame-reader-tool-card" data-action="open-reader-settings">${Icons.setting}<span>阅读设置</span></button>
+            <button class="textgame-reader-tool-card" data-action="travel">${Icons.magic}<span>穿越设置</span></button>
+            ${this.activeMask ? `<button class="textgame-reader-tool-card" data-action="save-run">${Icons.save}<span>存档</span></button>` : ''}
+          </div>
+        </div>
       </div>
     `;
     
     const paper = this.container.querySelector('[data-role="run-history"]');
     if (paper) paper.scrollTop = paper.scrollHeight;
     
-    this.container.querySelector('[data-action="exit-run"]')?.addEventListener('click', () => this.settleRun());
-    this.container.querySelector('[data-action="open-run-options"]')?.addEventListener('click', () => this.openRunOptionsModal());
+    this.bindEvents();
   }
   
   openRunOptionsModal() {
-    if (!this.activeRunData) return;
+    if (!this.activeRunData) {
+      showModal({ title: '当前未进行穿越', content: '请先点击顶栏的“开始”按钮，生成剧情节点进入穿越模式后，再使用此选项功能。' });
+      return;
+    }
     
     const runCount = this.activeRunData.roundCount || 1;
     const totalTokens = this.activeRunData.totalTokens || 0;
@@ -1278,7 +1302,7 @@ ${sampleText}`;
         </div>
         
         <div style="padding: 16px; border-top: 1px solid var(--theme-color-divider);">
-          <button class="textgame-reader-tool-card" data-action="send-custom" style="width: 100%; background: var(--theme-color-primary); color: #fff; border-radius: 24px; padding: 12px; font-weight: bold; font-size: 15px;">生成后续剧情</button>
+          <button class="textgame-reader-tool-card" data-action="send-custom" style="width: 100%; background: #1a1a1a; color: #fff; border-radius: 24px; padding: 12px; font-weight: bold; font-size: 15px;">生成后续剧情</button>
         </div>
       </div>
     `;
