@@ -335,13 +335,8 @@ export class TextGameReader {
           <div class="textgame-section-title">${Icons.book}<span>书籍设定</span></div>
           <button class="textgame-travel-modal-close" data-action="close-book-setting" title="关闭">${Icons.back}</button>
         </div>
-        <div class="textgame-book-setting-content" style="flex: 1; overflow-y: auto; padding: 0 16px 24px;">
+        <div class="textgame-book-setting-content" style="flex: 1; overflow-y: auto; padding: 0 16px 24px; margin-top: 16px;">
           
-          <div class="textgame-book-setting-magazine-header" style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid var(--theme-color-primary); padding-bottom: 20px;">
-            <h1 style="font-size: 28px; font-weight: bold; font-family: serif; margin-bottom: 8px; color: var(--theme-color-primary);">${escapeHtml(this.book?.name || '未命名小说')}</h1>
-            <p style="font-size: 14px; color: var(--theme-color-secondary); letter-spacing: 2px;">WORLD SETTINGS & ARCHIVES</p>
-          </div>
-
           <div class="textgame-book-setting-section" style="margin-bottom: 24px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
               <h3 style="font-size: 18px; font-weight: 600; border-left: 4px solid var(--theme-color-primary); padding-left: 8px;">世界观档案</h3>
@@ -410,16 +405,40 @@ export class TextGameReader {
       const appSettings = await getTextGameSettings();
       if (!appSettings?.apiProfile) throw new Error('请先在梦笺主页的 [设置] 中配置 API 预设。');
       
-      // 减少发给大模型的字数，避免因为单次请求输入过长、或包含触发 API 安全审核的敏感词语，导致 API 返回空数据拦截。
+      // --- 重构的“递进式全书压缩提取算法” ---
       let sampleText = '';
-      if (this.chapters.length <= 6) {
-        sampleText = this.chapters.map(c => `【${c.title}】\n${makeSnippet(c.content, 1000)}`).join('\n\n');
+      
+      // 如果小说是散文式或未分章（只有1章或2章）
+      if (this.chapters.length <= 3) {
+        const fullContent = this.chapters.map(c => c.content).join('\n\n');
+        // 分割成 10 个节点截取
+        const sliceCount = 10;
+        const sliceLength = 200;
+        const step = Math.floor(fullContent.length / sliceCount);
+        
+        const slices = [];
+        for (let i = 0; i < sliceCount; i++) {
+           const start = i * step;
+           slices.push(fullContent.slice(start, start + sliceLength));
+        }
+        
+        sampleText = `【开头原文】\n${makeSnippet(fullContent, 3000)}\n\n` +
+                     `【全书进程切片】\n${slices.join('\n...\n')}\n\n` +
+                     `【结尾原文】\n${fullContent.slice(-1000)}`;
       } else {
-        const head = [this.chapters[0], this.chapters[1]];
-        const midIdx = Math.floor(this.chapters.length / 2);
-        const mid = [this.chapters[midIdx], this.chapters[midIdx + 1]];
-        const tail = [this.chapters[this.chapters.length - 2], this.chapters[this.chapters.length - 1]];
-        sampleText = [...head, ...mid, ...tail].map(c => `【${c.title}】\n${makeSnippet(c.content, 500)}`).join('\n\n...\n\n');
+        // 分章小说的智能首尾 + 大纲压缩
+        const head = this.chapters.slice(0, 3); // 前 3 章
+        const tail = this.chapters.slice(-1);   // 最后 1 章
+        const mid = this.chapters.slice(3, -1); // 中间章节
+        
+        // 构建开局：3000字，结尾：1000字，中间：每章标题+100字
+        const headText = head.map(c => `[${c.title}]\n${makeSnippet(c.content, 1000)}`).join('\n\n');
+        const midText = mid.map(c => `[${c.title}] ${makeSnippet(c.content, 100).replace(/\n/g, ' ')}`).join('\n');
+        const tailText = tail.map(c => `[${c.title}]\n${makeSnippet(c.content, 1000)}`).join('\n\n');
+        
+        sampleText = `【开局全文（用于提取第一人称主角及初始世界观）】\n${headText}\n\n` +
+                     `【中间全书大纲脉络（梳理重要角色及剧情主线转折）】\n${midText}\n\n` +
+                     `【结局全文（用于确认战力天花板及最终结局）】\n${tailText}`;
       }
       
       // 修改提示词：使用英文字母与特殊符号的强制定界符，防止大模型魔改中文标题导致正则失效。
