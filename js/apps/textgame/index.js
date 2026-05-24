@@ -1,7 +1,10 @@
 /**
  * ==========================================================================
- * [区域标注·本次需求·梦笺应用主入口]
- * 说明：负责加载独立 CSS、隐藏全局标题栏、构建底部 Tab 丝滑切换框架。
+ * [区域标注·已完成·梦笺应用主入口]
+ * 说明：
+ * 1. 负责加载独立 CSS、隐藏全局标题栏、构建底部 Tab 丝滑切换框架。
+ * 2. 书架可打开 TXT 阅读器；阅读器内可发起穿书文游配置。
+ * 3. 仅修改梦笺应用相关区域，不改动其它应用。
  * 位置: /js/apps/textgame/index.js
  * ==========================================================================
  */
@@ -10,9 +13,11 @@ import { Icons } from './textgame-ui.js';
 import { TextGameShelf } from './textgame-shelf.js';
 import { TextGameArchive } from './textgame-archive.js';
 import { TextGameHome } from './textgame-home.js';
+import { TextGameReader } from './textgame-reader.js';
 
 /* ==========================================================================
-   [区域标注·本次需求·梦笺应用加载 CSS 工具函数]
+   [区域标注·已完成·梦笺应用加载 CSS 工具函数]
+   说明：等待 CSS 注入完成后再渲染主框架，减少进入应用时的闪屏。
    ========================================================================== */
 function loadTextGameCSS(href, id) {
   return new Promise((resolve) => {
@@ -42,28 +47,23 @@ function removeTextGameCSS(id) {
 }
 
 /* ==========================================================================
-   [区域标注·本次需求·梦笺主页挂载与框架渲染]
+   [区域标注·已完成·梦笺主页挂载与框架渲染]
+   说明：在梦笺容器内部切换页面/阅读器，不使用浏览器原生弹窗或原生选择器。
    ========================================================================== */
 export async function mount(container, context) {
-  // [修改标注·梦笺应用·优化加载速度]
-  
-  // 1. 在等待加载CSS之前，先清空可能由 Window.js 注入的 "应用加载中..." 字样
   container.innerHTML = '';
-  
-  // 隐藏全局系统标题栏（强制让 windowContent 内容区覆盖整个窗口）
+
   const windowContent = container.closest('.window-content') || container.parentElement;
   if (windowContent) {
     windowContent.classList.add('window-has-textgame');
     const header = windowContent.parentElement.querySelector('.app-window__header');
     if (header) {
-      header.style.display = 'none'; // 确保在 CSS 加载前就隐藏标题栏
+      header.style.display = 'none';
     }
   }
 
-  // 2. 优先加载独立 CSS，确保隔离和隐藏全局样式，防止闪烁
   await loadTextGameCSS('./js/apps/textgame/textgame.css', 'textgame-app-css');
 
-  // 3. 注入骨架/基本框架
   container.innerHTML = `
     <div class="textgame-app-container" id="textgame-app-main-view">
       <div class="textgame-header">
@@ -74,6 +74,7 @@ export async function mount(container, context) {
         <div class="textgame-page active" id="textgame-page-shelf"></div>
         <div class="textgame-page" id="textgame-page-archive"></div>
         <div class="textgame-page" id="textgame-page-home"></div>
+        <div class="textgame-page textgame-reader-page" id="textgame-page-reader"></div>
       </div>
       <div class="textgame-tab-bar">
         <div class="textgame-tab-item active" data-tab="shelf">
@@ -92,65 +93,84 @@ export async function mount(container, context) {
     </div>
   `;
 
-  // 4. 实例化子页面模块
   const pageShelf = container.querySelector('#textgame-page-shelf');
   const pageArchive = container.querySelector('#textgame-page-archive');
   const pageHome = container.querySelector('#textgame-page-home');
+  const pageReader = container.querySelector('#textgame-page-reader');
 
-  const shelfInstance = new TextGameShelf(pageShelf);
-  const archiveInstance = new TextGameArchive(pageArchive);
-  const homeInstance = new TextGameHome(pageHome);
-
-  // 初始化渲染子页面
-  await shelfInstance.render();
-  archiveInstance.render();
-  homeInstance.render();
-
-  // 5. 绑定 Tab 切换与 Header 更新逻辑
   const titleEl = container.querySelector('.textgame-title');
   const actionsEl = container.querySelector('.textgame-header-actions');
   const tabs = container.querySelectorAll('.textgame-tab-item');
   const pages = container.querySelectorAll('.textgame-page');
+  const tabBar = container.querySelector('.textgame-tab-bar');
 
-  function switchTab(tabId) {
-    // 切换 Tab 样式
+  let currentTab = 'shelf';
+  let readerInstance = null;
+
+  const switchTab = async (tabId) => {
+    currentTab = tabId;
+    readerInstance = null;
     tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.tab === tabId));
-    // 切换 Page 样式
     pages.forEach(page => page.classList.toggle('active', page.id === `textgame-page-${tabId}`));
+    if (tabBar) tabBar.classList.remove('is-hidden');
 
-    // 动态更新 Header 标题与操作栏
     if (tabId === 'shelf') {
       titleEl.textContent = 'Bookshelf';
-      actionsEl.innerHTML = `<button class="textgame-icon-btn" id="textgame-btn-import">${Icons.import}</button>`;
-      const btnImport = actionsEl.querySelector('#textgame-btn-import');
-      if (btnImport) {
-        btnImport.addEventListener('click', () => shelfInstance.triggerImport());
-      }
-      // 切换回书架时刷新列表
-      shelfInstance.loadBooks();
+      actionsEl.innerHTML = `<button class="textgame-icon-btn" id="textgame-btn-import" title="导入 TXT">${Icons.import}</button>`;
+      actionsEl.querySelector('#textgame-btn-import')?.addEventListener('click', () => shelfInstance.triggerImport());
+      await shelfInstance.loadBooks();
     } else if (tabId === 'archive') {
       titleEl.textContent = 'Archive';
       actionsEl.innerHTML = '';
+      await archiveInstance.render();
     } else if (tabId === 'home') {
       titleEl.textContent = 'Home';
       actionsEl.innerHTML = '';
+      await homeInstance.render();
     }
-  }
+  };
 
-  // 默认激活书架 Tab
-  switchTab('shelf');
+  const openReader = async (book) => {
+    currentTab = 'reader';
+    tabs.forEach(tab => tab.classList.remove('active'));
+    pages.forEach(page => page.classList.toggle('active', page.id === 'textgame-page-reader'));
+    if (tabBar) tabBar.classList.add('is-hidden');
+    titleEl.textContent = String(book?.name || 'Reader').replace(/\.txt$/i, '');
+    actionsEl.innerHTML = '';
+    readerInstance = new TextGameReader(pageReader, book, {
+      onBack: async () => {
+        pageReader.innerHTML = '';
+        await switchTab('shelf');
+      }
+    });
+    await readerInstance.render();
+  };
+
+  const shelfInstance = new TextGameShelf(pageShelf, { onOpenBook: openReader });
+  const archiveInstance = new TextGameArchive(pageArchive);
+  const homeInstance = new TextGameHome(pageHome);
+
+  await shelfInstance.render();
+  await archiveInstance.render();
+  await homeInstance.render();
+
+  await switchTab('shelf');
 
   tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
+    tab.addEventListener('click', async () => {
       if (!tab.classList.contains('active')) {
-        switchTab(tab.dataset.tab);
+        await switchTab(tab.dataset.tab);
       }
     });
   });
 
-  // 6. 绑定点击花体标题返回桌面
   titleEl.addEventListener('click', () => {
-    // 使用事件总线通知桌面关闭应用
+    if (currentTab === 'reader' && readerInstance) {
+      pageReader.innerHTML = '';
+      switchTab('shelf');
+      return;
+    }
+
     if (context.eventBus) {
       context.eventBus.emit('app:close', { appId: context.appId || (context.appMeta && context.appMeta.id) });
     } else if (context.appManager && context.appMeta && context.appMeta.id) {
@@ -160,7 +180,6 @@ export async function mount(container, context) {
 
   return {
     destroy() {
-      // 恢复全局系统标题栏状态
       if (windowContent) {
         windowContent.classList.remove('window-has-textgame');
       }
@@ -171,7 +190,7 @@ export async function mount(container, context) {
 }
 
 /* ==========================================================================
-   [区域标注·本次需求·梦笺应用卸载]
+   [区域标注·已完成·梦笺应用卸载]
    ========================================================================== */
 export async function unmount(instance) {
   if (instance && typeof instance.destroy === 'function') {
