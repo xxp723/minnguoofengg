@@ -812,6 +812,7 @@ ${sampleText}`;
     const companion = this.companions.find((item) => item.id === this.selectedCompanionId) || null;
     const memories = (companion && this.withCompanionMemory) ? await loadCompanionMemoryForTextGame(companion.id) : [];
     const globalWbEntries = await loadGlobalWorldbookEntriesForTextGame();
+    const bookSettings = await getBookSettings(this.book.id);
     
     const overlayRef = activeOverlay || document.querySelector('.textgame-travel-modal-overlay');
     const input = overlayRef?.querySelector('[data-role="custom-choice"]');
@@ -858,7 +859,7 @@ ${sampleText}`;
         },
         memorySummaries: memories
       } : null,
-      openingPrompt: this.buildOpeningPrompt(chapter, companion, memories, customChoice, globalWbEntries),
+      openingPrompt: this.buildOpeningPrompt(chapter, companion, memories, customChoice, globalWbEntries, bookSettings),
       chatHistory: [] // 留着存放后续生成的全新剧情
     });
 
@@ -886,7 +887,35 @@ ${sampleText}`;
       if (msg.role === 'user') {
         return `<div style="text-align: right; margin-bottom: 12px;"><span style="display: inline-block; background: var(--theme-color-primary); color: #fff; padding: 8px 12px; border-radius: 12px 12px 0 12px;">${escapeHtml(msg.content)}</span></div>`;
       }
-      return `<div style="text-align: left; margin-bottom: 12px;"><span style="display: inline-block; background: var(--theme-color-divider); color: var(--reader-color); padding: 8px 12px; border-radius: 12px 12px 12px 0; line-height: 1.6;">${escapeHtml(msg.content).replace(/\n/g, '<br>')}</span></div>`;
+      
+      let mainText = msg.content;
+      let summaryHtml = '';
+      
+      // 提取 AI 生成的摘要并转为折叠条
+      const summaryMatch = mainText.match(/<<<SUMMARY_START>>>([\s\S]*?)<<<SUMMARY_END>>>/i);
+      if (summaryMatch) {
+        mainText = mainText.replace(summaryMatch[0], '').trim();
+        const summaryText = summaryMatch[1].trim();
+        if (summaryText) {
+          summaryHtml = `
+            <details style="margin-top: 8px; font-size: 13px; cursor: pointer; user-select: none;">
+              <summary style="color: var(--theme-color-secondary); padding: 4px 8px; background: rgba(0,0,0,0.05); border-radius: 6px; display: inline-block;">
+                <span style="vertical-align: middle;">展开本轮前情摘要</span>
+              </summary>
+              <div style="margin-top: 6px; padding: 8px; background: rgba(0,0,0,0.03); border-radius: 6px; border-left: 3px solid var(--theme-color-secondary); color: var(--theme-color-secondary); line-height: 1.5;">
+                ${escapeHtml(summaryText).replace(/\n/g, '<br>')}
+              </div>
+            </details>
+          `;
+        }
+      }
+      
+      return `<div style="text-align: left; margin-bottom: 12px;">
+        <div style="display: inline-block; background: var(--theme-color-divider); color: var(--reader-color); padding: 8px 12px; border-radius: 12px 12px 12px 0; line-height: 1.6; max-width: 95%;">
+          ${escapeHtml(mainText).replace(/\n/g, '<br>')}
+          ${summaryHtml}
+        </div>
+      </div>`;
     }).join('');
 
     this.container.innerHTML = `
@@ -949,17 +978,60 @@ ${sampleText}`;
       const appSettings = await getTextGameSettings();
       if (!appSettings?.apiProfile) throw new Error('未配置 API 预设');
       
+      // --- 滑动窗口内存管理 ---
+      // 1. 分离最近对话（保留最多 3 轮完整的旧对话，即 6 条，加上刚进入的这一条用户操作，最多 7 条）
+      const MAX_RECENT_MSGS = 7;
+      const historyLength = this.activeRunData.chatHistory.length;
+      
+      const recentMsgs = this.activeRunData.chatHistory.slice(-MAX_RECENT_MSGS);
+      const oldMsgs = historyLength > MAX_RECENT_MSGS ? this.activeRunData.chatHistory.slice(0, historyLength - MAX_RECENT_MSGS) : [];
+      
+      // 2. 从被挤出滑动窗口的旧对话中，提取 AI 曾经生成的摘要，拼接成前情提要
+      const oldSummaries = [];
+      oldMsgs.forEach(msg => {
+        if (msg.role === 'assistant') {
+           const match = msg.content.match(/<<<SUMMARY_START>>>([\s\S]*?)<<<SUMMARY_END>>>/i);
+           if (match && match[1].trim()) oldSummaries.push(match[1].trim());
+        }
+      });
+      const summaryContext = oldSummaries.length > 0 
+        ? `\n【前情提要（被折叠的旧剧情缩影）】\n${oldSummaries.join('\n')}\n------------------------\n`
+        : '';
+        
+      // 3. 构建发送给 AI 的最近对话（去除其中可能存在的旧摘要格式，避免干扰 AI）
+      const recentContext = recentMsgs.map(m => {
+        let cleanText = m.content;
+        if (m.role === 'assistant') {
+           cleanText = cleanText.replace(/<<<SUMMARY_START>>>[\s\S]*?<<<SUMMARY_END>>>/gi, '').trim();
+        }
+        return `${m.role === 'user' ? '用户：' : '系统推演：'}${cleanText}`;
+      }).join('\n\n');
+
+      const actionPrompt = userAction === '【系统】梦境连接已建立，剧情开始推演...' 
+        ? '这是开局。请根据全局背景与本章原文，直接推演并输出第一段开场剧情。并给出接下来的 3 个行动选项。' 
+        : `用户刚才执行了：${userAction}。请严格根据前情提要和最近对话的发展逻辑，续写剧情反应。并给出接下来的 3 个行动选项。`;
+
       const prompt = `
-【上下文背景】
+【全局与底层上下文背景】
 ${this.activeRunData.openingPrompt}
+${summaryContext}
+【最近互动长剧情】
+${recentContext}
 
-【历史对话】
-${this.activeRunData.chatHistory.map(m => `${m.role === 'user' ? '用户：' : 'AI：'}${m.content}`).join('\n')}
+【你的任务】
+${actionPrompt}
 
-${userAction === '【系统】梦境连接已建立，剧情开始推演...' ? '请直接输出第一段开场剧情和3个行动选项。' : `用户刚才执行了：${userAction}。请根据上下文，续写这一段剧情反应并给出接下来的3个选项。`}
+【强制输出格式要求】
+1. 前面部分自由输出剧情正文及选项。
+2. 在输出的**绝对末尾**，你必须用 <<<SUMMARY_START>>> 和 <<<SUMMARY_END>>> 标签，将【你本次推演的这段剧情】用一句话总结成精简摘要。
+例如：
+(你的剧情和选项...)
+<<<SUMMARY_START>>>
+主角尝试隐藏身份潜入，但不慎引起了守卫的怀疑。
+<<<SUMMARY_END>>>
 `;
       
-      const response = await sendTextGameAiMessage([{ role: 'user', content: prompt }]);
+      const response = await sendTextGameAiMessage([{ role: 'user', content: prompt }], { temperature: 0.7, maxTokens: 4000 });
       
       this.activeRunData.chatHistory.push({ role: 'assistant', content: response });
       
@@ -989,7 +1061,7 @@ ${userAction === '【系统】梦境连接已建立，剧情开始推演...' ? '
         // 组装文本
         const rawContent = (this.activeRunData.chatHistory || [])
           .filter(m => m.role === 'assistant')
-          .map(m => m.content)
+          .map(m => m.content.replace(/<<<SUMMARY_START>>>[\s\S]*?<<<SUMMARY_END>>>/gi, '').trim())
           .join('\n\n=================================\n\n');
           
         const filename = `[同人]《${this.book.name.replace(/\.txt$/i, '')}》${this.activeMask ? this.activeMask.name : '未知'}的穿越篇章.txt`;
@@ -1076,7 +1148,7 @@ ${userAction === '【系统】梦境连接已建立，剧情开始推演...' ? '
     `;
   }
 
-  buildOpeningPrompt(chapter, companion, memories, customChoice, globalWbEntries = []) {
+  buildOpeningPrompt(chapter, companion, memories, customChoice, globalWbEntries = [], bookSettings = null) {
     const plotInstruction = this.selectedPlotMode === 'canon'
       ? '优先保持原著关键事件、人物动机和时间线；当用户选择干预时，再产生合理蝴蝶效应。'
       : '允许根据用户行动改写后续剧情，但需要保留小说世界观和人物性格的连续性。';
@@ -1092,11 +1164,19 @@ ${userAction === '【系统】梦境连接已建立，剧情开始推演...' ? '
       globalWbEntries.forEach(e => lines.push(`[${e.name}]：${e.content}`));
       lines.push('------------------------');
     }
+    
+    if (bookSettings) {
+      lines.push('【小说专属设定提取】');
+      if (bookSettings.worldview) lines.push(`[世界观档案]：\n${bookSettings.worldview}`);
+      if (bookSettings.chaptersSummary) lines.push(`[全书剧情主线]：\n${bookSettings.chaptersSummary}`);
+      if (bookSettings.characters) lines.push(`[全书重要角色]：\n${bookSettings.characters}`);
+      lines.push('------------------------');
+    }
 
     lines.push(
       `小说：《${this.book.name}》`,
       `章节/故事点：${chapter.title}`,
-      `原文片段：${makeSnippet(chapter.content, 1200)}`,
+      `本章原文片段：\n${makeSnippet(chapter.content, 4000)}`,
       `穿越方式：${travelInstruction}`,
       `剧情路线：${plotInstruction}`,
       companion ? `同行者：${companion.name}（${companion.identity || '无身份备注'}）` : '同行者：暂无',
