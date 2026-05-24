@@ -1276,15 +1276,15 @@
 
 .textgame-companion-card {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: 4px 10px;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 4px 16px;
   align-items: center;
 }
 
 .textgame-companion-card span {
   grid-row: span 2;
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
 }
@@ -1514,8 +1514,8 @@
 .textgame-switch {
   position: relative;
   display: inline-block;
-  width: 50px;
-  height: 30px;
+  width: 40px;
+  height: 24px;
 }
 
 .textgame-switch input {
@@ -1530,14 +1530,14 @@
   inset: 0;
   background-color: #e5e5ea;
   transition: 0.24s;
-  border-radius: 30px;
+  border-radius: 24px;
 }
 
 .textgame-slider:before {
   position: absolute;
   content: "";
-  height: 26px;
-  width: 26px;
+  height: 20px;
+  width: 20px;
   left: 2px;
   bottom: 2px;
   background-color: white;
@@ -1547,11 +1547,11 @@
 }
 
 .textgame-switch input:checked + .textgame-slider {
-  background-color: #34c759;
+  background-color: #1a1a1a;
 }
 
 .textgame-switch input:checked + .textgame-slider:before {
-  transform: translateX(20px);
+  transform: translateX(16px);
 }
 
 /* ==========================================================================

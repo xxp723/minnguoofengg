@@ -215,7 +215,7 @@ export class TextGameReader {
         </div>
         ${this.selectedCompanionId ? `
           <div class="textgame-config-switch-row" data-action="toggle-companion-memory" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
-            <span>让联系人携带记忆</span>
+            <span style="font-size: 13px;">让联系人携带记忆</span>
             <label class="textgame-switch" style="pointer-events: none;">
               <input type="checkbox" ${this.withCompanionMemory ? 'checked' : ''}>
               <span class="textgame-slider"></span>
@@ -251,7 +251,6 @@ export class TextGameReader {
           ${item.avatar ? `<img src="${escapeHtml(item.avatar)}" alt="" style="width:100%;height:100%;object-fit:cover;">` : Icons.user}
         </span>
         <b>${escapeHtml(item.contactName || item.name)}</b>
-        <em>${escapeHtml(item.identity || '已加入通讯录')}</em>
       </button>
     `).join('');
   }
