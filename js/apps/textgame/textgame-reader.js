@@ -1526,6 +1526,7 @@ ${actionPrompt}
       content: '确认要结束当前的沉浸式穿越吗？结束之后，系统将自动把这段由你创造的独立剧情打包成一本新的同人小说供你下载。',
       showCancel: true,
       confirmText: '结束穿越',
+      cancelText: '暂时退出',
       onConfirm: async () => {
         if (!this.activeRunData) return;
         
