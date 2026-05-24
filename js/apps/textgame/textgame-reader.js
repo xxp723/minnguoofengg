@@ -23,7 +23,8 @@ import {
 import {
   loadArchiveProfilesForTextGame,
   loadCompanionCandidatesForTextGame,
-  loadCompanionMemoryForTextGame
+  loadCompanionMemoryForTextGame,
+  loadGlobalWorldbookEntriesForTextGame
 } from './textgame-bridge.js';
 import { sendTextGameAiMessage } from './textgame-api.js';
 
@@ -409,20 +410,26 @@ export class TextGameReader {
       const appSettings = await getTextGameSettings();
       if (!appSettings?.apiProfile) throw new Error('请先在梦笺主页的 [设置] 中配置 API 预设。');
       
-      // 抽样前文：取前中后各截取一段组合（Token 控制在合理范围内，约前2章、中间2章、末尾2章摘要）
+      // 减少发给大模型的字数，避免因为单次请求输入过长、或包含触发 API 安全审核的敏感词语，导致 API 返回空数据拦截。
       let sampleText = '';
       if (this.chapters.length <= 6) {
-        sampleText = this.chapters.map(c => `【${c.title}】\n${makeSnippet(c.content, 2000)}`).join('\n\n');
+        sampleText = this.chapters.map(c => `【${c.title}】\n${makeSnippet(c.content, 1000)}`).join('\n\n');
       } else {
         const head = [this.chapters[0], this.chapters[1]];
         const midIdx = Math.floor(this.chapters.length / 2);
         const mid = [this.chapters[midIdx], this.chapters[midIdx + 1]];
         const tail = [this.chapters[this.chapters.length - 2], this.chapters[this.chapters.length - 1]];
-        sampleText = [...head, ...mid, ...tail].map(c => `【${c.title}】\n${makeSnippet(c.content, 1500)}`).join('\n\n...\n\n');
+        sampleText = [...head, ...mid, ...tail].map(c => `【${c.title}】\n${makeSnippet(c.content, 500)}`).join('\n\n...\n\n');
       }
       
       // 修改提示词：使用英文字母与特殊符号的强制定界符，防止大模型魔改中文标题导致正则失效。
-      const prompt = `请根据以下小说的抽样章节片段，提取并归纳本书的设定信息。
+      // 获取全局世界书顶部已开启条目
+      const globalWbEntries = await loadGlobalWorldbookEntriesForTextGame();
+      const wbPrompt = globalWbEntries.length > 0
+        ? `【全局设定补充参考】\n${globalWbEntries.map(e => `[${e.name}]：${e.content}`).join('\n')}\n\n`
+        : '';
+
+      const prompt = `${wbPrompt}请根据以下小说的抽样章节片段，提取并归纳本书的设定信息。
 请严格按照以下格式输出你的结果，不要输出任何多余的废话和 markdown 标记！
 
 <<<WORLDVIEW_START>>>
@@ -441,9 +448,14 @@ export class TextGameReader {
 抽样内容：
 ${sampleText}`;
       
-      // 调用基础的统一 LLM 接口
-      const response = await sendTextGameAiMessage([{ role: 'user', content: prompt }]);
+      // 调用基础的统一 LLM 接口：必须传入更大的 maxTokens（默认是900），否则大模型很容易在中途被截断，并且如果因为太长报错会直接返回空字符串
+      const response = await sendTextGameAiMessage([{ role: 'user', content: prompt }], { temperature: 0.7, maxTokens: 4000 });
       
+      // 最后再加一层防守：如果连大模型都没有返回任何实质内容，说明遭到了底层 API 的拦截（例如 Gemini 的安全机制）
+      if (!response || !response.trim()) {
+        throw new Error('大模型返回了空数据。可能是小说的内容触发了该模型厂商的敏感词安全拦截机制，或者请求/生成的字数超限。请在设置中更换其他大模型尝试。');
+      }
+
       // 提取函数：优先使用严谨定界符；若大模型未遵循，则降级使用中文正则或按顺序切分。
       const extractField = (responseStr, enStart, enEnd, cnKeywords) => {
         const enMatch = responseStr.match(new RegExp(`${enStart}([\\s\\S]*?)${enEnd}`, 'i'));
@@ -473,11 +485,6 @@ ${sampleText}`;
          if (!parsed.worldview) parsed.worldview = '（未提取到专属世界观段落，大模型可能合并输出了信息）';
          if (!parsed.chaptersSummary) parsed.chaptersSummary = '（未提取到专属章节提要段落）';
          if (!parsed.characters) parsed.characters = '（未提取到专属登场人物段落）';
-      }
-      
-      // 最后再加一层防守：如果连大模型都没有返回任何实质内容（极小概率）
-      if (!response.trim()) {
-        throw new Error('大模型返回了空数据。');
       }
       
       await saveBookSettings(this.book.id, {
@@ -804,6 +811,7 @@ ${sampleText}`;
     const chapter = this.chapters[this.chapterIndex] || this.chapters[0];
     const companion = this.companions.find((item) => item.id === this.selectedCompanionId) || null;
     const memories = (companion && this.withCompanionMemory) ? await loadCompanionMemoryForTextGame(companion.id) : [];
+    const globalWbEntries = await loadGlobalWorldbookEntriesForTextGame();
     
     const overlayRef = activeOverlay || document.querySelector('.textgame-travel-modal-overlay');
     const input = overlayRef?.querySelector('[data-role="custom-choice"]');
@@ -850,7 +858,7 @@ ${sampleText}`;
         },
         memorySummaries: memories
       } : null,
-      openingPrompt: this.buildOpeningPrompt(chapter, companion, memories, customChoice),
+      openingPrompt: this.buildOpeningPrompt(chapter, companion, memories, customChoice, globalWbEntries),
       chatHistory: [] // 留着存放后续生成的全新剧情
     });
 
@@ -1068,7 +1076,7 @@ ${userAction === '【系统】梦境连接已建立，剧情开始推演...' ? '
     `;
   }
 
-  buildOpeningPrompt(chapter, companion, memories, customChoice) {
+  buildOpeningPrompt(chapter, companion, memories, customChoice, globalWbEntries = []) {
     const plotInstruction = this.selectedPlotMode === 'canon'
       ? '优先保持原著关键事件、人物动机和时间线；当用户选择干预时，再产生合理蝴蝶效应。'
       : '允许根据用户行动改写后续剧情，但需要保留小说世界观和人物性格的连续性。';
@@ -1077,7 +1085,15 @@ ${userAction === '【系统】梦境连接已建立，剧情开始推演...' ? '
       ? '用户选择魂穿：让用户穿成当前情节中的某个合适人物，以该人物身份、处境和社会关系继续。'
       : '用户选择身穿：让用户以梦笺主页选择的面具本体进入小说现场，并处理身份暴露风险。';
 
-    const lines = [
+    const lines = [];
+    
+    if (globalWbEntries && globalWbEntries.length > 0) {
+      lines.push('【全局世界书设定补充】');
+      globalWbEntries.forEach(e => lines.push(`[${e.name}]：${e.content}`));
+      lines.push('------------------------');
+    }
+
+    lines.push(
       `小说：《${this.book.name}》`,
       `章节/故事点：${chapter.title}`,
       `原文片段：${makeSnippet(chapter.content, 1200)}`,
@@ -1085,7 +1101,7 @@ ${userAction === '【系统】梦境连接已建立，剧情开始推演...' ? '
       `剧情路线：${plotInstruction}`,
       companion ? `同行者：${companion.name}（${companion.identity || '无身份备注'}）` : '同行者：暂无',
       memories.length ? `同行者旧事记忆摘要：${memories.map((item) => item.summary).join('；')}` : '同行者旧事记忆摘要：暂无'
-    ];
+    );
     
     if (this.globalTravelPrompt) {
       lines.push(`用户全局指令：${this.globalTravelPrompt}`);

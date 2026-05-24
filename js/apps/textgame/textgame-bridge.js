@@ -153,3 +153,33 @@ export async function loadCompanionMemoryForTextGame(characterId) {
     .sort((a, b) => Number(b.isHighPriority) - Number(a.isHighPriority) || Number(b.timelineAt) - Number(a.timelineAt))
     .slice(0, 12);
 }
+
+/* ==========================================================================
+   [区域标注·已完成·梦笺世界书读取]
+   说明：
+   1. 从 worldbook::all-books 记录中读取全局世界书数据。
+   2. 只提取状态为已开启 (enabled: true) 且插入位置为顶部 (position: 'top') 的条目。
+   3. 仅返回条目的名称和内容。
+   ========================================================================== */
+export async function loadGlobalWorldbookEntriesForTextGame() {
+  try {
+    const record = await dbInstance.get(DB_STORE_NAME, 'worldbook::all-books');
+    const books = Array.isArray(record?.value) ? record.value : [];
+    
+    // 寻找全局世界书（类型为 global，或书名包含全局世界书，或默认第一本）
+    const globalBook = books.find(b => b.type === 'global' || b.name === '全局世界书') || books[0];
+    
+    if (!globalBook || !Array.isArray(globalBook.entries)) return [];
+    
+    return globalBook.entries
+      .filter(entry => entry.enabled !== false && entry.position === 'top')
+      .map(entry => ({
+        name: normalizeText(entry.name || entry.comment || '未命名设定'),
+        content: normalizeText(entry.content)
+      }))
+      .filter(entry => entry.content);
+  } catch (error) {
+    console.error('[TextGame] 读取世界书失败:', error);
+    return [];
+  }
+}
