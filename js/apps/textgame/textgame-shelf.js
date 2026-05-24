@@ -9,7 +9,8 @@
  */
 
 import { Icons, escapeHtml, showModal } from './textgame-ui.js';
-import { getBooks, addBook, renameBook, deleteBook } from './textgame-store.js';
+import { getBooks, addBook, renameBook, deleteBook, getTextGameSettings, setTextGameApiProfile } from './textgame-store.js';
+import { getSettingsPrimaryApiPresetsForTextGame } from './textgame-api.js';
 
 /* ==========================================================================
    [区域标注·已完成·梦笺 TXT 编码识别]
@@ -287,6 +288,84 @@ export class TextGameShelf {
       this.fileInput.click();
     }
   }
+
+  /* ==========================================================================
+     [区域标注·已完成·梦笺书架 API 配置弹窗]
+     说明：
+     1. 书架页“API配置”按钮读取设置应用主 API 已保存预设，只在梦笺应用内展示。
+     2. 选中预设后复制到梦笺自身 settings.apiProfile，并通过 textgame-store.js → DB.js / IndexedDB 保存。
+     3. 梦笺后续 AI 调用只使用该副本；不修改设置应用和其它应用 API，不使用 localStorage/sessionStorage。
+     ========================================================================== */
+  async openApiConfigModal() {
+    const existing = document.querySelector('.textgame-api-modal-overlay');
+    if (existing) existing.remove();
+
+    let presets = [];
+    let settings = null;
+    try {
+      [presets, settings] = await Promise.all([
+        getSettingsPrimaryApiPresetsForTextGame(),
+        getTextGameSettings()
+      ]);
+    } catch (err) {
+      showModal({ title: 'API配置', content: escapeHtml(err.message || '无法读取 API 预设。') });
+      return;
+    }
+
+    const currentProfileId = String(settings?.apiProfile?.id || '');
+
+    const overlay = document.createElement('div');
+    overlay.className = 'textgame-modal-overlay textgame-api-modal-overlay active';
+    overlay.innerHTML = `
+      <div class="textgame-modal-container textgame-api-modal-container">
+        <div class="textgame-api-modal-head">
+          <div class="textgame-api-modal-title">${Icons.setting}<span>API配置</span></div>
+          <button class="textgame-api-modal-close" data-action="close-api-modal" title="关闭">${Icons.back}</button>
+        </div>
+        <div class="textgame-api-preset-list">
+          ${presets.length ? presets.map((preset) => `
+            <button class="textgame-api-preset-card ${preset.id === currentProfileId ? 'active' : ''}" data-api-preset-id="${escapeHtml(preset.id)}">
+              <span>${Icons.setting}</span>
+              <b>${escapeHtml(preset.name)}</b>
+              <em>${escapeHtml(preset.model)}</em>
+              ${preset.id === currentProfileId ? `<i>${Icons.check}</i>` : ''}
+            </button>
+          `).join('') : `
+            <div class="textgame-empty-mini">${Icons.setting}<span>暂无主 API 预设</span></div>
+          `}
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const close = () => {
+      overlay.classList.remove('active');
+      setTimeout(() => overlay.remove(), 240);
+    };
+
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) close();
+    });
+    overlay.querySelector('.textgame-api-modal-container')?.addEventListener('click', (event) => event.stopPropagation());
+    overlay.querySelector('[data-action="close-api-modal"]')?.addEventListener('click', close);
+
+    overlay.querySelectorAll('[data-api-preset-id]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const preset = presets.find((item) => item.id === button.dataset.apiPresetId);
+        if (!preset) return;
+
+        try {
+          await setTextGameApiProfile(preset);
+          close();
+          showModal({ title: 'API配置', content: `已选择：${escapeHtml(preset.name)}` });
+        } catch (err) {
+          showModal({ title: '保存失败', content: escapeHtml(err.message || '无法保存 API 配置。') });
+        }
+      });
+    });
+  }
+
 
   async handleFileSelect(event) {
     const file = event.target.files[0];

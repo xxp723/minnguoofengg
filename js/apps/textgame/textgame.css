@@ -715,6 +715,133 @@
 }
 
 /* ==========================================================================
+   [区域标注·已完成·梦笺书架 API 配置弹窗]
+   说明：
+   1. 书架页“API配置”弹窗延续梦笺玻璃拟态杂志风格。
+   2. API 预设卡片使用 IconPark 图标；选中状态只表示梦笺自身 settings.apiProfile。
+   3. 本区域仅样式，不涉及持久化存储，不使用浏览器原生弹窗/选择器。
+   ========================================================================== */
+.textgame-api-modal-container {
+  width: min(92vw, 390px);
+  max-width: 390px;
+  max-height: 84vh;
+  overflow-y: auto;
+  padding: 18px;
+  border-radius: 28px;
+}
+
+.textgame-api-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.textgame-api-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1f1b18;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.textgame-api-modal-title svg {
+  width: 22px;
+  height: 22px;
+}
+
+.textgame-api-modal-close {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(36, 30, 24, 0.08);
+  border-radius: 18px;
+  background: rgba(36, 30, 24, 0.06);
+  color: #1f1b18;
+  display: grid;
+  place-items: center;
+  transform: rotate(-90deg);
+}
+
+.textgame-api-modal-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.textgame-api-preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.textgame-api-preset-card {
+  width: 100%;
+  border: 1px solid rgba(36, 30, 24, 0.09);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #1f1b18;
+  padding: 12px;
+  text-align: left;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 24px;
+  grid-template-rows: auto auto;
+  gap: 4px 10px;
+  align-items: center;
+  box-shadow: 0 10px 28px rgba(40, 32, 26, 0.05);
+}
+
+.textgame-api-preset-card.active {
+  border-color: rgba(26, 26, 26, 0.3);
+  background: rgba(26, 26, 26, 0.92);
+  color: #fff;
+}
+
+.textgame-api-preset-card > span {
+  grid-row: 1 / 3;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+}
+
+.textgame-api-preset-card svg {
+  width: 20px;
+  height: 20px;
+}
+
+.textgame-api-preset-card b,
+.textgame-api-preset-card em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.textgame-api-preset-card b {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.textgame-api-preset-card em {
+  grid-column: 2 / 3;
+  font-size: 11px;
+  font-style: normal;
+  opacity: 0.72;
+}
+
+.textgame-api-preset-card i {
+  grid-column: 3 / 4;
+  grid-row: 1 / 3;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+}
+
+/* ==========================================================================
    [区域标注·已完成·梦笺沉浸式全屏 TXT 阅读器]
    说明：
    1. 阅读页已去除书名/章节标题展示栏，正文铺满屏幕，不再限制在圆角容器内。

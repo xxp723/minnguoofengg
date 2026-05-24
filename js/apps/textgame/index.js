@@ -118,7 +118,18 @@ export async function mount(container, context) {
 
     if (tabId === 'shelf') {
       titleEl.textContent = 'Bookshelf';
-      actionsEl.innerHTML = `<button class="textgame-icon-btn" id="textgame-btn-import" title="导入 TXT">${Icons.import}</button>`;
+      /* ==========================================================================
+         [区域标注·已完成·梦笺书架顶部操作按钮]
+         说明：
+         1. “API配置”位于“导入”左侧，只作用于梦笺应用。
+         2. API配置弹窗由 TextGameShelf 读取设置应用主 API 预设并保存梦笺独立副本。
+         3. 不使用浏览器原生弹窗/选择器，不涉及 localStorage/sessionStorage。
+         ========================================================================== */
+      actionsEl.innerHTML = `
+        <button class="textgame-icon-btn textgame-api-config-btn" id="textgame-btn-api-config" title="API配置">${Icons.setting}</button>
+        <button class="textgame-icon-btn" id="textgame-btn-import" title="导入 TXT">${Icons.import}</button>
+      `;
+      actionsEl.querySelector('#textgame-btn-api-config')?.addEventListener('click', () => shelfInstance.openApiConfigModal());
       actionsEl.querySelector('#textgame-btn-import')?.addEventListener('click', () => shelfInstance.triggerImport());
       await shelfInstance.loadBooks();
     } else if (tabId === 'archive') {

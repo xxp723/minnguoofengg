@@ -38,7 +38,19 @@ function normalizeTextGameData(raw) {
     books: Array.isArray(source.books) ? source.books : [],
     storyRuns: Array.isArray(source.storyRuns) ? source.storyRuns : [],
     settings: {
-      activeMaskId: String(source?.settings?.activeMaskId || '')
+      activeMaskId: String(source?.settings?.activeMaskId || ''),
+      apiProfile: source?.settings?.apiProfile && typeof source.settings.apiProfile === 'object'
+        ? {
+            id: String(source.settings.apiProfile.id || ''),
+            name: String(source.settings.apiProfile.name || ''),
+            provider: String(source.settings.apiProfile.provider || 'openai'),
+            apiKey: String(source.settings.apiProfile.apiKey || ''),
+            baseUrl: String(source.settings.apiProfile.baseUrl || ''),
+            model: String(source.settings.apiProfile.model || ''),
+            availableModels: Array.isArray(source.settings.apiProfile.availableModels) ? source.settings.apiProfile.availableModels : [],
+            stream: typeof source.settings.apiProfile.stream === 'boolean' ? source.settings.apiProfile.stream : true
+          }
+        : null
     },
     updatedAt: source.updatedAt || Date.now()
   };
@@ -78,6 +90,31 @@ export async function setTextGameActiveMask(maskId) {
   data.settings.activeMaskId = String(maskId || '');
   await saveTextGameData(data);
   return data.settings.activeMaskId;
+}
+
+/* ==========================================================================
+   [区域标注·已完成·梦笺独立 API 预设持久化]
+   说明：
+   1. 仅保存梦笺从设置应用“主 API 已保存预设”中选中的副本。
+   2. 梦笺 AI 调用只读取 settings.apiProfile，不改设置应用和其它应用 API。
+   3. 持久化继续使用 DB.js / IndexedDB，不使用 localStorage/sessionStorage。
+   ========================================================================== */
+export async function setTextGameApiProfile(profile) {
+  const data = await getTextGameData();
+  data.settings.apiProfile = profile && typeof profile === 'object'
+    ? {
+        id: String(profile.id || ''),
+        name: String(profile.name || ''),
+        provider: String(profile.provider || 'openai'),
+        apiKey: String(profile.apiKey || ''),
+        baseUrl: String(profile.baseUrl || ''),
+        model: String(profile.model || ''),
+        availableModels: Array.isArray(profile.availableModels) ? profile.availableModels : [],
+        stream: typeof profile.stream === 'boolean' ? profile.stream : true
+      }
+    : null;
+  await saveTextGameData(data);
+  return data.settings.apiProfile;
 }
 
 /**

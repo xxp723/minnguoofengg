@@ -280,8 +280,18 @@ export class TextGameReader {
   }
 
   openTocModal() {
+    /* ==========================================================================
+       [区域标注·已完成·梦笺阅读页目录弹窗]
+       说明：
+       1. 点击“目录”后使用梦笺应用内弹窗，不使用浏览器原生弹窗/选择器。
+       2. 已完成：点击弹窗内容外的遮罩区域可关闭弹窗。
+       3. 已完成：弹窗创建时直接带 active 状态，避免先透明再显示造成阅读页闪屏。
+       ========================================================================== */
+    const existing = document.querySelector('.textgame-toc-modal-overlay');
+    if (existing) existing.remove();
+
     const overlay = document.createElement('div');
-    overlay.className = 'textgame-modal-overlay textgame-toc-modal-overlay';
+    overlay.className = 'textgame-modal-overlay textgame-toc-modal-overlay active';
     overlay.innerHTML = `
       <div class="textgame-modal-container textgame-toc-modal-container">
         <div class="textgame-travel-modal-head">
@@ -300,13 +310,16 @@ export class TextGameReader {
     `;
 
     document.body.appendChild(overlay);
-    requestAnimationFrame(() => overlay.classList.add('active'));
 
     const close = () => {
       overlay.classList.remove('active');
       setTimeout(() => overlay.remove(), 240);
     };
 
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) close();
+    });
+    overlay.querySelector('.textgame-toc-modal-container')?.addEventListener('click', (event) => event.stopPropagation());
     overlay.querySelector('[data-action="close-toc-modal"]')?.addEventListener('click', close);
     overlay.querySelectorAll('[data-chapter-index]').forEach((button) => {
       button.addEventListener('click', async () => {
@@ -390,15 +403,16 @@ export class TextGameReader {
      [区域标注·已完成·从此处穿书弹窗]
      说明：
      1. 底栏“穿越设置”打开梦笺自定义弹窗，用于设置穿越方式/剧情路线/同行联系人/行动选项。
-     2. 弹窗内复用 IconPark 图标、选择卡片与联系人卡片；保存穿书存档由底栏“存档”确认触发。
-     3. 不使用浏览器原生弹窗/选择器，不涉及 localStorage/sessionStorage。
+     2. 已完成：点击弹窗内容外遮罩区域可关闭，并保留当前自定义输入。
+     3. 已完成：弹窗创建时直接带 active 状态，避免先透明再显示造成阅读页闪屏。
+     4. 不使用浏览器原生弹窗/选择器，不涉及 localStorage/sessionStorage。
      ========================================================================== */
   openTravelModal() {
     const existing = document.querySelector('.textgame-travel-modal-overlay');
     if (existing) existing.remove();
 
     const overlay = document.createElement('div');
-    overlay.className = 'textgame-modal-overlay textgame-travel-modal-overlay';
+    overlay.className = 'textgame-modal-overlay textgame-travel-modal-overlay active';
     overlay.innerHTML = `
       <div class="textgame-modal-container textgame-travel-modal-container">
         <div class="textgame-travel-modal-head">
@@ -412,7 +426,6 @@ export class TextGameReader {
     `;
 
     document.body.appendChild(overlay);
-    requestAnimationFrame(() => overlay.classList.add('active'));
     this.bindTravelModalEvents(overlay);
   }
 
@@ -423,10 +436,18 @@ export class TextGameReader {
   }
 
   bindTravelModalEvents(overlay) {
-    overlay.querySelector('[data-action="close-travel-modal"]')?.addEventListener('click', () => {
+    const closeWithDraft = () => {
       this.customChoice = overlay.querySelector('[data-role="custom-choice"]')?.value || '';
       this.closeTravelModal(overlay);
+    };
+
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) closeWithDraft();
     });
+
+    overlay.querySelector('.textgame-travel-modal-container')?.addEventListener('click', (event) => event.stopPropagation());
+
+    overlay.querySelector('[data-action="close-travel-modal"]')?.addEventListener('click', closeWithDraft);
 
     overlay.querySelectorAll('[data-choice-group]').forEach((button) => {
       button.addEventListener('click', () => {
