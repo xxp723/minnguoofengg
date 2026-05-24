@@ -43,7 +43,10 @@ export class TextGameHome {
         <button class="textgame-home-prompt-bar" data-action="open-prompt-modal">
           <div class="textgame-home-prompt-left">
             <span class="textgame-home-prompt-icon">${Icons.magic}</span>
-            <span class="textgame-home-prompt-title">穿越指令词</span>
+            <div class="textgame-home-prompt-text">
+              <span class="textgame-home-prompt-title">穿越指令词</span>
+              <span class="textgame-home-prompt-desc">${this.globalTravelPrompt ? escapeHtml(this.globalTravelPrompt).substring(0, 12) + (this.globalTravelPrompt.length > 12 ? '...' : '') : '设置全局剧情偏好'}</span>
+            </div>
           </div>
           <span class="textgame-home-prompt-arrow">${Icons.next}</span>
         </button>
@@ -126,16 +129,16 @@ export class TextGameHome {
     overlay.className = 'textgame-modal-overlay textgame-prompt-modal-overlay active';
     overlay.innerHTML = `
       <div class="textgame-modal-container textgame-prompt-modal-container">
-        <div class="textgame-mask-modal-head">
-          <div class="textgame-mask-modal-title">${Icons.magic}<span>穿越指令词</span></div>
-          <button class="textgame-mask-modal-close" data-action="close-prompt-modal" title="关闭">${Icons.back}</button>
+        <div class="textgame-prompt-modal-head">
+          <div class="textgame-prompt-modal-title">${Icons.magic}<span>穿越指令词</span></div>
+          <button class="textgame-prompt-modal-close" data-action="close-prompt-modal" title="关闭">${Icons.back}</button>
         </div>
-        <div class="textgame-config-block" style="padding: 16px;">
-          <div class="textgame-config-label">全局剧情生成指令</div>
-          <textarea class="textgame-custom-choice" data-role="global-prompt-input" placeholder="例如：多一些对话描写，少一些景色描写。此指令将作用于所有面具身份的穿越剧情生成。">${escapeHtml(this.globalTravelPrompt)}</textarea>
-          <div style="margin-top: 16px; text-align: right;">
-            <button class="textgame-action-btn" data-action="save-prompt" style="padding: 8px 16px; background: var(--theme-color-primary); color: #fff; border-radius: 8px; border: none;">保存</button>
+        <div class="textgame-prompt-modal-body">
+          <div class="textgame-prompt-modal-desc">
+            此指令将作用于所有面具身份的穿越剧情生成，可用于控制文笔偏好、细节描写等。
           </div>
+          <textarea class="textgame-prompt-modal-textarea" data-role="global-prompt-input" placeholder="例如：多一些对话描写，少一些景色描写...">${escapeHtml(this.globalTravelPrompt)}</textarea>
+          <button class="textgame-prompt-modal-save" data-action="save-prompt">${Icons.check}<span>保存配置</span></button>
         </div>
       </div>
     `;

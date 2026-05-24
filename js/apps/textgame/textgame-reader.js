@@ -400,7 +400,11 @@ export class TextGameReader {
     overlay.addEventListener('click', (event) => {
       if (event.target === overlay) close();
     });
-    overlay.querySelector('.textgame-reader-settings-modal-container')?.addEventListener('click', (event) => event.stopPropagation());
+    overlay.querySelector('.textgame-reader-settings-modal-container')?.addEventListener('click', (event) => {
+      if (!event.target.closest('button')) {
+        event.stopPropagation();
+      }
+    });
     
     overlay.querySelector('[data-action="close-reader-settings"]')?.addEventListener('click', close);
     overlay.querySelectorAll('[data-bg]').forEach((button) => {

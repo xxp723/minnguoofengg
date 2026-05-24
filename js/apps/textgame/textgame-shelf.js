@@ -257,7 +257,11 @@ export class TextGameShelf {
     overlay.addEventListener('click', (event) => {
       if (event.target === overlay) close();
     });
-    overlay.querySelector('.textgame-book-manage-modal-container')?.addEventListener('click', (event) => event.stopPropagation());
+    overlay.querySelector('.textgame-book-manage-modal-container')?.addEventListener('click', (event) => {
+      if (!event.target.closest('button')) {
+        event.stopPropagation();
+      }
+    });
 
     overlay.querySelector('[data-action="close-book-manage"]')?.addEventListener('click', close);
     overlay.querySelector('[data-action="confirm-rename-book"]')?.addEventListener('click', async () => {

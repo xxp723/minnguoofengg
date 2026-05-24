@@ -113,6 +113,7 @@ export async function loadCompanionCandidatesForTextGame(maskId) {
         id: role.id,
         name: role.name,
         identity: role.identity,
+        avatar: role.avatar || matchedContact.avatar || '',
         roleArchive: role,
         contactName: normalizeText(matchedContact.name) || role.name,
         contactNumber: normalizeText(matchedContact.contact || matchedContact.number || role.contact),
