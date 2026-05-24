@@ -470,9 +470,14 @@ ${sampleText}`;
       
       // 更新视图
       const newSettings = await getBookSettings(this.book.id);
-      overlay.querySelector('[data-role="view-worldview"]').innerHTML = escapeHtml(newSettings.worldview).replace(/\n/g, '<br>');
-      overlay.querySelector('[data-role="view-summary"]').innerHTML = escapeHtml(newSettings.chaptersSummary).replace(/\n/g, '<br>');
-      overlay.querySelector('[data-role="view-characters"]').innerHTML = escapeHtml(newSettings.characters).replace(/\n/g, '<br>');
+      
+      const renderField = (fieldValue, emptyTip) => {
+        return fieldValue ? escapeHtml(fieldValue).replace(/\n/g, '<br>') : `<p style="color: var(--theme-color-secondary); font-style: italic; text-align: center;">${emptyTip}</p>`;
+      };
+      
+      overlay.querySelector('[data-role="view-worldview"]').innerHTML = renderField(newSettings.worldview, '暂无世界观设定。点击右上角“AI 提取”自动生成。');
+      overlay.querySelector('[data-role="view-summary"]').innerHTML = renderField(newSettings.chaptersSummary, '暂无章节提要。需先执行 AI 提取。');
+      overlay.querySelector('[data-role="view-characters"]').innerHTML = renderField(newSettings.characters, '暂无人物情报。需先执行 AI 提取。');
       
       showModal({ title: '提取成功', content: '书籍设定已更新并保存。' });
       
