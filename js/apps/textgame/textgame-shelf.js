@@ -15,7 +15,7 @@ import { getBooks, addBook, deleteBook } from './textgame-store.js';
    [区域标注·已完成·梦笺 TXT 编码识别]
    说明：
    1. 仅负责导入阶段的 ArrayBuffer 解码，不涉及任何持久化存储。
-   2. 优先识别 UTF BOM；无 BOM 时生成 UTF-8 / GB18030 / GBK / Big5 等候选预览，由用户在应用内弹窗确认。
+   2. 优先识别 UTF BOM；无 BOM 时固定显示 UTF-8 / GB18030 / GBK / Big5 / UTF-16 预览，由用户在应用内弹窗确认。
    3. 不使用 localStorage/sessionStorage，不过滤长文本，解码后的完整正文继续交给 IndexedDB 存储链路。
    ========================================================================== */
 function decodeTextFileBuffer(buffer) {
@@ -40,9 +40,17 @@ function decodeTextByEncoding(buffer, encoding, { fatal = false } = {}) {
   return new TextDecoder(encoding, { fatal }).decode(buffer);
 }
 
-function makePreviewText(text, max = 260) {
-  const value = String(text || '').replace(/\s+/g, ' ').trim();
-  return value.length > max ? `${value.slice(0, max)}…` : value || '（空白内容）';
+function makePreviewText(text, max = 110) {
+  const normalized = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const paragraphs = normalized
+    .split(/\n\s*\n+/)
+    .map((item) => item.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  const firstParagraph = paragraphs[0] || normalized
+    .split('\n')
+    .map((item) => item.trim())
+    .find(Boolean) || '';
+  return firstParagraph.length > max ? `${firstParagraph.slice(0, max)}…` : firstParagraph || '（空白内容）';
 }
 
 function scoreDecodedTextForPreview(text, encoding) {
@@ -63,26 +71,38 @@ function scoreDecodedTextForPreview(text, encoding) {
 
 function buildTextDecodeCandidates(buffer) {
   const encodings = ['utf-8', 'gb18030', 'gbk', 'big5', 'utf-16le', 'utf-16be'];
-  const candidates = [];
 
-  encodings.forEach((encoding) => {
+  return encodings.map((encoding) => {
     try {
-      const text = decodeTextByEncoding(buffer, encoding, { fatal: encoding === 'utf-8' });
-      candidates.push({
+      const text = encoding === 'utf-8'
+        ? decodeUtf8ForPreview(buffer)
+        : decodeTextByEncoding(buffer, encoding);
+      return {
         encoding,
         label: getEncodingLabel(encoding),
         text,
         preview: makePreviewText(text),
         score: scoreDecodedTextForPreview(text, encoding)
-      });
+      };
     } catch (err) {
-      // 当前编码无法严格解码时跳过，由其它候选继续提供预览。
+      const text = '';
+      return {
+        encoding,
+        label: getEncodingLabel(encoding),
+        text,
+        preview: '当前浏览器不支持此编码预览',
+        score: Number.POSITIVE_INFINITY
+      };
     }
   });
+}
 
-  return candidates
-    .filter((candidate, index, list) => list.findIndex((item) => item.text === candidate.text) === index)
-    .sort((a, b) => a.score - b.score);
+function decodeUtf8ForPreview(buffer) {
+  try {
+    return decodeTextByEncoding(buffer, 'utf-8', { fatal: true });
+  } catch (err) {
+    return decodeTextByEncoding(buffer, 'utf-8');
+  }
 }
 
 function getEncodingLabel(encoding) {
@@ -222,13 +242,14 @@ export class TextGameShelf {
   /* ==========================================================================
      [区域标注·已完成·梦笺 TXT 编码预览导入弹窗]
      说明：
-     1. 自动识别无法覆盖所有 TXT 来源；这里改为导入前显示多个编码预览。
+     1. 自动识别无法覆盖所有 TXT 来源；这里改为导入前固定显示多个编码的第一段预览。
      2. 用户可在梦笺应用内弹窗中选择正确预览后再写入 IndexedDB，避免乱码正文被保存。
      3. 弹窗不使用浏览器原生选择器，不使用 localStorage/sessionStorage，不做长文本过滤。
      ========================================================================== */
   openEncodingImportModal(file, buffer) {
     const candidates = buildTextDecodeCandidates(buffer);
-    let selectedEncoding = candidates[0]?.encoding || 'utf-8';
+    const suggestedCandidate = [...candidates].sort((a, b) => a.score - b.score)[0];
+    let selectedEncoding = suggestedCandidate?.encoding || 'utf-8';
 
     const existing = document.querySelector('.textgame-encoding-modal-overlay');
     if (existing) existing.remove();
