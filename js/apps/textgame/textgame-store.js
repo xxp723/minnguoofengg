@@ -39,6 +39,12 @@ function normalizeTextGameData(raw) {
     storyRuns: Array.isArray(source.storyRuns) ? source.storyRuns : [],
     settings: {
       activeMaskId: String(source?.settings?.activeMaskId || ''),
+      globalTravelPrompt: String(source?.settings?.globalTravelPrompt || ''),
+      readerSettings: {
+        background: String(source?.settings?.readerSettings?.background || '#faf9f7'),
+        color: String(source?.settings?.readerSettings?.color || '#302923'),
+        fontSize: Number(source?.settings?.readerSettings?.fontSize || 16)
+      },
       apiProfile: source?.settings?.apiProfile && typeof source.settings.apiProfile === 'object'
         ? {
             id: String(source.settings.apiProfile.id || ''),
@@ -90,6 +96,24 @@ export async function setTextGameActiveMask(maskId) {
   data.settings.activeMaskId = String(maskId || '');
   await saveTextGameData(data);
   return data.settings.activeMaskId;
+}
+
+export async function setGlobalTravelPrompt(prompt) {
+  const data = await getTextGameData();
+  data.settings.globalTravelPrompt = String(prompt || '');
+  await saveTextGameData(data);
+  return data.settings.globalTravelPrompt;
+}
+
+export async function setReaderSettings(settings) {
+  const data = await getTextGameData();
+  data.settings.readerSettings = {
+    background: String(settings.background || '#faf9f7'),
+    color: String(settings.color || '#302923'),
+    fontSize: Number(settings.fontSize || 16)
+  };
+  await saveTextGameData(data);
+  return data.settings.readerSettings;
 }
 
 /* ==========================================================================

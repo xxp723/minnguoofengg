@@ -254,6 +254,11 @@ export class TextGameShelf {
       setTimeout(() => overlay.remove(), 240);
     };
 
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) close();
+    });
+    overlay.querySelector('.textgame-book-manage-modal-container')?.addEventListener('click', (event) => event.stopPropagation());
+
     overlay.querySelector('[data-action="close-book-manage"]')?.addEventListener('click', close);
     overlay.querySelector('[data-action="confirm-rename-book"]')?.addEventListener('click', async () => {
       const input = overlay.querySelector('[data-role="rename-input"]');

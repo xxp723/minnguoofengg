@@ -14,7 +14,8 @@ import {
   updateBookProgress,
   saveStoryRun,
   getTextGameSettings,
-  getStoryRunsByBookAndMask
+  getStoryRunsByBookAndMask,
+  setReaderSettings
 } from './textgame-store.js';
 import {
   loadArchiveProfilesForTextGame,
@@ -104,6 +105,7 @@ export class TextGameReader {
       color: '#302923',
       fontSize: 16
     };
+    this.withCompanionMemory = true;
   }
 
   async render() {
@@ -153,12 +155,17 @@ export class TextGameReader {
 
   async loadBridgeData() {
     const settings = await getTextGameSettings();
+    
+    if (settings && settings.readerSettings) {
+      this.readerSettings = { ...this.readerSettings, ...settings.readerSettings };
+    }
+    
     const profiles = await loadArchiveProfilesForTextGame();
     this.activeMask = settings.activeMaskId
       ? profiles.masks.find((mask) => mask.id === settings.activeMaskId) || null
       : null;
     this.companions = this.activeMask ? await loadCompanionCandidatesForTextGame(this.activeMask.id) : [];
-    if (!this.selectedCompanionId && this.companions[0]) this.selectedCompanionId = this.companions[0].id;
+    this.globalTravelPrompt = settings.globalTravelPrompt || '';
   }
 
   getProgressPercent() {
@@ -206,6 +213,15 @@ export class TextGameReader {
         <div class="textgame-companion-list">
           ${this.renderCompanionList()}
         </div>
+        ${this.selectedCompanionId ? `
+          <div class="textgame-config-switch-row" data-action="toggle-companion-memory" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <span>让联系人携带记忆</span>
+            <label class="textgame-switch" style="pointer-events: none;">
+              <input type="checkbox" ${this.withCompanionMemory ? 'checked' : ''}>
+              <span class="textgame-slider"></span>
+            </label>
+          </div>
+        ` : ''}
       </div>
 
       <div class="textgame-config-block">
@@ -231,7 +247,9 @@ export class TextGameReader {
 
     return this.companions.map((item) => `
       <button class="textgame-companion-card ${item.id === this.selectedCompanionId ? 'active' : ''}" data-companion-id="${escapeHtml(item.id)}">
-        <span>${Icons.contact}</span>
+        <span class="textgame-companion-avatar" style="border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; background-color: var(--theme-color-divider);">
+          ${item.avatar ? `<img src="${escapeHtml(item.avatar)}" alt="" style="width:100%;height:100%;object-fit:cover;">` : Icons.user}
+        </span>
         <b>${escapeHtml(item.contactName || item.name)}</b>
         <em>${escapeHtml(item.identity || '已加入通讯录')}</em>
       </button>
@@ -372,12 +390,18 @@ export class TextGameReader {
       overlay.classList.remove('active');
       setTimeout(() => overlay.remove(), 240);
     };
-    const refresh = () => {
+    const refresh = async () => {
       this.readerControlsVisible = true;
       close();
+      await setReaderSettings(this.readerSettings);
       this.render();
     };
 
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) close();
+    });
+    overlay.querySelector('.textgame-reader-settings-modal-container')?.addEventListener('click', (event) => event.stopPropagation());
+    
     overlay.querySelector('[data-action="close-reader-settings"]')?.addEventListener('click', close);
     overlay.querySelectorAll('[data-bg]').forEach((button) => {
       button.addEventListener('click', () => {
@@ -461,10 +485,17 @@ export class TextGameReader {
 
     overlay.querySelectorAll('[data-companion-id]').forEach((button) => {
       button.addEventListener('click', () => {
-        this.selectedCompanionId = button.dataset.companionId || '';
+        const id = button.dataset.companionId || '';
+        this.selectedCompanionId = this.selectedCompanionId === id ? '' : id;
         this.customChoice = overlay.querySelector('[data-role="custom-choice"]')?.value || '';
         this.renderTravelConfigOnly(overlay);
       });
+    });
+
+    overlay.querySelector('[data-action="toggle-companion-memory"]')?.addEventListener('click', () => {
+      this.withCompanionMemory = !this.withCompanionMemory;
+      this.customChoice = overlay.querySelector('[data-role="custom-choice"]')?.value || '';
+      this.renderTravelConfigOnly(overlay);
     });
 
     overlay.querySelectorAll('[data-option]').forEach((button) => {
@@ -533,7 +564,7 @@ export class TextGameReader {
   async startStoryRun(activeOverlay = null) {
     const chapter = this.chapters[this.chapterIndex] || this.chapters[0];
     const companion = this.companions.find((item) => item.id === this.selectedCompanionId) || null;
-    const memories = companion ? await loadCompanionMemoryForTextGame(companion.id) : [];
+    const memories = (companion && this.withCompanionMemory) ? await loadCompanionMemoryForTextGame(companion.id) : [];
     const input = activeOverlay?.querySelector('[data-role="custom-choice"]') || document.querySelector('.textgame-travel-modal-overlay [data-role="custom-choice"]');
     const customChoice = String(input?.value || this.customChoice || '').trim();
     this.customChoice = customChoice;
@@ -652,16 +683,25 @@ export class TextGameReader {
       ? '用户选择魂穿：让用户穿成当前情节中的某个合适人物，以该人物身份、处境和社会关系继续。'
       : '用户选择身穿：让用户以梦笺主页选择的面具本体进入小说现场，并处理身份暴露风险。';
 
-    return [
+    const lines = [
       `小说：《${this.book.name}》`,
       `章节/故事点：${chapter.title}`,
       `原文片段：${makeSnippet(chapter.content, 1200)}`,
       `穿越方式：${travelInstruction}`,
       `剧情路线：${plotInstruction}`,
       companion ? `同行者：${companion.name}（${companion.identity || '无身份备注'}）` : '同行者：暂无',
-      memories.length ? `同行者旧事记忆摘要：${memories.map((item) => item.summary).join('；')}` : '同行者旧事记忆摘要：暂无',
+      memories.length ? `同行者旧事记忆摘要：${memories.map((item) => item.summary).join('；')}` : '同行者旧事记忆摘要：暂无'
+    ];
+    
+    if (this.globalTravelPrompt) {
+      lines.push(`用户全局指令：${this.globalTravelPrompt}`);
+    }
+    
+    lines.push(
       customChoice ? `用户自定义行动：${customChoice}` : '用户自定义行动：未填写',
       '请以文游方式推进：先叙事，再给出 3 个可选行动，并允许用户自定义输入。'
-    ].join('\n');
+    );
+    
+    return lines.join('\n');
   }
 }

@@ -10,7 +10,7 @@
  */
 
 import { Icons, escapeHtml, showModal } from './textgame-ui.js';
-import { getTextGameSettings, setTextGameActiveMask } from './textgame-store.js';
+import { getTextGameSettings, setTextGameActiveMask, setGlobalTravelPrompt } from './textgame-store.js';
 import { loadArchiveProfilesForTextGame } from './textgame-bridge.js';
 
 export class TextGameHome {
@@ -18,6 +18,7 @@ export class TextGameHome {
     this.container = container;
     this.masks = [];
     this.activeMaskId = '';
+    this.globalTravelPrompt = '';
   }
 
   async render() {
@@ -26,6 +27,8 @@ export class TextGameHome {
 
     this.masks = profiles.masks || [];
     this.activeMaskId = settings.activeMaskId || this.masks[0]?.id || '';
+    this.globalTravelPrompt = settings.globalTravelPrompt || '';
+    
     if (this.activeMaskId && settings.activeMaskId !== this.activeMaskId) {
       await setTextGameActiveMask(this.activeMaskId);
     }
@@ -35,6 +38,15 @@ export class TextGameHome {
     this.container.innerHTML = `
       <div class="textgame-home-panel">
         ${this.renderHomeAvatar(activeMask)}
+        
+        <!-- [区域标注·已完成·梦笺全局穿越指令词] -->
+        <button class="textgame-home-prompt-bar" data-action="open-prompt-modal">
+          <div class="textgame-home-prompt-left">
+            <span class="textgame-home-prompt-icon">${Icons.magic}</span>
+            <span class="textgame-home-prompt-title">穿越指令词</span>
+          </div>
+          <span class="textgame-home-prompt-arrow">${Icons.next}</span>
+        </button>
       </div>
     `;
 
@@ -94,6 +106,63 @@ export class TextGameHome {
   bindEvents() {
     this.container.querySelector('[data-action="open-mask-modal"]')?.addEventListener('click', () => {
       this.openMaskModal();
+    });
+    this.container.querySelector('[data-action="open-prompt-modal"]')?.addEventListener('click', () => {
+      this.openPromptModal();
+    });
+  }
+
+  /* ==========================================================================
+     [区域标注·已完成·梦笺主页全局穿越指令词弹窗]
+     说明：
+     1. 用于设置全局的穿越指令，如文笔偏好、细节描写控制。
+     2. 不使用原生 prompt 弹窗，使用梦笺统一 UI 样式，点击外部可关闭。
+     ========================================================================== */
+  openPromptModal() {
+    const existing = document.querySelector('.textgame-prompt-modal-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'textgame-modal-overlay textgame-prompt-modal-overlay active';
+    overlay.innerHTML = `
+      <div class="textgame-modal-container textgame-prompt-modal-container">
+        <div class="textgame-mask-modal-head">
+          <div class="textgame-mask-modal-title">${Icons.magic}<span>穿越指令词</span></div>
+          <button class="textgame-mask-modal-close" data-action="close-prompt-modal" title="关闭">${Icons.back}</button>
+        </div>
+        <div class="textgame-config-block" style="padding: 16px;">
+          <div class="textgame-config-label">全局剧情生成指令</div>
+          <textarea class="textgame-custom-choice" data-role="global-prompt-input" placeholder="例如：多一些对话描写，少一些景色描写。此指令将作用于所有面具身份的穿越剧情生成。">${escapeHtml(this.globalTravelPrompt)}</textarea>
+          <div style="margin-top: 16px; text-align: right;">
+            <button class="textgame-action-btn" data-action="save-prompt" style="padding: 8px 16px; background: var(--theme-color-primary); color: #fff; border-radius: 8px; border: none;">保存</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const close = () => {
+      overlay.classList.remove('active');
+      setTimeout(() => overlay.remove(), 240);
+    };
+
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) close();
+    });
+    overlay.querySelector('.textgame-prompt-modal-container')?.addEventListener('click', (e) => e.stopPropagation());
+
+    overlay.querySelector('[data-action="close-prompt-modal"]')?.addEventListener('click', close);
+    overlay.querySelector('[data-action="save-prompt"]')?.addEventListener('click', async () => {
+      const input = overlay.querySelector('[data-role="global-prompt-input"]');
+      const val = input ? input.value.trim() : '';
+      this.globalTravelPrompt = val;
+      await setGlobalTravelPrompt(val);
+      close();
+      showModal({
+        title: '保存成功',
+        content: '全局穿越指令词已更新。'
+      });
     });
   }
 
