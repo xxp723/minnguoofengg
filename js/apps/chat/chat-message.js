@@ -1427,8 +1427,22 @@ export function refreshCurrentSessionLastMessage(state) {
 export async function retryLatestAiReply(container, state, db, settingsManager) {
   if (!state.currentChatId || state.isAiSending) return;
 
+  /* ========================================================================
+     [区域标注·已完成·重回清理AI拍一拍系统小字] 清空最新一轮角色回复
+     说明：
+     1. “重回”需要清空最新一轮 AI/角色回复后，再基于最新一轮用户消息重新请求 AI。
+     2. AI 主动拍一拍会生成 type:ai_pat_system 的系统小字；它视觉上是系统提示，
+        但在当前数据模型中 role 不是 assistant，因此旧逻辑会在这里提前停止，
+        导致只能清空系统小字下方的 AI 回复。
+     3. 本区域只把 ai_pat_system 视为“最新一轮 AI 回复附属消息”一起删除；
+        不删除 user_pat_system，因为它代表用户发起的拍一拍输入，需要保留给重回重新生成。
+     ======================================================================== */
   for (let i = state.currentMessages.length - 1; i >= 0; i -= 1) {
-    if (state.currentMessages[i]?.role === 'assistant') {
+    const message = state.currentMessages[i];
+    const isLatestAiReplyMessage = message?.role === 'assistant'
+      || String(message?.type || '') === 'ai_pat_system';
+
+    if (isLatestAiReplyMessage) {
       state.currentMessages.splice(i, 1);
       continue;
     }
