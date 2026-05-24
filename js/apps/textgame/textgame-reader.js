@@ -54,6 +54,7 @@ export class TextGameReader {
     this.companions = [];
     this.activeMask = null;
     this.customChoice = '';
+    this.readerControlsVisible = false;
   }
 
   async render() {
@@ -61,18 +62,17 @@ export class TextGameReader {
 
     const chapter = this.chapters[this.chapterIndex] || this.chapters[0];
     this.container.innerHTML = `
-      <div class="textgame-reader">
-        <div class="textgame-reader-toolbar">
-          <button class="textgame-reader-back" data-action="back">${Icons.back}<span>书架</span></button>
-          <div class="textgame-reader-count">${this.chapterIndex + 1} / ${this.chapters.length}</div>
+      <!-- [区域标注·已完成·梦笺沉浸式阅读页] 默认隐藏顶栏/底栏，点击正文中心显示，点击非栏区域隐藏。 -->
+      <div class="textgame-reader ${this.readerControlsVisible ? 'controls-visible' : ''}" data-role="reader-shell">
+        <div class="textgame-reader-toolbar" data-role="reader-topbar">
+          <button class="textgame-reader-back" data-action="back" aria-label="返回书架">${Icons.back}</button>
         </div>
 
-        <article class="textgame-reader-paper">
-          <h2>${escapeHtml(chapter.title || this.book.name)}</h2>
+        <article class="textgame-reader-paper" data-role="reader-paper">
           <div class="textgame-reader-body">${escapeHtml(chapter.content || '').replace(/\n/g, '<br>')}</div>
         </article>
 
-        <div class="textgame-reader-actions">
+        <div class="textgame-reader-actions" data-role="reader-bottombar">
           <button class="textgame-pill-btn" data-action="prev">${Icons.back}<span>上一章</span></button>
           <button class="textgame-pill-btn primary" data-action="travel">${Icons.magic}<span>从此处穿书</span></button>
           <button class="textgame-pill-btn" data-action="next"><span>下一章</span>${Icons.play}</button>
@@ -167,15 +167,31 @@ export class TextGameReader {
   }
 
   bindEvents() {
+    const readerShell = this.container.querySelector('[data-role="reader-shell"]');
+
+    /* ==========================================================================
+       [区域标注·已完成·梦笺沉浸式阅读页交互]
+       说明：
+       1. 点击小说正文/中心区域显示顶栏和底栏；再次点击非顶栏/底栏页面区域时隐藏。
+       2. 顶栏/底栏按钮点击不触发显示状态切换，避免返回、翻章、穿书误操作。
+       3. 不使用浏览器原生弹窗/选择器，不涉及 localStorage/sessionStorage。
+       ========================================================================== */
+    readerShell?.addEventListener('click', (event) => {
+      if (event.target.closest('[data-role="reader-topbar"], [data-role="reader-bottombar"]')) return;
+      this.setReaderControlsVisible(!this.readerControlsVisible);
+    });
+
     this.container.querySelector('[data-action="back"]')?.addEventListener('click', () => this.onBack?.());
     this.container.querySelector('[data-action="prev"]')?.addEventListener('click', async () => {
       if (this.chapterIndex <= 0) return;
       this.chapterIndex -= 1;
+      this.readerControlsVisible = false;
       await this.render();
     });
     this.container.querySelector('[data-action="next"]')?.addEventListener('click', async () => {
       if (this.chapterIndex >= this.chapters.length - 1) return;
       this.chapterIndex += 1;
+      this.readerControlsVisible = false;
       await this.render();
     });
     this.container.querySelector('[data-action="travel"]')?.addEventListener('click', () => {
@@ -208,6 +224,11 @@ export class TextGameReader {
     });
 
     this.container.querySelector('[data-action="start-run"]')?.addEventListener('click', () => this.startStoryRun());
+  }
+
+  setReaderControlsVisible(isVisible) {
+    this.readerControlsVisible = Boolean(isVisible);
+    this.container.querySelector('[data-role="reader-shell"]')?.classList.toggle('controls-visible', this.readerControlsVisible);
   }
 
   /* ==========================================================================

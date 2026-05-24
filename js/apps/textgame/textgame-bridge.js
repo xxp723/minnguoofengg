@@ -79,11 +79,13 @@ export async function loadArchiveProfilesForTextGame() {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·梦笺闲谈通讯录读取]
+   [区域标注·已完成·梦笺同行联系人读取修复]
    说明：
-   1. 读取当前梦笺面具对应的 chat_contacts_${maskId}。
-   2. 只返回已添加到通讯录、且能匹配到档案绑定角色 contact 字段的同行候选人。
-   3. 不复制联系人头像、联系方式、签名、开场白到梦笺存档；只在配置界面展示。
+   1. 读取当前梦笺面具对应的 chat_contacts_${maskId}，只读 IndexedDB 中闲谈已添加通讯录。
+   2. 已修复：兼容闲谈联系人实际字段 contact / number，以及 roleId / id 与档案角色 id 的匹配。
+   3. 只返回已添加到通讯录、且属于当前梦笺面具绑定角色的同行候选人。
+   4. 不复制联系人头像、联系方式、签名、开场白到梦笺存档；只在配置界面展示。
+   5. 禁止 localStorage/sessionStorage；不写双份兜底存储。
    ========================================================================== */
 export async function loadCompanionCandidatesForTextGame(maskId) {
   const activeMaskId = normalizeText(maskId);
@@ -99,7 +101,13 @@ export async function loadCompanionCandidatesForTextGame(maskId) {
 
   return boundRoles
     .map((role) => {
-      const matchedContact = contacts.find((contact) => normalizeText(contact?.number) === normalizeText(role.contact));
+      const roleId = normalizeText(role.id);
+      const roleContact = normalizeText(role.contact);
+      const matchedContact = contacts.find((contact) => {
+        const contactRoleId = normalizeText(contact?.roleId || contact?.id);
+        const contactNumber = normalizeText(contact?.contact || contact?.number);
+        return (roleId && contactRoleId === roleId) || (roleContact && contactNumber === roleContact);
+      });
       if (!matchedContact) return null;
       return {
         id: role.id,
@@ -107,7 +115,7 @@ export async function loadCompanionCandidatesForTextGame(maskId) {
         identity: role.identity,
         roleArchive: role,
         contactName: normalizeText(matchedContact.name) || role.name,
-        contactNumber: normalizeText(matchedContact.number),
+        contactNumber: normalizeText(matchedContact.contact || matchedContact.number || role.contact),
         inContacts: true
       };
     })
