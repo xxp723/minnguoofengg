@@ -135,6 +135,25 @@
 }
 
 /* ==========================================================================
+   [区域标注·已完成·梦笺阅读页移除应用级书名标题栏]
+   说明：
+   1. 阅读页进入 textgame-reader-mode 后隐藏梦笺应用级 header，彻底去除书名标题栏。
+   2. 仅作用于梦笺阅读页模式；返回书架/存档/主页时会恢复普通标题栏。
+   3. 不涉及持久化存储，不使用浏览器原生弹窗/选择器。
+   ========================================================================== */
+.textgame-app-container.textgame-reader-mode .textgame-header {
+  display: none;
+}
+
+.textgame-app-container.textgame-reader-mode .textgame-content-wrapper {
+  min-height: 100%;
+}
+
+.textgame-app-container.textgame-reader-mode .textgame-reader-page.active {
+  padding-top: 16px;
+}
+
+/* ==========================================================================
    [区域标注·已完成·梦笺底部悬浮 Tab 栏]
    ========================================================================== */
 .textgame-tab-bar {

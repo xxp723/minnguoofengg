@@ -97,6 +97,7 @@ export async function mount(container, context) {
   const pageArchive = container.querySelector('#textgame-page-archive');
   const pageHome = container.querySelector('#textgame-page-home');
   const pageReader = container.querySelector('#textgame-page-reader');
+  const appView = container.querySelector('#textgame-app-main-view');
 
   const titleEl = container.querySelector('.textgame-title');
   const actionsEl = container.querySelector('.textgame-header-actions');
@@ -110,6 +111,7 @@ export async function mount(container, context) {
   const switchTab = async (tabId) => {
     currentTab = tabId;
     readerInstance = null;
+    appView?.classList.remove('textgame-reader-mode');
     tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.tab === tabId));
     pages.forEach(page => page.classList.toggle('active', page.id === `textgame-page-${tabId}`));
     if (tabBar) tabBar.classList.remove('is-hidden');
@@ -132,10 +134,10 @@ export async function mount(container, context) {
 
   const openReader = async (book) => {
     currentTab = 'reader';
+    appView?.classList.add('textgame-reader-mode');
     tabs.forEach(tab => tab.classList.remove('active'));
     pages.forEach(page => page.classList.toggle('active', page.id === 'textgame-page-reader'));
     if (tabBar) tabBar.classList.add('is-hidden');
-    titleEl.textContent = String(book?.name || 'Reader').replace(/\.txt$/i, '');
     actionsEl.innerHTML = '';
     readerInstance = new TextGameReader(pageReader, book, {
       onBack: async () => {
