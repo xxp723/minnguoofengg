@@ -1126,6 +1126,19 @@ ${sampleText}`;
     });
   }
 
+  async loadRun(run) {
+    this.activeRunId = run.id;
+    this.activeRunData = run;
+    this.chapterIndex = Number(run.chapterIndex) || 0;
+    this.selectedTravelMode = run.travelMode || 'soul';
+    this.selectedPlotMode = run.plotMode || 'canon';
+    this.customChoice = run.customChoice || '';
+    if (run.companion) {
+      this.selectedCompanionId = run.companion.roleId;
+    }
+    await this.render();
+  }
+
   async startStoryRun(activeOverlay = null) {
     const chapter = this.chapters[this.chapterIndex] || this.chapters[0];
     const companion = this.companions.find((item) => item.id === this.selectedCompanionId) || null;
@@ -1585,6 +1598,26 @@ ${actionPrompt}
     overlay.querySelectorAll('[data-action="close-run-drawer"]').forEach((item) => {
       item.addEventListener('click', close);
     });
+
+    overlay.querySelectorAll('.textgame-run-node-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        const runId = card.dataset.runId;
+        const run = runs.find(r => r.id === runId);
+        if (!run) return;
+        
+        showModal({
+          title: '读取存档',
+          content: `确定要读取《${escapeHtml(run.bookName || '未命名小说')}》的这个穿越进度吗？`,
+          showCancel: true,
+          confirmText: '读取',
+          cancelText: '取消',
+          onConfirm: () => {
+            close();
+            this.loadRun(run);
+          }
+        });
+      });
+    });
   }
 
   renderRunNode(run) {
@@ -1593,7 +1626,7 @@ ${actionPrompt}
     const created = run.createdAt ? new Date(run.createdAt).toLocaleString('zh-CN', { hour12: false }) : '';
 
     return `
-      <article class="textgame-run-node-card">
+      <article class="textgame-run-node-card" data-run-id="${escapeHtml(run.id)}">
         <h4>${escapeHtml(run.chapterTitle || '故事点')}</h4>
         <div class="textgame-archive-tags">
           <span>${escapeHtml(route)}</span>
