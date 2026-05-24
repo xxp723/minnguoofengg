@@ -2,38 +2,82 @@
  * ==========================================================================
  * [区域标注·已完成·梦笺 TXT 阅读器与穿书文游]
  * 说明：
- * 1. 支持 TXT 小说阅读、章节切分、阅读进度保存。
- * 2. 已完成：点击“从此处穿书”后以梦笺应用内弹窗展示穿书配置，不再滑到页面底部面板。
- * 3. 穿书存档只写入梦笺自身 textgame 记录；只读联动档案/闲谈/旧事。
- * 4. 不使用 localStorage/sessionStorage，不使用浏览器原生弹窗或原生选择器。
+ * 1. 支持 TXT 小说阅读、多格式章节切分、阅读进度保存。
+ * 2. 已完成：阅读页顶栏含返回、书名圆角框、右侧竖向更多按钮；更多按钮打开当前小说/当前面具身份的穿书存档抽屉。
+ * 3. 已完成：底栏改为方框式控制面板，含阅读进度、上一章/下一章、目录、阅读设置、穿越设置、存档。
+ * 4. 穿书存档只写入梦笺自身 textgame 记录，并按梦笺当前用户面具身份隔离显示；不使用 localStorage/sessionStorage。
  * ==========================================================================
  */
 
 import { Icons, escapeHtml, showModal } from './textgame-ui.js';
-import { updateBookProgress, saveStoryRun, getTextGameSettings } from './textgame-store.js';
+import {
+  updateBookProgress,
+  saveStoryRun,
+  getTextGameSettings,
+  getStoryRunsByBookAndMask
+} from './textgame-store.js';
 import {
   loadArchiveProfilesForTextGame,
   loadCompanionCandidatesForTextGame,
   loadCompanionMemoryForTextGame
 } from './textgame-bridge.js';
 
+/* ==========================================================================
+   [区域标注·已完成·梦笺多格式章节目录解析]
+   说明：
+   1. 支持中文“第n章/回/节/卷/部”、卷/正文/番外/楔子/序章/后记等常见格式。
+   2. 支持英文 Chapter / CHAPTER / Part / Book / Prologue / Epilogue 等格式。
+   3. 仅匹配行首短标题，降低正文误判；不涉及持久化存储，不过滤长文本正文。
+   ========================================================================== */
 function splitChapters(content) {
-  const text = String(content || '').replace(/\r\n/g, '\n');
-  const matches = [...text.matchAll(/(^|\n)(第[一二三四五六七八九十百千万0-9０-９]+[章节回卷部].*)/g)];
+  const text = String(content || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = text.split('\n');
+  const matches = [];
+  let offset = 0;
+
+  lines.forEach((line) => {
+    const rawLine = line || '';
+    const trimmed = rawLine.trim();
+    if (isChapterTitleLine(trimmed)) {
+      matches.push({
+        index: offset + rawLine.indexOf(trimmed),
+        title: trimmed
+      });
+    }
+    offset += rawLine.length + 1;
+  });
+
   if (!matches.length) {
     return [{ title: '正文', content: text.trim() || '（空白章节）', start: 0 }];
   }
 
   return matches.map((match, index) => {
-    const titleStart = match.index + (match[1] ? match[1].length : 0);
     const nextStart = matches[index + 1]?.index ?? text.length;
-    const title = match[2].trim();
     return {
-      title,
-      start: titleStart,
-      content: text.slice(titleStart, nextStart).trim() || title
+      title: match.title,
+      start: match.index,
+      content: text.slice(match.index, nextStart).trim() || match.title
     };
   });
+}
+
+function isChapterTitleLine(line) {
+  if (!line || line.length > 42) return false;
+  if (/[。！？!?；;，,]{2,}/.test(line)) return false;
+
+  const chineseNumber = '零〇一二两三四五六七八九十百千万亿0-9０-９';
+  const romanNumber = 'IVXLCDMivxlcdm';
+  const patterns = [
+    new RegExp(`^第[${chineseNumber}]+\\s*[章节回卷部篇节集幕].{0,24}$`),
+    new RegExp(`^(正文|番外|外传|卷|篇|部)\\s*[${chineseNumber}]+.{0,24}$`),
+    new RegExp(`^第[${chineseNumber}]+\\s*(卷|部|篇)\\s*.{0,24}$`),
+    /^(楔子|序章|序幕|序言|前言|引子|终章|尾声|后记|番外)(\s*[:：·\-—].{0,24}|.{0,18})?$/,
+    new RegExp(`^(chapter|chap\\.|ch\\.)\\s+([0-9０-９]+|[${romanNumber}]+|one|two|three|four|five|six|seven|eight|nine|ten)\\b.{0,24}$`, 'i'),
+    new RegExp(`^(part|book|volume)\\s+([0-9０-９]+|[${romanNumber}]+|one|two|three|four|five|six|seven|eight|nine|ten)\\b.{0,24}$`, 'i'),
+    /^(prologue|epilogue|preface|afterword)(\s*[:：·\-—].{0,24}|.{0,18})?$/i
+  ];
+
+  return patterns.some((pattern) => pattern.test(line));
 }
 
 function makeSnippet(text, max = 900) {
@@ -55,27 +99,50 @@ export class TextGameReader {
     this.activeMask = null;
     this.customChoice = '';
     this.readerControlsVisible = false;
+    this.readerSettings = {
+      background: '#faf9f7',
+      color: '#302923',
+      fontSize: 16
+    };
   }
 
   async render() {
     await this.loadBridgeData();
 
     const chapter = this.chapters[this.chapterIndex] || this.chapters[0];
+    const progressPercent = this.getProgressPercent();
+
     this.container.innerHTML = `
-      <!-- [区域标注·已完成·梦笺沉浸式阅读页] 默认隐藏顶栏/底栏，点击正文中心显示，点击非栏区域隐藏。 -->
-      <div class="textgame-reader ${this.readerControlsVisible ? 'controls-visible' : ''}" data-role="reader-shell">
+      <!-- [区域标注·已完成·梦笺沉浸式阅读页] 顶栏/底栏默认隐藏，点击正文中心显示；顶栏含书名与当前小说存档抽屉入口。 -->
+      <div class="textgame-reader ${this.readerControlsVisible ? 'controls-visible' : ''}" data-role="reader-shell" style="--reader-bg:${escapeHtml(this.readerSettings.background)};--reader-color:${escapeHtml(this.readerSettings.color)};--reader-font-size:${this.readerSettings.fontSize}px;">
         <div class="textgame-reader-toolbar" data-role="reader-topbar">
           <button class="textgame-reader-back" data-action="back" aria-label="返回书架">${Icons.back}</button>
+          <div class="textgame-reader-title-box" title="${escapeHtml(this.book?.name || '未命名小说')}">${escapeHtml(String(this.book?.name || '未命名小说').replace(/\.txt$/i, ''))}</div>
+          <button class="textgame-reader-more" data-action="open-run-drawer" aria-label="查看存档节点">${Icons.moreVertical}</button>
         </div>
 
         <article class="textgame-reader-paper" data-role="reader-paper">
           <div class="textgame-reader-body">${escapeHtml(chapter.content || '').replace(/\n/g, '<br>')}</div>
         </article>
 
-        <div class="textgame-reader-actions" data-role="reader-bottombar">
-          <button class="textgame-pill-btn" data-action="prev">${Icons.back}<span>上一章</span></button>
-          <button class="textgame-pill-btn primary" data-action="travel">${Icons.magic}<span>从此处穿书</span></button>
-          <button class="textgame-pill-btn" data-action="next"><span>下一章</span>${Icons.play}</button>
+        <div class="textgame-reader-actions textgame-reader-control-panel" data-role="reader-bottombar">
+          <div class="textgame-reader-progress-head">
+            <button class="textgame-reader-step-btn" data-action="prev" aria-label="上一章">${Icons.back}</button>
+            <div class="textgame-reader-progress-main">
+              <div class="textgame-reader-progress-label">
+                <span>${escapeHtml(chapter.title || '正文')}</span>
+                <em>${progressPercent}%</em>
+              </div>
+              <input class="textgame-reader-progress-range" data-action="jump-progress" type="range" min="0" max="${Math.max(this.chapters.length - 1, 0)}" step="1" value="${this.chapterIndex}">
+            </div>
+            <button class="textgame-reader-step-btn" data-action="next" aria-label="下一章">${Icons.next}</button>
+          </div>
+          <div class="textgame-reader-tool-grid">
+            <button class="textgame-reader-tool-card" data-action="open-toc">${Icons.list}<span>目录</span></button>
+            <button class="textgame-reader-tool-card" data-action="open-reader-settings">${Icons.setting}<span>阅读设置</span></button>
+            <button class="textgame-reader-tool-card" data-action="travel">${Icons.magic}<span>穿越设置</span></button>
+            ${this.activeMask ? `<button class="textgame-reader-tool-card" data-action="save-run">${Icons.save}<span>存档</span></button>` : ''}
+          </div>
         </div>
       </div>
     `;
@@ -87,9 +154,16 @@ export class TextGameReader {
   async loadBridgeData() {
     const settings = await getTextGameSettings();
     const profiles = await loadArchiveProfilesForTextGame();
-    this.activeMask = profiles.masks.find((mask) => mask.id === settings.activeMaskId) || profiles.masks[0] || null;
+    this.activeMask = settings.activeMaskId
+      ? profiles.masks.find((mask) => mask.id === settings.activeMaskId) || null
+      : null;
     this.companions = this.activeMask ? await loadCompanionCandidatesForTextGame(this.activeMask.id) : [];
     if (!this.selectedCompanionId && this.companions[0]) this.selectedCompanionId = this.companions[0].id;
+  }
+
+  getProgressPercent() {
+    if (this.chapters.length <= 1) return 100;
+    return Math.round((this.chapterIndex / (this.chapters.length - 1)) * 100);
   }
 
   renderTravelPanel() {
@@ -143,8 +217,6 @@ export class TextGameReader {
         </div>
         <textarea class="textgame-custom-choice" data-role="custom-choice" placeholder="也可以输入自定义选项，例如：我想立刻阻止这一幕发生。">${escapeHtml(this.customChoice)}</textarea>
       </div>
-
-      <button class="textgame-start-run-btn" data-action="start-run">${Icons.check}<span>生成穿书存档</span></button>
     `;
   }
 
@@ -172,8 +244,8 @@ export class TextGameReader {
     /* ==========================================================================
        [区域标注·已完成·梦笺沉浸式阅读页交互]
        说明：
-       1. 点击小说正文/中心区域显示顶栏和底栏；再次点击非顶栏/底栏页面区域时隐藏。
-       2. 顶栏/底栏按钮点击不触发显示状态切换，避免返回、翻章、穿书误操作。
+       1. 点击小说正文/中心区域显示顶栏和方框底栏；再次点击非顶栏/底栏区域时隐藏。
+       2. 顶栏/底栏按钮点击不触发显示状态切换，避免返回、翻章、穿书、存档误操作。
        3. 不使用浏览器原生弹窗/选择器，不涉及 localStorage/sessionStorage。
        ========================================================================== */
     readerShell?.addEventListener('click', (event) => {
@@ -182,48 +254,24 @@ export class TextGameReader {
     });
 
     this.container.querySelector('[data-action="back"]')?.addEventListener('click', () => this.onBack?.());
-    this.container.querySelector('[data-action="prev"]')?.addEventListener('click', async () => {
-      if (this.chapterIndex <= 0) return;
-      this.chapterIndex -= 1;
-      this.readerControlsVisible = false;
-      await this.render();
+    this.container.querySelector('[data-action="prev"]')?.addEventListener('click', () => this.goToChapter(this.chapterIndex - 1));
+    this.container.querySelector('[data-action="next"]')?.addEventListener('click', () => this.goToChapter(this.chapterIndex + 1));
+    this.container.querySelector('[data-action="jump-progress"]')?.addEventListener('change', (event) => {
+      this.goToChapter(Number(event.target.value || 0));
     });
-    this.container.querySelector('[data-action="next"]')?.addEventListener('click', async () => {
-      if (this.chapterIndex >= this.chapters.length - 1) return;
-      this.chapterIndex += 1;
-      this.readerControlsVisible = false;
-      await this.render();
-    });
-    this.container.querySelector('[data-action="travel"]')?.addEventListener('click', () => {
-      this.openTravelModal();
-    });
+    this.container.querySelector('[data-action="travel"]')?.addEventListener('click', () => this.openTravelModal());
+    this.container.querySelector('[data-action="save-run"]')?.addEventListener('click', () => this.openSaveRunConfirmModal());
+    this.container.querySelector('[data-action="open-toc"]')?.addEventListener('click', () => this.openTocModal());
+    this.container.querySelector('[data-action="open-reader-settings"]')?.addEventListener('click', () => this.openReaderSettingsModal());
+    this.container.querySelector('[data-action="open-run-drawer"]')?.addEventListener('click', () => this.openRunDrawer());
+  }
 
-    this.container.querySelectorAll('[data-choice-group]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const group = button.dataset.choiceGroup;
-        if (group === 'travel') this.selectedTravelMode = button.dataset.choiceId || 'soul';
-        if (group === 'plot') this.selectedPlotMode = button.dataset.choiceId || 'canon';
-        this.customChoice = this.container.querySelector('[data-role="custom-choice"]')?.value || '';
-        this.renderTravelConfigOnly();
-      });
-    });
-
-    this.container.querySelectorAll('[data-companion-id]').forEach((button) => {
-      button.addEventListener('click', () => {
-        this.selectedCompanionId = button.dataset.companionId || '';
-        this.customChoice = this.container.querySelector('[data-role="custom-choice"]')?.value || '';
-        this.renderTravelConfigOnly();
-      });
-    });
-
-    this.container.querySelectorAll('[data-option]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const input = this.container.querySelector('[data-role="custom-choice"]');
-        if (input) input.value = button.dataset.option || '';
-      });
-    });
-
-    this.container.querySelector('[data-action="start-run"]')?.addEventListener('click', () => this.startStoryRun());
+  async goToChapter(index) {
+    const nextIndex = Math.min(Math.max(Number(index || 0), 0), Math.max(this.chapters.length - 1, 0));
+    if (nextIndex === this.chapterIndex) return;
+    this.chapterIndex = nextIndex;
+    this.readerControlsVisible = false;
+    await this.render();
   }
 
   setReaderControlsVisible(isVisible) {
@@ -231,11 +279,118 @@ export class TextGameReader {
     this.container.querySelector('[data-role="reader-shell"]')?.classList.toggle('controls-visible', this.readerControlsVisible);
   }
 
+  openTocModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'textgame-modal-overlay textgame-toc-modal-overlay';
+    overlay.innerHTML = `
+      <div class="textgame-modal-container textgame-toc-modal-container">
+        <div class="textgame-travel-modal-head">
+          <div class="textgame-section-title">${Icons.list}<span>目录</span></div>
+          <button class="textgame-travel-modal-close" data-action="close-toc-modal" title="关闭">${Icons.back}</button>
+        </div>
+        <div class="textgame-toc-list">
+          ${this.chapters.map((chapter, index) => `
+            <button class="textgame-toc-item ${index === this.chapterIndex ? 'active' : ''}" data-chapter-index="${index}">
+              <b>${escapeHtml(chapter.title || `第 ${index + 1} 章`)}</b>
+              <em>${Math.round(this.chapters.length <= 1 ? 100 : (index / (this.chapters.length - 1)) * 100)}%</em>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
+
+    const close = () => {
+      overlay.classList.remove('active');
+      setTimeout(() => overlay.remove(), 240);
+    };
+
+    overlay.querySelector('[data-action="close-toc-modal"]')?.addEventListener('click', close);
+    overlay.querySelectorAll('[data-chapter-index]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const index = Number(button.dataset.chapterIndex || 0);
+        close();
+        await this.goToChapter(index);
+      });
+    });
+  }
+
+  openReaderSettingsModal() {
+    const backgrounds = ['#faf9f7', '#f4efe6', '#eef3ef', '#1f1b18'];
+    const colors = ['#302923', '#5a4032', '#26352d', '#f6efe6'];
+
+    const overlay = document.createElement('div');
+    overlay.className = 'textgame-modal-overlay textgame-reader-settings-modal-overlay';
+    overlay.innerHTML = `
+      <div class="textgame-modal-container textgame-reader-settings-modal-container">
+        <div class="textgame-travel-modal-head">
+          <div class="textgame-section-title">${Icons.setting}<span>阅读设置</span></div>
+          <button class="textgame-travel-modal-close" data-action="close-reader-settings" title="关闭">${Icons.back}</button>
+        </div>
+        <div class="textgame-config-block">
+          <div class="textgame-config-label">页面背景</div>
+          <div class="textgame-color-row">
+            ${backgrounds.map((color) => `<button class="textgame-color-dot ${this.readerSettings.background === color ? 'active' : ''}" style="--dot-color:${color}" data-bg="${color}" aria-label="背景颜色"></button>`).join('')}
+          </div>
+        </div>
+        <div class="textgame-config-block">
+          <div class="textgame-config-label">字体颜色</div>
+          <div class="textgame-color-row">
+            ${colors.map((color) => `<button class="textgame-color-dot ${this.readerSettings.color === color ? 'active' : ''}" style="--dot-color:${color}" data-color="${color}" aria-label="字体颜色"></button>`).join('')}
+          </div>
+        </div>
+        <div class="textgame-config-block">
+          <div class="textgame-config-label">字体大小</div>
+          <div class="textgame-font-size-row">
+            <button class="textgame-reader-step-btn" data-font-size="-1">${Icons.back}</button>
+            <strong>${this.readerSettings.fontSize}px</strong>
+            <button class="textgame-reader-step-btn" data-font-size="1">${Icons.next}</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
+
+    const close = () => {
+      overlay.classList.remove('active');
+      setTimeout(() => overlay.remove(), 240);
+    };
+    const refresh = () => {
+      this.readerControlsVisible = true;
+      close();
+      this.render();
+    };
+
+    overlay.querySelector('[data-action="close-reader-settings"]')?.addEventListener('click', close);
+    overlay.querySelectorAll('[data-bg]').forEach((button) => {
+      button.addEventListener('click', () => {
+        this.readerSettings.background = button.dataset.bg || this.readerSettings.background;
+        refresh();
+      });
+    });
+    overlay.querySelectorAll('[data-color]').forEach((button) => {
+      button.addEventListener('click', () => {
+        this.readerSettings.color = button.dataset.color || this.readerSettings.color;
+        refresh();
+      });
+    });
+    overlay.querySelectorAll('[data-font-size]').forEach((button) => {
+      button.addEventListener('click', () => {
+        this.readerSettings.fontSize = Math.min(24, Math.max(13, this.readerSettings.fontSize + Number(button.dataset.fontSize || 0)));
+        refresh();
+      });
+    });
+  }
+
   /* ==========================================================================
      [区域标注·已完成·从此处穿书弹窗]
      说明：
-     1. 点击阅读页“从此处穿书”后打开梦笺自定义弹窗，不再滚动到页面底部配置面板。
-     2. 弹窗内仍复用 IconPark 图标、选择卡片、联系人卡片和生成存档逻辑。
+     1. 底栏“穿越设置”打开梦笺自定义弹窗，用于设置穿越方式/剧情路线/同行联系人/行动选项。
+     2. 弹窗内复用 IconPark 图标、选择卡片与联系人卡片；保存穿书存档由底栏“存档”确认触发。
      3. 不使用浏览器原生弹窗/选择器，不涉及 localStorage/sessionStorage。
      ========================================================================== */
   openTravelModal() {
@@ -300,11 +455,6 @@ export class TextGameReader {
         }
       });
     });
-
-    overlay.querySelector('[data-action="start-run"]')?.addEventListener('click', async () => {
-      this.customChoice = overlay.querySelector('[data-role="custom-choice"]')?.value || '';
-      await this.startStoryRun(overlay);
-    });
   }
 
   renderTravelConfigOnly(overlay = document.querySelector('.textgame-travel-modal-overlay')) {
@@ -322,12 +472,50 @@ export class TextGameReader {
     });
   }
 
+  /* ==========================================================================
+     [区域标注·已完成·梦笺底栏确认保存穿书存档]
+     说明：
+     1. 底栏“存档”只保存穿书文游存档，不创建阅读存档/书签。
+     2. 保存前使用梦笺应用内确认弹窗；保存后写入 storyRuns 并按当前用户面具身份隔离展示。
+     3. 不使用浏览器原生 confirm，不使用 localStorage/sessionStorage。
+     ========================================================================== */
+  openSaveRunConfirmModal() {
+    if (!this.activeMask) {
+      showModal({ title: '无法存档', content: '请先在梦笺主页选择用户面具身份。' });
+      return;
+    }
+
+    const chapter = this.chapters[this.chapterIndex] || this.chapters[0];
+    const companion = this.companions.find((item) => item.id === this.selectedCompanionId) || null;
+    const route = this.selectedPlotMode === 'canon' ? '走原著' : '改写线';
+    const travel = this.selectedTravelMode === 'soul' ? '魂穿' : '身穿';
+
+    showModal({
+      title: '保存穿书存档',
+      content: `
+        <div class="textgame-run-confirm">
+          <p>小说：${escapeHtml(this.book.name || '未命名小说')}</p>
+          <p>章节：${escapeHtml(chapter.title || '故事点')}</p>
+          <p>身份：${escapeHtml(this.activeMask.name || '未命名面具')}</p>
+          <p>配置：${escapeHtml(route)} / ${escapeHtml(travel)} / ${escapeHtml(companion?.name || '暂无同行者')}</p>
+        </div>
+      `,
+      showCancel: true,
+      confirmText: '确认存档',
+      cancelText: '取消',
+      onConfirm: async () => {
+        await this.startStoryRun();
+      }
+    });
+  }
+
   async startStoryRun(activeOverlay = null) {
     const chapter = this.chapters[this.chapterIndex] || this.chapters[0];
     const companion = this.companions.find((item) => item.id === this.selectedCompanionId) || null;
     const memories = companion ? await loadCompanionMemoryForTextGame(companion.id) : [];
-    const input = activeOverlay?.querySelector('[data-role="custom-choice"]') || this.container.querySelector('[data-role="custom-choice"]');
-    const customChoice = String(input?.value || '').trim();
+    const input = activeOverlay?.querySelector('[data-role="custom-choice"]') || document.querySelector('.textgame-travel-modal-overlay [data-role="custom-choice"]');
+    const customChoice = String(input?.value || this.customChoice || '').trim();
+    this.customChoice = customChoice;
 
     const run = await saveStoryRun({
       bookId: this.book.id,
@@ -364,15 +552,74 @@ export class TextGameReader {
     this.closeTravelModal(activeOverlay);
 
     showModal({
-      title: '穿书存档已生成',
+      title: '穿书存档已保存',
       content: `
         <div class="textgame-run-created">
-          <p>已从《${escapeHtml(this.book.name)}》「${escapeHtml(chapter.title)}」生成文游存档。</p>
+          <p>已从《${escapeHtml(this.book.name)}》「${escapeHtml(chapter.title)}」保存穿书存档。</p>
           <p>路线：${this.selectedPlotMode === 'canon' ? '走原著' : '改写线'} / ${this.selectedTravelMode === 'soul' ? '魂穿' : '身穿'}</p>
+          <p>身份：${escapeHtml(this.activeMask?.name || '未命名面具')}</p>
           <p>存档号：${escapeHtml(run.id)}</p>
         </div>
       `
     });
+  }
+
+  async openRunDrawer() {
+    const existing = document.querySelector('.textgame-run-drawer-overlay');
+    if (existing) existing.remove();
+
+    const runs = this.activeMask ? await getStoryRunsByBookAndMask(this.book.id, this.activeMask.id) : [];
+
+    const overlay = document.createElement('div');
+    overlay.className = 'textgame-run-drawer-overlay';
+    overlay.innerHTML = `
+      <div class="textgame-run-drawer-mask" data-action="close-run-drawer"></div>
+      <aside class="textgame-run-drawer-panel">
+        <div class="textgame-run-drawer-head">
+          <div>
+            <b>${Icons.archive}<span>存档节点</span></b>
+            <p>${escapeHtml(String(this.book?.name || '未命名小说').replace(/\.txt$/i, ''))}</p>
+          </div>
+          <button class="textgame-run-drawer-close" data-action="close-run-drawer">${Icons.back}</button>
+        </div>
+        <div class="textgame-run-drawer-list">
+          ${runs.length ? runs.map((run) => this.renderRunNode(run)).join('') : `
+            <div class="textgame-empty-mini">${Icons.archive}<span>${this.activeMask ? '当前身份暂无这本小说的穿书存档。' : '请先在梦笺主页选择用户面具身份。'}</span></div>
+          `}
+        </div>
+      </aside>
+    `;
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
+
+    const close = () => {
+      overlay.classList.remove('active');
+      setTimeout(() => overlay.remove(), 240);
+    };
+
+    overlay.querySelectorAll('[data-action="close-run-drawer"]').forEach((item) => {
+      item.addEventListener('click', close);
+    });
+  }
+
+  renderRunNode(run) {
+    const route = run.plotMode === 'canon' ? '走原著' : '改写线';
+    const travel = run.travelMode === 'soul' ? '魂穿' : '身穿';
+    const created = run.createdAt ? new Date(run.createdAt).toLocaleString('zh-CN', { hour12: false }) : '';
+
+    return `
+      <article class="textgame-run-node-card">
+        <h4>${escapeHtml(run.chapterTitle || '故事点')}</h4>
+        <div class="textgame-archive-tags">
+          <span>${escapeHtml(route)}</span>
+          <span>${escapeHtml(travel)}</span>
+          <span>${escapeHtml(run?.companion?.name || '暂无同行者')}</span>
+        </div>
+        <p>${escapeHtml(run.storyPoint || '').slice(0, 96)}${String(run.storyPoint || '').length > 96 ? '…' : ''}</p>
+        <em>${escapeHtml(created)}</em>
+      </article>
+    `;
   }
 
   buildOpeningPrompt(chapter, companion, memories, customChoice) {

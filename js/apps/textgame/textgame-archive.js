@@ -3,13 +3,13 @@
  * [区域标注·已完成·梦笺存档页面]
  * 说明：
  * 1. 展示 TXT 阅读器生成的穿书文游存档。
- * 2. 存档只来自梦笺 textgame-store.js → DB.js / IndexedDB。
- * 3. 删除存档使用应用内自定义弹窗，不使用浏览器原生弹窗。
+ * 2. 已完成：存档主页面按梦笺当前用户面具身份隔离展示，切换面具后不串档。
+ * 3. 存档只来自梦笺 textgame-store.js → DB.js / IndexedDB；删除存档使用应用内自定义弹窗。
  * ==========================================================================
  */
 
 import { Icons, escapeHtml, showModal } from './textgame-ui.js';
-import { getStoryRuns, deleteStoryRun } from './textgame-store.js';
+import { getTextGameSettings, getStoryRunsByMask, deleteStoryRun } from './textgame-store.js';
 
 export class TextGameArchive {
   constructor(container) {
@@ -18,13 +18,30 @@ export class TextGameArchive {
   }
 
   async render() {
-    this.runs = await getStoryRuns();
+    /* ==========================================================================
+       [区域标注·已完成·梦笺穿书存档身份隔离]
+       说明：
+       1. 存档主页面只展示当前梦笺用户面具身份保存的穿书存档。
+       2. 切换其它用户面具身份后不显示旧身份的存档；不使用浏览器存储兜底。
+       ========================================================================== */
+    const settings = await getTextGameSettings();
+    this.runs = settings.activeMaskId ? await getStoryRunsByMask(settings.activeMaskId) : [];
+
+    if (!settings.activeMaskId) {
+      this.container.innerHTML = `
+        <div class="textgame-empty-state">
+          ${Icons.user}
+          <p>请先在梦笺主页选择用户面具身份<br>穿书存档会按身份隔离显示</p>
+        </div>
+      `;
+      return;
+    }
 
     if (!this.runs.length) {
       this.container.innerHTML = `
         <div class="textgame-empty-state">
           ${Icons.archive}
-          <p>存档夹空空如也<br>从阅读器选择“从此处穿书”后会生成文游存档</p>
+          <p>当前身份的存档夹空空如也<br>在阅读器底栏点击“存档”可保存穿书存档</p>
         </div>
       `;
       return;

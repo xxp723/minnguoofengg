@@ -3,13 +3,13 @@
  * [区域标注·已完成·梦笺书架页面]
  * 说明：
  * 1. 负责 3x3 书架网格渲染、本地 TXT 文件导入与解析（已完成：导入前提供应用内编码预览选择，避免自动识别仍误判乱码）。
- * 2. 点击书籍进入 TXT 阅读器；删除使用梦笺自定义弹窗，不使用浏览器原生弹窗。
+ * 2. 已完成：长按书架书籍打开梦笺应用内管理弹窗，可重命名/删除；短按仍进入阅读器。
  * 3. 书籍正文完整写入 textgame-store.js → DB.js / IndexedDB，不做长文本过滤，不写浏览器存储兜底。
  * ==========================================================================
  */
 
 import { Icons, escapeHtml, showModal } from './textgame-ui.js';
-import { getBooks, addBook, deleteBook } from './textgame-store.js';
+import { getBooks, addBook, renameBook, deleteBook } from './textgame-store.js';
 
 /* ==========================================================================
    [区域标注·已完成·梦笺 TXT 编码识别]
@@ -123,6 +123,8 @@ export class TextGameShelf {
     this.onOpenBook = onOpenBook;
     this.fileInput = null;
     this.books = [];
+    this.longPressTimer = null;
+    this.longPressTriggered = false;
   }
 
   async render() {
@@ -170,7 +172,6 @@ export class TextGameShelf {
 
     grid.innerHTML = this.books.map(book => `
       <div class="textgame-book-item" data-id="${escapeHtml(book.id)}">
-        <button class="textgame-book-delete" data-action="delete-book" data-id="${escapeHtml(book.id)}" title="删除">${Icons.delete}</button>
         <div class="textgame-book-cover" data-action="open-book" data-id="${escapeHtml(book.id)}">
           <div class="textgame-book-cover-text">${escapeHtml(book.coverText || '书')}</div>
           <div class="textgame-book-progress"><span style="width:${Math.max(0, Math.min(100, Number(book.progress || 0) * 100))}%"></span></div>
@@ -179,31 +180,104 @@ export class TextGameShelf {
       </div>
     `).join('');
 
+    /* ==========================================================================
+       [区域标注·已完成·梦笺书架长按管理]
+       说明：
+       1. 短按书籍封面进入阅读器；长按书籍打开应用内管理弹窗，可重命名/删除。
+       2. 不使用浏览器原生 prompt/confirm；重命名与删除只调用 IndexedDB 存储层。
+       ========================================================================== */
     grid.querySelectorAll('[data-action="open-book"]').forEach((item) => {
+      const clearLongPress = () => {
+        if (this.longPressTimer) {
+          clearTimeout(this.longPressTimer);
+          this.longPressTimer = null;
+        }
+      };
+
+      item.addEventListener('pointerdown', () => {
+        clearLongPress();
+        this.longPressTriggered = false;
+        const book = this.books.find(b => b.id === item.dataset.id);
+        if (!book) return;
+        this.longPressTimer = setTimeout(() => {
+          this.longPressTriggered = true;
+          this.openBookManageModal(book);
+        }, 560);
+      });
+
+      item.addEventListener('pointerup', clearLongPress);
+      item.addEventListener('pointerleave', clearLongPress);
+      item.addEventListener('pointercancel', clearLongPress);
+
       item.addEventListener('click', () => {
+        if (this.longPressTriggered) {
+          this.longPressTriggered = false;
+          return;
+        }
         const book = this.books.find(b => b.id === item.dataset.id);
         if (book) this.onOpenBook?.(book);
       });
     });
+  }
 
-    grid.querySelectorAll('[data-action="delete-book"]').forEach((button) => {
-      button.addEventListener('click', (event) => {
-        event.stopPropagation();
-        const bookId = button.dataset.id;
-        const book = this.books.find(b => b.id === bookId);
-        if (!book) return;
+  openBookManageModal(book) {
+    const existing = document.querySelector('.textgame-book-manage-modal-overlay');
+    if (existing) existing.remove();
 
-        showModal({
-          title: '确认删除',
-          content: `确定要从书架移除《${escapeHtml(book.name)}》吗？关联的穿书存档也会一起移除。`,
-          showCancel: true,
-          confirmText: '确认删除',
-          cancelText: '取消',
-          onConfirm: async () => {
-            await deleteBook(bookId);
-            await this.loadBooks();
-          }
-        });
+    const overlay = document.createElement('div');
+    overlay.className = 'textgame-modal-overlay textgame-book-manage-modal-overlay';
+    overlay.innerHTML = `
+      <div class="textgame-modal-container textgame-book-manage-modal-container">
+        <div class="textgame-book-manage-head">
+          <div class="textgame-book-manage-title">${Icons.book}<span>管理小说</span></div>
+          <button class="textgame-book-manage-close" data-action="close-book-manage" title="关闭">${Icons.back}</button>
+        </div>
+        <div class="textgame-book-manage-cover">
+          <div>${escapeHtml(book.coverText || '书')}</div>
+          <strong>${escapeHtml(String(book.name || '').replace(/\.txt$/i, ''))}</strong>
+        </div>
+        <label class="textgame-form-label" for="textgame-rename-book-input">重命名</label>
+        <input class="textgame-form-input" id="textgame-rename-book-input" data-role="rename-input" value="${escapeHtml(String(book.name || '').replace(/\.txt$/i, ''))}" maxlength="80">
+        <div class="textgame-book-manage-actions">
+          <button class="textgame-start-run-btn" data-action="confirm-rename-book">${Icons.edit}<span>确认重命名</span></button>
+          <button class="textgame-danger-btn" data-action="confirm-delete-book">${Icons.delete}<span>删除小说</span></button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
+
+    const close = () => {
+      overlay.classList.remove('active');
+      setTimeout(() => overlay.remove(), 240);
+    };
+
+    overlay.querySelector('[data-action="close-book-manage"]')?.addEventListener('click', close);
+    overlay.querySelector('[data-action="confirm-rename-book"]')?.addEventListener('click', async () => {
+      const input = overlay.querySelector('[data-role="rename-input"]');
+      const nextName = String(input?.value || '').trim();
+      try {
+        await renameBook(book.id, nextName);
+        close();
+        await this.loadBooks();
+      } catch (err) {
+        showModal({ title: '重命名失败', content: escapeHtml(err.message || '无法重命名该小说。') });
+      }
+    });
+
+    overlay.querySelector('[data-action="confirm-delete-book"]')?.addEventListener('click', () => {
+      showModal({
+        title: '确认删除',
+        content: `确定要从书架移除《${escapeHtml(book.name)}》吗？关联的穿书存档也会一起移除。`,
+        showCancel: true,
+        confirmText: '确认删除',
+        cancelText: '取消',
+        onConfirm: async () => {
+          await deleteBook(book.id);
+          close();
+          await this.loadBooks();
+        }
       });
     });
   }

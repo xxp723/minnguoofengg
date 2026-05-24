@@ -83,6 +83,9 @@ export async function setTextGameActiveMask(maskId) {
 /**
  * ==========================================================================
  * [区域标注·已完成·梦笺书籍管理]
+ * 说明：
+ * 1. 书架支持长按管理弹窗中的重命名/删除。
+ * 2. 重命名与删除都只更新 IndexedDB 中的梦笺 books/storyRuns 数据，不写浏览器存储兜底。
  * ==========================================================================
  */
 
@@ -115,6 +118,40 @@ export async function addBook(book) {
   data.books.push(newBook);
   await saveTextGameData(data);
   return newBook;
+}
+
+export async function renameBook(bookId, name) {
+  const safeName = String(name || '').trim();
+  if (!safeName) {
+    throw new Error('书名不能为空');
+  }
+
+  const data = await getTextGameData();
+  let updatedBook = null;
+
+  data.books = (data.books || []).map((book) => {
+    if (book.id !== bookId) return book;
+    updatedBook = {
+      ...book,
+      name: safeName,
+      coverText: safeName.replace(/\.txt$/i, '').substring(0, 2) || '书',
+      updatedAt: nowIso()
+    };
+    return updatedBook;
+  });
+
+  if (!updatedBook) {
+    throw new Error('未找到该书籍');
+  }
+
+  data.storyRuns = (data.storyRuns || []).map((run) => (
+    run.bookId === bookId
+      ? { ...run, bookName: safeName, updatedAt: run.updatedAt || nowIso() }
+      : run
+  ));
+
+  await saveTextGameData(data);
+  return updatedBook;
 }
 
 export async function deleteBook(bookId) {
@@ -157,6 +194,21 @@ export async function updateBookProgress(bookId, patch = {}) {
 export async function getStoryRuns() {
   const data = await getTextGameData();
   return data.storyRuns || [];
+}
+
+export async function getStoryRunsByMask(maskId) {
+  const activeMaskId = String(maskId || '');
+  const data = await getTextGameData();
+  return (data.storyRuns || []).filter((run) => String(run?.activeMaskSnapshot?.id || '') === activeMaskId);
+}
+
+export async function getStoryRunsByBookAndMask(bookId, maskId) {
+  const activeMaskId = String(maskId || '');
+  const data = await getTextGameData();
+  return (data.storyRuns || []).filter((run) => (
+    run.bookId === bookId
+    && String(run?.activeMaskSnapshot?.id || '') === activeMaskId
+  ));
 }
 
 export async function saveStoryRun(run) {
