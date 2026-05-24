@@ -150,7 +150,7 @@
 }
 
 .textgame-app-container.textgame-reader-mode .textgame-reader-page.active {
-  padding-top: 16px;
+  padding: 0;
 }
 
 /* ==========================================================================
@@ -715,16 +715,16 @@
 }
 
 /* ==========================================================================
-   [区域标注·已完成·梦笺沉浸式 TXT 阅读器]
+   [区域标注·已完成·梦笺沉浸式全屏 TXT 阅读器]
    说明：
-   1. 阅读页已去除书名/章节标题展示栏，正文优先铺满阅读区域。
+   1. 阅读页已去除书名/章节标题展示栏，正文铺满屏幕，不再限制在圆角容器内。
    2. 顶栏与底栏默认隐藏，点击正文中心后显示；再次点击非顶栏/底栏区域后隐藏，避免进入页面闪屏。
    3. 顶栏左侧仅保留 IconPark 风格 “<” 返回按钮，点击返回书架。
    ========================================================================== */
 .textgame-reader {
   position: relative;
   min-height: 100%;
-  padding-bottom: 18px;
+  padding: 0;
 }
 
 .textgame-reader-toolbar,
@@ -800,11 +800,12 @@
 
 .textgame-reader-paper {
   min-height: 100%;
-  background: rgba(255, 252, 246, 0.86);
-  border: 1px solid rgba(36, 30, 24, 0.08);
-  border-radius: 24px;
-  padding: 26px 20px 32px;
-  box-shadow: 0 18px 42px rgba(60, 48, 36, 0.08);
+  box-sizing: border-box;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 28px 24px 42px;
+  box-shadow: none;
 }
 
 .textgame-reader-body {
