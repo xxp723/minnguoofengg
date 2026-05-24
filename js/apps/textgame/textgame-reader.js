@@ -25,7 +25,7 @@ import {
   loadCompanionCandidatesForTextGame,
   loadCompanionMemoryForTextGame
 } from './textgame-bridge.js';
-import { callLLM } from './textgame-api.js';
+import { sendTextGameAiMessage } from './textgame-api.js';
 
 /* ==========================================================================
    [区域标注·已完成·梦笺多格式章节目录解析]
@@ -434,7 +434,7 @@ ${sampleText}
 请直接输出包含这3个字段的合法JSON对象，不要有其它多余的回答或 Markdown 标记。`;
       
       // 调用基础的统一 LLM 接口
-      const response = await callLLM(prompt, appSettings.apiProfile);
+      const response = await sendTextGameAiMessage([{ role: 'user', content: prompt }]);
       
       // 提取 JSON
       const jsonMatch = response.match(/\{[\s\S]*\}/);
@@ -907,7 +907,7 @@ ${this.activeRunData.chatHistory.map(m => `${m.role === 'user' ? '用户：' : '
 ${userAction === '【系统】梦境连接已建立，剧情开始推演...' ? '请直接输出第一段开场剧情和3个行动选项。' : `用户刚才执行了：${userAction}。请根据上下文，续写这一段剧情反应并给出接下来的3个选项。`}
 `;
       
-      const response = await callLLM(prompt, appSettings.apiProfile);
+      const response = await sendTextGameAiMessage([{ role: 'user', content: prompt }]);
       
       this.activeRunData.chatHistory.push({ role: 'assistant', content: response });
       
