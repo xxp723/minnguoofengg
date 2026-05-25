@@ -160,6 +160,7 @@ import {
   refreshCurrentSessionLastMessage as refreshCurrentSessionLastMessageModule
 } from './chat-message-render.js';
 import {
+  DATA_KEY_CHAT_CONSOLE,
   appendChatConsoleRuntimeLog,
   persistChatConsoleRuntimeLogs
 } from './chat-message-console.js';
@@ -480,22 +481,47 @@ export async function sendMessage(container, state, db, content, settingsManager
   // 判断是否是当前窗口的消息
   const isCurrentChat = targetChatId === state.currentChatId;
 
-  // 读取对应窗口的 messages
-  let targetMessages = [];
+  /* ======================================================================
+     [区域标注·已完成·本次后台保活完整消息组与记忆基准修复] 目标会话最新快照
+     说明：
+     1. 无论当前是否还停留在消息页，都从 DB.js / IndexedDB 读取目标会话最新 messages；
+        避免退出到聊天列表后，后台 AI 回复写入 DB，却在下一轮请求中继续使用旧的 state.currentMessages。
+     2. 当前打开同一会话时，再把 state.currentMessages 指向这份最新数组，确保渲染、短期记忆、
+        长期记忆总结看到的是同一份完整消息组。
+     3. 本区域不使用 localStorage/sessionStorage，不写双份存储兜底，不过滤长文本或媒体字段。
+     ====================================================================== */
+  let targetMessages = (await dbGet(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId)) || [];
+  if (!Array.isArray(targetMessages)) targetMessages = [];
   if (isCurrentChat) {
-    targetMessages = state.currentMessages;
-  } else {
-    targetMessages = (await dbGet(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId)) || [];
+    state.currentMessages = targetMessages;
   }
+
+  /* ======================================================================
+     [区域标注·已完成·本次后台保活目标会话日志修复] 目标会话日志快照
+     说明：
+     1. 日志按 targetChatId 单独读取和写入；用户退出消息页导致 currentChatId=null 时不再丢日志。
+     2. 本轮所有控制台日志先写入 targetConsoleLogs，再通过 DB.js / IndexedDB 持久化到该会话。
+     3. 若用户此时正打开同一会话，会同步 state.chatConsoleLogs 以保持控制台实时显示。
+     ====================================================================== */
+  const storedTargetConsoleLogs = await dbGet(db, DATA_KEY_CHAT_CONSOLE(state.activeMaskId, targetChatId));
+  const targetConsoleLogs = Array.isArray(storedTargetConsoleLogs) ? storedTargetConsoleLogs : [];
+  const appendTargetChatConsoleLog = (level, text) => appendChatConsoleRuntimeLog(state, level, text, {
+    targetChatId,
+    logs: targetConsoleLogs
+  });
+  const persistTargetChatConsoleRuntimeLogs = () => persistChatConsoleRuntimeLogs(state, db, {
+    targetChatId,
+    logs: targetConsoleLogs
+  });
 
   /* ======================================================================
      [区域标注·已完成·本次控制台日志开关增强] 用户发送与触发记录
      说明：记录当前聊天页给 AI 的触发情况（文本发送 / 空触发）。
      ====================================================================== */
   if (!options.skipAppendUser) {
-    appendChatConsoleRuntimeLog(state, 'info', userText ? `用户发送：${userText}` : '用户发送：空文本');
+    appendTargetChatConsoleLog('info', userText ? `用户发送：${userText}` : '用户发送：空文本');
   } else if (triggerAi) {
-    appendChatConsoleRuntimeLog(state, 'info', '触发 AI 回复（不追加用户消息）');
+    appendTargetChatConsoleLog('info', '触发 AI 回复（不追加用户消息）');
   }
 
   /* [区域标注·本次需求] 用户消息入列并写入 IndexedDB */
@@ -596,8 +622,7 @@ export async function sendMessage(container, state, db, content, settingsManager
        2. currentRoundMessages 只表示本轮连续用户消息/撤回提示条数，不再误写成 currentRound，避免误判短期记忆未刷新。
        3. historyRounds/historyMessages 只展示本次短期记忆实际携带范围；不改变 promptPayload.history 的发送内容。
        ======================================================================== */
-    appendChatConsoleRuntimeLog(
-      state,
+    appendTargetChatConsoleLog(
       'info',
       `开始请求 AI：conversationRound=第${promptPayload.conversationRoundIndex || 0}轮，historyRounds=${promptPayload.historyRoundCount || 0}，historyMessages=${promptPayload.historyMessageCount ?? promptPayload.history.length}，currentRoundMessages=${promptPayload.currentRoundMessageCount ?? promptPayload.currentUserRoundMessages.length}`
     );
@@ -682,7 +707,7 @@ export async function sendMessage(container, state, db, content, settingsManager
        ======================================================================== */
     const { innerVoice: extractedInnerVoice, cleanedText: rawAiTextAfterInnerVoice } = extractInnerVoiceFromRawText(rawAiTextOriginal);
     if (extractedInnerVoice) {
-      appendChatConsoleRuntimeLog(state, 'info', `心声数据已提取：好感=${extractedInnerVoice.affection}%，醋意=${extractedInnerVoice.jealousy}%，心跳=${extractedInnerVoice.heartbeat}bpm`);
+      appendTargetChatConsoleLog('info', `心声数据已提取：好感=${extractedInnerVoice.affection}%，醋意=${extractedInnerVoice.jealousy}%，心跳=${extractedInnerVoice.heartbeat}bpm`);
     }
 
     /* ========================================================================
@@ -702,7 +727,7 @@ export async function sendMessage(container, state, db, content, settingsManager
       extractedAsideSegments = Array.isArray(asideSegments) ? asideSegments : [];
       rawAiText = cleanedText;
       if (extractedAsideText) {
-        appendChatConsoleRuntimeLog(state, 'info', `旁白文本已提取：${extractedAsideSegments.length || 1} 段：${extractedAsideText.slice(0, 80)}${extractedAsideText.length > 80 ? '…' : ''}`);
+        appendTargetChatConsoleLog('info', `旁白文本已提取：${extractedAsideSegments.length || 1} 段：${extractedAsideText.slice(0, 80)}${extractedAsideText.length > 80 ? '…' : ''}`);
       }
     }
 
@@ -714,7 +739,7 @@ export async function sendMessage(container, state, db, content, settingsManager
          2. 不再把“AI 没有返回内容”或任何空回复占位文本发送到聊天界面。
          3. 本区域不写入 localStorage/sessionStorage，不新增双份存储兜底。
          ====================================================================== */
-      appendChatConsoleRuntimeLog(state, 'warn', 'AI 返回为空文本，已改为显示 API 报错弹窗');
+      appendTargetChatConsoleLog('warn', 'AI 返回为空文本，已改为显示 API 报错弹窗');
       if (state.currentChatId === targetChatId) {
         showApiErrorModal(container, {
           code: 'empty_response',
@@ -724,7 +749,7 @@ export async function sendMessage(container, state, db, content, settingsManager
       }
       return;
     } else {
-      appendChatConsoleRuntimeLog(state, 'info', `AI 原始返回长度：${String(rawAiText).length}`);
+      appendTargetChatConsoleLog('info', `AI 原始返回长度：${String(rawAiText).length}`);
     }
     
     // applyAiPendingTransferDecisions 需要修改为接收 targetMessages 和 targetChatId
@@ -837,9 +862,9 @@ export async function sendMessage(container, state, db, content, settingsManager
           rawAiTextAfterInnerVoice
         );
     if (!aiMessages.length) {
-      appendChatConsoleRuntimeLog(state, 'warn', '解析后无可显示消息');
+      appendTargetChatConsoleLog('warn', '解析后无可显示消息');
     } else {
-      appendChatConsoleRuntimeLog(state, 'info', `解析完成：${aiMessages.length} 条消息${generatedImageMessages.length ? `，含AI生图 ${generatedImageMessages.length} 张` : ''}`);
+      appendTargetChatConsoleLog('info', `解析完成：${aiMessages.length} 条消息${generatedImageMessages.length ? `，含AI生图 ${generatedImageMessages.length} 张` : ''}`);
     }
     for (let index = 0; index < aiMessages.length; index += 1) {
       const message = {
@@ -860,8 +885,7 @@ export async function sendMessage(container, state, db, content, settingsManager
       ).trim();
       if (index > 0) await sleep(getAiBubbleDelayMs(visibleText, index));
       targetMessages.push(message);
-      appendChatConsoleRuntimeLog(
-        state,
+      appendTargetChatConsoleLog(
         'info',
         message.type === 'sticker'
           ? `AI消息[${index + 1}]：表情包 ${message.stickerName || ''}`.trim()
@@ -903,11 +927,10 @@ export async function sendMessage(container, state, db, content, settingsManager
         await Promise.all([
           dbPut(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId, targetMessages),
           dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions),
-          persistChatConsoleRuntimeLogs(state, db)
+          persistTargetChatConsoleRuntimeLogs()
         ]);
       } catch (dbError) {
-        appendChatConsoleRuntimeLog(
-          state,
+        appendTargetChatConsoleLog(
           'warn',
           `AI消息[${index + 1}]后台同步暂未完成，结束阶段将再次保存：${dbError?.message || 'IndexedDB 写入失败'}`
         );
@@ -993,7 +1016,7 @@ export async function sendMessage(container, state, db, content, settingsManager
        2. 不再把“API 调用失败：...”或“AI 没有返回内容”写入消息界面。
        3. 聊天记录持久化仍只走 DB.js / IndexedDB；本错误弹窗不做任何持久化存储。
        ======================================================================== */
-    appendChatConsoleRuntimeLog(state, 'error', `API 调用失败，已显示报错弹窗：${error?.message || '未知错误'}`);
+    appendTargetChatConsoleLog('error', `API 调用失败，已显示报错弹窗：${error?.message || '未知错误'}`);
     if (state.currentChatId === targetChatId) {
       showApiErrorModal(container, error);
     }
@@ -1007,7 +1030,7 @@ export async function sendMessage(container, state, db, content, settingsManager
     await Promise.all([
       dbPut(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId, targetMessages),
       dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions),
-      persistChatConsoleRuntimeLogs(state, db)
+      persistTargetChatConsoleRuntimeLogs()
     ]);
 
     /* ========================================================================
