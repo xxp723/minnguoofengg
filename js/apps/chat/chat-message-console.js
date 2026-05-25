@@ -22,6 +22,7 @@ import { dbPut } from './chat-utils.js';
    2. 当前文件只导出聊天消息页需要的日志键与操作函数。
    ========================================================================== */
 export const DATA_KEY_CHAT_CONSOLE = (maskId, chatId) => `chat_console::${maskId || 'default'}::${chatId || 'none'}`;
+export const DATA_KEY_CHAT_CONSOLE_TOKEN_USAGE = (maskId, chatId) => `chat_console_token_usage::${maskId || 'default'}::${chatId || 'none'}`;
 
 /* ========================================================================
    [区域标注·已完成·本次后台保活目标会话日志修复] 目标会话运行日志追加

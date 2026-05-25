@@ -52,6 +52,7 @@ import { buildAppShell } from './chat-shell.js';
    ======================================================================== */
 export const DATA_KEY_CHAT_CONSOLE = (maskId, chatId) => `chat_console::${maskId || 'default'}::${chatId || 'none'}`;
 export const DATA_KEY_CHAT_CONSOLE_ENABLED = (maskId, chatId) => `chat_console_enabled::${maskId || 'default'}::${chatId || 'none'}`;
+export const DATA_KEY_CHAT_CONSOLE_TOKEN_USAGE = (maskId, chatId) => `chat_console_token_usage::${maskId || 'default'}::${chatId || 'none'}`;
 /* ===== [区域标注·已完成·语言翻译] IndexedDB 数据键 ===== */
 export const DATA_KEY_CHAT_TRANSLATION_SETTINGS = (maskId, chatId) => `chat_translation_settings::${maskId || 'default'}::${chatId || 'none'}`;
 
@@ -433,7 +434,7 @@ export function createInitialChatState({
     chatConsoleExpanded: false,
     chatConsoleWarnErrorOnly: false,
     chatConsoleLogs: [],
-    /* [区域标注·已完成·控制台标题Token显示] 最新一轮 AI token 用量，仅用于控制台标题运行时显示；不持久化。 */
+    /* [区域标注·已完成·本次后台重进Token恢复] 最新一轮 AI token 用量；按当前面具 + 会话写入 IndexedDB，重进会话可恢复标题显示。 */
     chatConsoleTokenUsage: null,
     /* ===== [区域标注·已完成·语言翻译] 翻译设置状态 ===== */
     translationSettings: null

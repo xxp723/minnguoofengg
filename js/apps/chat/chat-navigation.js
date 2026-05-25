@@ -39,6 +39,7 @@ import {
   CHAT_MESSAGE_INITIAL_VISIBLE_COUNT,
   DATA_KEY_CHAT_CONSOLE,
   DATA_KEY_CHAT_CONSOLE_ENABLED,
+  DATA_KEY_CHAT_CONSOLE_TOKEN_USAGE,
   DATA_KEY_CHAT_TRANSLATION_SETTINGS,
   normalizeChatConsoleLogs
 } from './chat-state.js';
@@ -128,6 +129,14 @@ export async function openChatMessage(container, state, db, chatId) {
      ======================================================================== */
   state.chatConsoleLogs = normalizeChatConsoleLogs(await dbGet(db, DATA_KEY_CHAT_CONSOLE(state.activeMaskId, chatId)));
   state.chatConsoleEnabled = Boolean(await dbGet(db, DATA_KEY_CHAT_CONSOLE_ENABLED(state.activeMaskId, chatId)));
+  /* ========================================================================
+     [区域标注·已完成·本次后台重进Token恢复] 进入会话时恢复最新一轮 token 用量
+     说明：
+     1. tokenUsage 按“当前面具 + 当前会话”从 DB.js / IndexedDB 读取。
+     2. 用户退出消息页后再重进，控制台标题仍可显示本轮发送 / 返回 tokens。
+     3. 不使用 localStorage/sessionStorage，不做双份存储兜底，不估算 token。
+     ======================================================================== */
+  state.chatConsoleTokenUsage = await dbGet(db, DATA_KEY_CHAT_CONSOLE_TOKEN_USAGE(state.activeMaskId, chatId)) || null;
   state.chatConsoleExpanded = false;
   /* ===== [区域标注·已完成·语言翻译] 从 IndexedDB 加载翻译设置 ===== */
   state.translationSettings = normalizeTranslationSettings(await dbGet(db, DATA_KEY_CHAT_TRANSLATION_SETTINGS(state.activeMaskId, chatId)));

@@ -161,6 +161,7 @@ import {
 } from './chat-message-render.js';
 import {
   DATA_KEY_CHAT_CONSOLE,
+  DATA_KEY_CHAT_CONSOLE_TOKEN_USAGE,
   appendChatConsoleRuntimeLog,
   persistChatConsoleRuntimeLogs
 } from './chat-message-console.js';
@@ -627,13 +628,15 @@ export async function sendMessage(container, state, db, content, settingsManager
       `开始请求 AI：conversationRound=第${promptPayload.conversationRoundIndex || 0}轮，historyRounds=${promptPayload.historyRoundCount || 0}，historyMessages=${promptPayload.historyMessageCount ?? promptPayload.history.length}，currentRoundMessages=${promptPayload.currentRoundMessageCount ?? promptPayload.currentUserRoundMessages.length}`
     );
     /* ======================================================================
-       [区域标注·已完成·控制台标题Token显示] 本轮请求开始时重置标题 token
+       [区域标注·已完成·本次后台重进Token恢复] 本轮请求开始时重置标题 token
        说明：
-       1. chatConsoleTokenUsage 只作为当前运行时标题显示，不写入 DB.js / IndexedDB。
-       2. 不使用 localStorage/sessionStorage，不做双份存储兜底。
-       3. API 返回后会用 prompt.js 归一化后的真实 tokenUsage 覆盖本值。
+       1. chatConsoleTokenUsage 会按当前面具 + 目标会话写入 DB.js / IndexedDB，重进会话可恢复。
+       2. 请求开始先清空当前标题显示与对应 IndexedDB 记录，避免沿用上一轮 token。
+       3. API 返回后只使用 prompt.js 归一化后的真实 tokenUsage 覆盖，不估算、不做兜底。
+       4. 不使用 localStorage/sessionStorage，不做双份存储兜底，不过滤长文本字段。
        ====================================================================== */
     state.chatConsoleTokenUsage = null;
+    await dbPut(db, DATA_KEY_CHAT_CONSOLE_TOKEN_USAGE(state.activeMaskId, targetChatId), null);
     syncChatConsoleDock(container, state);
     // 后台请求旁白相关状态可能需要额外处理，这里暂用 state 的，或者如果不在当前窗口，也可以不用旁白（看具体需求）
     let targetAsideModeActive = state.asideModeActive;
@@ -684,14 +687,16 @@ export async function sendMessage(container, state, db, content, settingsManager
     });
 
     /* ======================================================================
-       [区域标注·已完成·控制台标题Token显示] AI 返回后刷新标题 token
+       [区域标注·已完成·本次后台重进Token恢复] AI 返回后刷新并持久化标题 token
        说明：
        1. tokenUsage 来自 prompt.js 对各 API 响应 usage / usageMetadata 的归一化结果。
-       2. 仅用于控制台标题最右侧实时显示“发送 / 返回”tokens，不做任何持久化。
-       3. 不使用 localStorage/sessionStorage，也不新增兜底估算或长文本过滤逻辑。
+       2. 按“当前面具 + 目标会话”写入 DB.js / IndexedDB，用户退出消息页后重进仍可显示。
+       3. 只保存真实返回的 tokenUsage；不使用 localStorage/sessionStorage，不新增兜底估算或长文本过滤逻辑。
        ====================================================================== */
+    const latestTokenUsage = result?.tokenUsage || null;
+    await dbPut(db, DATA_KEY_CHAT_CONSOLE_TOKEN_USAGE(state.activeMaskId, targetChatId), latestTokenUsage);
     if (state.currentChatId === targetChatId) {
-      state.chatConsoleTokenUsage = result?.tokenUsage || null;
+      state.chatConsoleTokenUsage = latestTokenUsage;
       syncChatConsoleDock(container, state);
     }
 
@@ -842,8 +847,22 @@ export async function sendMessage(container, state, db, content, settingsManager
       }))
       .filter(item => item.imageUrl);
 
+    /* ========================================================================
+       [区域标注·已完成·本次后台重进完整AI消息组修复] AI 回复解析固定使用目标会话设置
+       说明：
+       1. 用户退出消息页后 closeChatMessage() 会把 state.chatPromptSettings 重置为默认值。
+       2. 本轮 AI 请求开始时已读取 targetChatSettings；解析返回文本时必须继续使用这份目标会话设置，
+          避免后台返回后误用默认最大气泡数 3，导致只落库 AI 回复组前几条。
+       3. 仅替换本轮解析用的 chatPromptSettings，不改 state 其它运行时字段，不影响消息渲染、短期记忆或长期记忆触发。
+       4. 持久化仍只走 DB.js / IndexedDB，不使用 localStorage/sessionStorage，不写双份兜底，不过滤长文本。
+       ======================================================================== */
+    const targetParseState = {
+      ...state,
+      chatPromptSettings: targetChatSettings
+    };
+
     const orderedAiMessages = sortAiMessagesByRuntimeProtocolOrder([
-      ...buildAiReplyMessages(rawAiText, state, {
+      ...buildAiReplyMessages(rawAiText, targetParseState, {
         /* [区域标注·已完成·AI文字图/生图互斥前端接收] 生图 API 开启时前端丢弃 [文字图]；未开启时才把 [文字图] 渲染为文字图气泡。 */
         textImageProtocolEnabled: Boolean(result?.textImageProtocolEnabled)
       }),
