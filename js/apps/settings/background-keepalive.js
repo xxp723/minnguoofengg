@@ -19,8 +19,8 @@ function escapeHtml(text) {
 }
 
 /* ==========================================================================
-   [区域标注·本次需求] 渲染“后台保活”板块 UI
-   说明：提供独立面板，内部包含一个 iPhone 风格的滑动式开关。
+   [区域标注·本次需求] 渲染“后台保活与通知”板块 UI
+   说明：提供独立面板，内部包含后台保活与消息通知两个小版块。
    ========================================================================== */
 export function renderBackgroundKeepaliveSection(state = {}) {
   const isEnabled = Boolean(state.backgroundKeepaliveEnabled);
@@ -28,9 +28,11 @@ export function renderBackgroundKeepaliveSection(state = {}) {
     <!-- 后台保活设置页 -->
     <div id="settings-keepalive" class="settings-detail" style="display: none;">
       <div class="settings-detail__body">
+        
+        <!-- 后台保活板块 -->
         <section class="ui-card">
-          <h3>后台保活与通知</h3>
-          <p class="ui-muted" style="margin-bottom: 10px;">开启后，如果你把小手机网页切换到手机后台去浏览其它应用/网页了，闲谈应用中AI的回复依然能在后台生成，并会通过通知提醒你。</p>
+          <h3>后台保活</h3>
+          <p class="ui-muted" style="margin-bottom: 10px;">开启后，即使页面在后台也能保持运行，联系人的回复依然会生成，主动发朋友圈等调用API的行为也能在后台进行。</p>
           
           <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px;">
             <div class="ui-muted" style="font-size: 14px; color: rgba(120, 105, 85, 0.75);">启用后台保活</div>
@@ -40,6 +42,18 @@ export function renderBackgroundKeepaliveSection(state = {}) {
             </label>
           </div>
         </section>
+
+        <!-- 消息通知板块 -->
+        <section class="ui-card" style="margin-top: 16px;">
+          <h3>消息通知</h3>
+          <p class="ui-muted" style="margin-bottom: 10px;">开启浏览器通知权限后，联系人在后台发送的消息将通过系统通知提醒你。</p>
+          
+          <div style="display: flex; gap: 10px; margin-top: 16px;">
+            <button class="ui-btn ui-btn--primary" id="btn-request-notification" style="flex: 1;">请求通知权限</button>
+            <button class="ui-btn ui-btn--secondary" id="btn-test-notification" style="flex: 1;">测试通知</button>
+          </div>
+        </section>
+
       </div>
     </div>
   `;
@@ -48,42 +62,65 @@ export function renderBackgroundKeepaliveSection(state = {}) {
 /* ==========================================================================
    [区域标注·本次需求] 绑定事件与权限请求
    说明：
-   1. 当用户点击开关且即将开启时，若 Notification 权限不足，则使用应用内 Modal 引导用户授权。
-   2. 数据存储通过传入的 settings 接口（底层 IndexedDB），禁用 localStorage。
+   1. 开关仅负责控制持久化状态，不耦合权限请求。
+   2. 权限请求按钮单独点击触发浏览器原生通知授权。
+   3. 测试按钮检测权限并发送通知验证。
    ========================================================================== */
 export function bindBackgroundKeepaliveEvents(container, { settings }) {
   const checkbox = container.querySelector('#setting-background-keepalive');
-  if (!checkbox) return;
+  const btnRequest = container.querySelector('#btn-request-notification');
+  const btnTest = container.querySelector('#btn-test-notification');
 
-  checkbox.addEventListener('change', async (e) => {
-    const isChecked = e.target.checked;
+  // 后台保活开关 - 只保存状态，不强绑授权
+  if (checkbox) {
+    checkbox.addEventListener('change', async (e) => {
+      const isChecked = e.target.checked;
+      try {
+        await settings.update({ backgroundKeepaliveEnabled: isChecked });
+      } catch (err) {
+        console.error('Failed to save background keepalive settings', err);
+        e.target.checked = !isChecked; // 失败恢复
+      }
+    });
+  }
 
-    if (isChecked) {
-      // 检查浏览器通知权限
+  // 请求通知权限按钮
+  if (btnRequest) {
+    btnRequest.addEventListener('click', async () => {
       if (!('Notification' in window)) {
-        e.target.checked = false;
-        alert('你的浏览器不支持系统通知，无法开启后台保活功能。');
+        alert('你的浏览器不支持系统通知。');
+        return;
+      }
+      
+      if (Notification.permission === 'granted') {
+        alert('已开启通知权限，无需再次请求。');
         return;
       }
 
-      // 如果没有权限，则请求权限
-      if (Notification.permission !== 'granted') {
-        const permission = await Notification.requestPermission();
-        // 无论原先是 default 还是 denied，如果请求后不是 granted，就说明最终用户没给权限
-        if (permission !== 'granted') {
-          e.target.checked = false;
-          alert('未能获取通知权限，无法开启后台保活通知。如果曾经拒绝过，请在浏览器设置中手动允许。');
-          return;
-        }
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        alert('通知权限已开启！后台消息将会通过系统弹窗提醒你。');
+      } else {
+        alert('未能获取通知权限。如果曾经拒绝过，请在浏览器设置中手动允许。');
       }
-    }
+    });
+  }
 
-    // 保存设置
-    try {
-      await settings.update({ backgroundKeepaliveEnabled: isChecked });
-    } catch (err) {
-      console.error('Failed to save background keepalive settings', err);
-      e.target.checked = !isChecked; // 失败恢复
-    }
-  });
+  // 测试通知按钮
+  if (btnTest) {
+    btnTest.addEventListener('click', () => {
+      if (!('Notification' in window)) {
+        alert('你的浏览器不支持系统通知。');
+        return;
+      }
+
+      if (Notification.permission === 'granted') {
+        new Notification('后台保活测试', {
+          body: '如果你能看到这条消息，说明浏览器通知功能正常！',
+        });
+      } else {
+        alert('未开启通知权限，请先点击“请求通知权限”进行授权。');
+      }
+    });
+  }
 }
