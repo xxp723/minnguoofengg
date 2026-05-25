@@ -161,18 +161,48 @@ function formatChatConsoleTokenCount(value) {
   return Number.isFinite(count) && count >= 0 ? String(count) : '--';
 }
 
+function readChatConsoleTokenCount(...values) {
+  for (const value of values) {
+    const count = Math.floor(Number(value));
+    if (Number.isFinite(count) && count >= 0) return count;
+  }
+  return null;
+}
+
 /* ==========================================================================
-   [区域标注·已完成·控制台标题Token显示] 控制台标题右侧每轮 Token 显示
+   [区域标注·已完成·本次重进Token标题显示修复] 控制台标题右侧每轮 Token 显示
    说明：
-   1. 只读取本轮 AI 请求返回的 tokenUsage 运行时结果，用于当前页面标题实时显示。
-   2. 不写入 DB.js / IndexedDB，也不使用 localStorage/sessionStorage，不做双份存储兜底。
-   3. 发送给 AI 的 tokens 显示为“发送”，AI 返回的 tokens 显示为“返回”，方便下次直接定位修改。
+   1. 读取当前 state.chatConsoleTokenUsage；该值可能来自本轮运行时结果，也可能来自 DB.js / IndexedDB 重进恢复。
+   2. 兼容真实 API usage / usageMetadata 的常见字段名，只展示真实返回字段；不估算、不按长文本过滤。
+   3. 不在本渲染区域写入 DB.js / IndexedDB，不使用 localStorage/sessionStorage，不做双份存储兜底。
    ========================================================================== */
 function renderChatConsoleTokenMetaHtml(tokenUsage = null) {
   const usage = tokenUsage && typeof tokenUsage === 'object' ? tokenUsage : {};
-  const inputText = formatChatConsoleTokenCount(usage.inputTokens);
-  const outputText = formatChatConsoleTokenCount(usage.outputTokens);
-  return `<span class="msg-console-dock__tokens" title="本轮发送给 AI / AI 返回 tokens">发送 ${escapeHtml(inputText)} / 返回 ${escapeHtml(outputText)}</span>`;
+  const usageMetadata = usage.usageMetadata && typeof usage.usageMetadata === 'object' ? usage.usageMetadata : {};
+  const inputTokens = readChatConsoleTokenCount(
+    usage.inputTokens,
+    usage.promptTokens,
+    usage.prompt_tokens,
+    usage.input_tokens,
+    usageMetadata.promptTokenCount
+  );
+  const outputTokens = readChatConsoleTokenCount(
+    usage.outputTokens,
+    usage.completionTokens,
+    usage.completion_tokens,
+    usage.output_tokens,
+    usageMetadata.candidatesTokenCount
+  );
+  const totalTokens = readChatConsoleTokenCount(
+    usage.totalTokens,
+    usage.total_tokens,
+    usageMetadata.totalTokenCount
+  );
+
+  const inputText = formatChatConsoleTokenCount(inputTokens);
+  const outputText = formatChatConsoleTokenCount(outputTokens);
+  const totalText = totalTokens === null ? '' : ` / 总计 ${escapeHtml(formatChatConsoleTokenCount(totalTokens))}`;
+  return `<span class="msg-console-dock__tokens" title="本轮发送给 AI / AI 返回 tokens">发送 ${escapeHtml(inputText)} / 返回 ${escapeHtml(outputText)}${totalText}</span>`;
 }
 
 export function renderChatConsoleDockHtml({
