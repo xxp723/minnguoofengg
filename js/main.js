@@ -282,41 +282,15 @@ class MiniPhoneApp {
     if (!('serviceWorker' in navigator)) return;
 
     try {
-      // 动态计算当前项目的根路径，兼容 Netlify 根目录和 GitHub Pages 子目录部署
-      const pathname = window.location.pathname;
-      let basePath = '/';
-      
-      // 如果是类似 /repo-name/ 这样的子目录，提取它作为基础路径
-      // 例如：/MiniPhone/index.html -> /MiniPhone/
-      //       /MiniPhone/ -> /MiniPhone/
-      //       / -> /
-      if (pathname.length > 1) {
-        const segments = pathname.split('/');
-        // 通常 index.html 在根目录，如果路径以 .html 结尾，去掉最后一段
-        if (segments[segments.length - 1].includes('.')) {
-          segments.pop();
-        }
-        // 如果还有剩余段，且最后一个不是空，加上斜杠
-        if (segments.length > 0 && segments[segments.length - 1] !== '') {
-          basePath = segments.join('/') + '/';
-        } else {
-          basePath = segments.join('/');
-        }
-      }
-      
-      // 确保以 / 开头，以 / 结尾
-      if (!basePath.startsWith('/')) basePath = '/' + basePath;
-      if (!basePath.endsWith('/')) basePath = basePath + '/';
-      
-      // 将多个斜杠替换为单个斜杠，避免 //service-worker.js 的情况
-      basePath = basePath.replace(/\/+/g, '/');
+      // 使用 URL API 获取 service-worker.js 相对于当前 HTML 页面的绝对地址
+      // 这可以完美处理 GitHub Pages 的子目录以及 Netlify 等根目录部署情况
+      const swUrl = new URL('./service-worker.js', window.location.href).href;
+      const scopeUrl = new URL('./', window.location.href).pathname;
 
-      const swPath = basePath + 'service-worker.js';
-
-      await navigator.serviceWorker.register(swPath, {
-        scope: basePath
+      await navigator.serviceWorker.register(swUrl, {
+        scope: scopeUrl
       });
-      Logger.info(`Service Worker 注册成功 (scope: ${basePath})`);
+      Logger.info(`Service Worker 注册成功 (scope: ${scopeUrl})`);
     } catch (error) {
       Logger.warn('Service Worker 注册失败', error);
     }

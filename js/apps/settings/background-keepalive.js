@@ -118,7 +118,7 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
   if (btnRequest) {
     btnRequest.addEventListener('click', async () => {
       if (!('Notification' in window)) {
-        showResult('error', '你的浏览器不支持系统通知。');
+        showResult('error', '你的浏览器或设备不支持系统级网页通知 (如部分手机内置浏览器)。');
         return;
       }
       
@@ -127,11 +127,18 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
         return;
       }
 
-      const permission = await Notification.requestPermission();
-      if (permission === 'granted') {
-        showResult('success', '通知权限已开启！后台消息将会通过系统通知提醒你。');
-      } else {
-        showResult('error', '未能获取通知权限。如果曾经拒绝过，请在浏览器设置中手动允许。');
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          showResult('success', '通知权限已开启！后台消息将会通过系统通知提醒你。');
+        } else if (permission === 'denied') {
+          showResult('error', '通知权限被拒绝。如果您曾在地址栏手动开启，请【刷新当前网页】后重试！(注意：iOS Safari 需将网页添加到主屏幕才能使用通知)');
+        } else {
+          showResult('error', '未能获取通知权限，请检查浏览器设置。');
+        }
+      } catch (e) {
+        showResult('error', '请求通知权限时发生错误，您的环境可能不支持。');
+        console.error(e);
       }
     });
   }
