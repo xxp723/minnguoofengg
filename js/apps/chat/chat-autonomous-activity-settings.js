@@ -1770,6 +1770,10 @@ export function initAutonomousMomentPublisher({
   };
 
   const onVisibilityOrPageShow = () => {
+    /* ========================================================================
+       [区域标注·本次需求] 后台保活通知触发点 (仅聊天自动回复在 chat-message.js 触发)
+       这里原为判断是否回到前台以触发主动发朋友圈检查。保留此处的可见性判断逻辑。
+       ======================================================================== */
     if (document.visibilityState === 'hidden') return;
     void checkAndPublish();
   };

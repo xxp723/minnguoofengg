@@ -30,19 +30,14 @@ export function renderBackgroundKeepaliveSection(state = {}) {
       <div class="settings-detail__body">
         <section class="ui-card">
           <h3>后台保活与通知</h3>
-          <p class="ui-muted" style="margin-bottom: 10px;">开启后，切换到后台依然能收到回复。</p>
+          <p class="ui-muted" style="margin-bottom: 10px;">开启后，如果你把小手机网页切换到手机后台去浏览其它应用/网页了，闲谈应用中AI的回复依然能在后台生成，并会通过通知提醒你。</p>
           
-          <div class="settings-row">
-            <div class="settings-row__content">
-              <div class="settings-row__title">启用后台保活</div>
-              <div class="settings-row__desc">允许后台生成并在收到回复时弹窗通知</div>
-            </div>
-            <div class="settings-row__action">
-              <label class="toggle-switch toggle-switch--theme">
-                <input class="ios-switch__input" type="checkbox" id="setting-background-keepalive" ${isEnabled ? 'checked' : ''}>
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px;">
+            <div class="ui-muted" style="font-size: 14px; color: rgba(120, 105, 85, 0.75);">启用后台保活</div>
+            <label class="toggle-switch toggle-switch--theme">
+              <input class="ios-switch__input" type="checkbox" id="setting-background-keepalive" ${isEnabled ? 'checked' : ''}>
+              <span class="toggle-slider"></span>
+            </label>
           </div>
         </section>
       </div>
@@ -71,16 +66,15 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
         return;
       }
 
-      if (Notification.permission === 'default') {
+      // 如果没有权限，则请求权限
+      if (Notification.permission !== 'granted') {
         const permission = await Notification.requestPermission();
+        // 无论原先是 default 还是 denied，如果请求后不是 granted，就说明最终用户没给权限
         if (permission !== 'granted') {
           e.target.checked = false;
+          alert('未能获取通知权限，无法开启后台保活通知。如果曾经拒绝过，请在浏览器设置中手动允许。');
           return;
         }
-      } else if (Notification.permission === 'denied') {
-        e.target.checked = false;
-        alert('你之前拒绝了通知权限。请在浏览器设置中手动允许本网站发送通知后，再来开启此功能。');
-        return;
       }
     }
 
