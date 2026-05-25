@@ -32,7 +32,7 @@ export function renderBackgroundKeepaliveSection(state = {}) {
           <span class="settings-form-group__icon">${ICON_KEEPALIVE}</span>
           <h4 class="settings-form-group__title">后台保活与通知</h4>
         </div>
-        <p class="settings-form-group__desc">开启后，如果你把小手机网页切换到手机后台去浏览其它应用/网页了，闲谈应用中AI的回复依然能在后台生成，并会通过通知提醒你。</p>
+        <p class="settings-form-group__desc">开启后，切换到后台也能收到角色回复。</p>
         
         <div class="settings-row">
           <div class="settings-row__content">
@@ -40,9 +40,9 @@ export function renderBackgroundKeepaliveSection(state = {}) {
             <div class="settings-row__desc">允许后台生成并在收到回复时弹窗通知</div>
           </div>
           <div class="settings-row__action">
-            <label class="ui-switch">
-              <input type="checkbox" id="setting-background-keepalive" ${isEnabled ? 'checked' : ''}>
-              <span class="ui-switch__slider"></span>
+            <label class="toggle-switch toggle-switch--theme">
+              <input class="ios-switch__input" type="checkbox" id="setting-background-keepalive" ${isEnabled ? 'checked' : ''}>
+              <span class="toggle-slider"></span>
             </label>
           </div>
         </div>
@@ -102,8 +102,24 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
     if (isChecked) {
       // 检查浏览器通知权限
       if (!('Notification' in window)) {
-        alert('你的浏览器不支持系统通知。'); // 提示不支持，无法用内建的
         e.target.checked = false;
+        const deniedModalHtml = `
+          <div class="chat-modal" id="keepalive-denied-modal">
+            <div class="chat-modal__backdrop"></div>
+            <div class="chat-modal__content">
+              <h3 class="chat-modal__title">不支持系统通知</h3>
+              <p class="chat-modal__text">你的浏览器不支持系统通知，无法开启后台保活功能。</p>
+              <div class="chat-modal__actions">
+                <button class="ui-button ui-button--primary" data-action="close">我知道了</button>
+              </div>
+            </div>
+          </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', deniedModalHtml);
+        const deniedModalEl = document.getElementById('keepalive-denied-modal');
+        deniedModalEl.querySelector('[data-action="close"]').addEventListener('click', () => {
+          deniedModalEl.remove();
+        });
         return;
       }
 
