@@ -145,7 +145,7 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
 
   // 测试通知按钮
   if (btnTest) {
-    btnTest.addEventListener('click', () => {
+    btnTest.addEventListener('click', async () => {
       if (!('Notification' in window)) {
         showResult('error', '你的浏览器不支持系统通知。');
         return;
@@ -155,29 +155,34 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
         const title = '后台保活测试';
         const options = {
           body: '如果你能看到这条消息，说明浏览器通知功能正常！',
-          icon: 'assets/icons/icon-192.png'
+          icon: 'assets/icons/icon-192.png',
+          // 增加震动模式，帮助手机端唤起横幅
+          vibrate: [200, 100, 200]
         };
 
-        try {
-          new Notification(title, options);
-          showResult('success', '测试通知已发送，请查看系统通知栏。');
-        } catch (e) {
-          if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.ready.then(reg => {
-              if (reg && typeof reg.showNotification === 'function') {
-                reg.showNotification(title, options);
-                showResult('success', '测试通知已发送（经由服务工作线程），请查看系统通知栏。');
-              } else {
-                showResult('error', '系统通知被阻止或不支持（缺少有效的 ServiceWorker 注册）。');
-              }
-            }).catch(err => {
-              console.error('SW 通知发送失败:', err);
-              showResult('error', '发送测试通知时遇到问题。');
-            });
-          } else {
-            showResult('error', '发送通知失败。你的浏览器要求必须由 ServiceWorker 弹出通知。');
+        // 优先使用 ServiceWorker 发送通知，避免安卓 PWA 中 new Notification() 被静默拦截
+        if ('serviceWorker' in navigator) {
+          try {
+            const reg = await navigator.serviceWorker.ready;
+            if (reg && typeof reg.showNotification === 'function') {
+              await reg.showNotification(title, options);
+              showResult('success', '测试通知已发送，请查看系统通知栏。');
+              return;
+            }
+          } catch (err) {
+            console.warn('ServiceWorker 发送通知失败，尝试回退方法:', err);
           }
         }
+
+        // 如果 ServiceWorker 失败或不存在，回退到原生 Notification
+        try {
+          new Notification(title, options);
+          showResult('success', '测试通知已发送 (回退模式)，请查看系统通知栏。');
+        } catch (e) {
+          console.error('原生 Notification 发送失败:', e);
+          showResult('error', '发送通知失败，可能由于环境限制 (如需通过 ServiceWorker)。');
+        }
+
       } else {
         showResult('error', '未开启通知权限，请先点击“请求通知权限”进行授权。');
       }

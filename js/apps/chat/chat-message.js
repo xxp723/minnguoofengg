@@ -1011,15 +1011,25 @@ export async function sendMessage(container, state, db, content, settingsManager
               body: notificationBody,
               icon: session?.avatar || ''
             };
-            try {
-              new Notification(title, options);
-            } catch (e) {
-              if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.ready.then(reg => {
-                  if (reg && typeof reg.showNotification === 'function') {
-                    reg.showNotification(title, options);
-                  }
-                }).catch(err => console.error('SW 通知发送失败:', err));
+            // 优先使用 ServiceWorker，这是移动端（如安卓 Chrome PWA）弹出横幅通知的推荐方式
+            options.vibrate = [200, 100, 200]; // 增加震动，帮助手机端唤起横幅
+            
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.ready.then(reg => {
+                if (reg && typeof reg.showNotification === 'function') {
+                  reg.showNotification(title, options);
+                } else {
+                  new Notification(title, options);
+                }
+              }).catch(err => {
+                console.error('SW 通知发送失败:', err);
+                new Notification(title, options);
+              });
+            } else {
+              try {
+                new Notification(title, options);
+              } catch (e) {
+                console.error('原生 Notification 发送失败:', e);
               }
             }
           }
