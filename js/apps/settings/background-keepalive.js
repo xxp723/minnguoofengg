@@ -163,61 +163,80 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
           vibrate: [200, 100, 200]
         };
 
-        // [区域标注·已修改] 终极修复：使用智能轮询确保 SW 发送通知成功
-        // 由于部分移动端浏览器严格禁止 `new Notification()`（抛出 Illegal constructor），我们必须且只能通过 Service Worker 发送。
-        // 但为了解决 SW 刚注册时 worker 还在 installing 导致抛出 "No active registration available" 的经典难题，
-        // 我们不强求它 active，而是引入指数回退的轮询机制，只要 registration 对象有效，就反复尝试。
+        // [区域标注·已修改] 终极破壁方案：强制接管与精准事件驱动
+        // 在某些移动端浏览器中：
+        // 1. `new Notification()` 抛出 Illegal constructor 被彻底封杀。
+        // 2. `ServiceWorkerRegistration.showNotification()` 必须要求有 `active` 且能控制页面的 Worker，否则严格报错。
+        // 所以，盲目轮询无效，必须强制推进 SW 生命周期。
         
         if (!('serviceWorker' in navigator)) {
           showResult('error', '环境不支持 Service Worker，无法发送系统通知。');
           return;
         }
 
-        const executeShowNotificationWithRetry = (reg, maxRetries = 5, delay = 500) => {
+        const forceActiveAndShow = (reg) => {
           if (!reg || typeof reg.showNotification !== 'function') {
             showResult('error', 'Service Worker 注册对象无效，无法发送通知。');
             return;
           }
 
-          let attempt = 0;
-          const tryShow = () => {
-            attempt++;
-            reg.showNotification(title, options).then(() => {
-              showResult('success', `测试通知已发送 (重试 ${attempt} 次)！如果没弹窗，请检查手机系统通知设置或是否允许悬浮窗。`);
-            }).catch(err => {
-              // 捕获到经典的未激活错误，并且还有重试机会
-              if (err.message.includes('No active registration') && attempt < maxRetries) {
-                console.log(`[测试通知] 第 ${attempt} 次尝试被拒绝，Worker 可能在安装中，等待 ${delay}ms 后重试...`);
-                setTimeout(tryShow, delay);
-              } else {
-                showResult('error', `发送失败: ${err.message} (已尝试 ${attempt} 次)`);
-              }
-            });
-          };
-          
-          // 立刻发起第一次尝试
-          tryShow();
+          // 如果已经有活跃的 worker，直接发
+          if (reg.active) {
+            reg.showNotification(title, options)
+               .then(() => showResult('success', '测试通知已通过活跃SW发送！'))
+               .catch(err => showResult('error', `活跃SW发送失败: ${err.message}`));
+            return;
+          }
+
+          // 如果没有 active worker，但有 installing 或 waiting
+          const pendingWorker = reg.installing || reg.waiting;
+          if (pendingWorker) {
+            showResult('success', 'Worker 正在准备中，强制接管...');
+            
+            // 发送信令要求强制跳过等待
+            pendingWorker.postMessage({ type: 'SKIP_WAITING' });
+            
+            // 监听 controllerchange：当新的 SW 真正接管页面时，它必然已经变成 active，这才是唯一安全的发送时机
+            const onControllerChange = () => {
+              navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+              reg.showNotification(title, options)
+                 .then(() => showResult('success', 'SW 已接管页面，通知发送成功！'))
+                 .catch(err => showResult('error', `SW接管后发送依然失败: ${err.message}`));
+            };
+            
+            navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+            
+            // 设置一个终极超时兜底，防止因为某些诡异原因 controllerchange 永远不触发
+            setTimeout(() => {
+              navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+              // 如果超时还没接管，死马当活马医，强行发一次看看
+              reg.showNotification(title, options)
+                 .catch(err => showResult('error', `强制接管超时，尝试发送被拒: ${err.message}`));
+            }, 3000);
+            
+          } else {
+             showResult('error', 'Registration 中找不到任何状态的 Worker。');
+          }
         };
 
         // 尝试获取现有的 Registration
         navigator.serviceWorker.getRegistration().then(reg => {
           if (reg) {
-            executeShowNotificationWithRetry(reg);
+            forceActiveAndShow(reg);
           } else {
-            showResult('success', '环境无SW注册，正在后台极速补注册...');
+            showResult('success', '正在极速补注册 SW...');
             // 现场补注册
             const swUrl = new URL('service-worker.js', window.location.href).href;
             const scopeUrl = new URL('./', window.location.href).pathname;
             
             navigator.serviceWorker.register(swUrl, { scope: scopeUrl }).then(newReg => {
-              // 刚注册成功，立刻进入轮询尝试，因为此时极大概率会报 "No active registration"
-              executeShowNotificationWithRetry(newReg, 8, 1000); // 刚注册的给多一点重试次数和间隔
+              forceActiveAndShow(newReg);
             }).catch(err => {
-              showResult('error', `补注册 Service Worker 失败: ${err.message}`);
+              showResult('error', `补注册 SW 失败: ${err.message}`);
             });
           }
         }).catch(err => {
-          showResult('error', `获取 Service Worker 状态出错: ${err.message}`);
+          showResult('error', `获取 SW 状态出错: ${err.message}`);
         });
 
       } else {
