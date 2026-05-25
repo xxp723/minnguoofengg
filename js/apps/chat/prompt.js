@@ -2681,10 +2681,11 @@ function normalizeAiTokenUsage(provider, payload) {
   };
 }
 
-async function requestOpenAiLike(profile, messages) {
+async function requestOpenAiLike(profile, messages, options = {}) {
   const endpoint = `${trimSlash(profile.baseUrl)}/chat/completions`;
   const response = await fetch(endpoint, {
     method: 'POST',
+    signal: options.signal,
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${profile.apiKey}`
@@ -2720,7 +2721,7 @@ async function requestOpenAiLike(profile, messages) {
    [API 调用区域] Gemini 接口
    说明：将 system 与历史消息压平成文本，兼容 Gemini generateContent。
    ========================================================================== */
-async function requestGemini(profile, messages) {
+async function requestGemini(profile, messages, options = {}) {
   const endpoint = `${trimSlash(profile.baseUrl)}/models/${encodeURIComponent(profile.model)}:generateContent`;
   const url = `${endpoint}?key=${encodeURIComponent(profile.apiKey)}`;
   const normalizedMessages = normalizeMessages(messages);
@@ -2734,6 +2735,7 @@ async function requestGemini(profile, messages) {
 
   const response = await fetch(url, {
     method: 'POST',
+    signal: options.signal,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ text: mergedText }, ...visualParts] }],
@@ -2766,7 +2768,7 @@ async function requestGemini(profile, messages) {
    [API 调用区域] Claude 接口
    说明：Claude system 单独传入，其余 user/assistant 作为 messages。
    ========================================================================== */
-async function requestClaude(profile, messages) {
+async function requestClaude(profile, messages, options = {}) {
   const systemPrompt = messages.find(item => item.role === 'system')?.content || '';
   const claudeMessages = normalizeMessages(messages)
     .filter(item => item.role === 'user' || item.role === 'assistant')
@@ -2775,6 +2777,7 @@ async function requestClaude(profile, messages) {
   const endpoint = `${trimSlash(profile.baseUrl)}/messages`;
   const response = await fetch(endpoint, {
     method: 'POST',
+    signal: options.signal,
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': profile.apiKey,
@@ -2835,7 +2838,15 @@ export async function chat({
      ====================================================================== */
   asideModeActive = false,
   asideSettings = null,
-  asideHistory = []
+  asideHistory = [],
+  /* ======================================================================
+     [区域标注·已完成·闲谈后台恢复请求保护] 主 API 请求中止信号
+     说明：
+     1. 由 chat-message.js 在页面后台恢复后判断请求疑似被浏览器挂起时传入。
+     2. 只用于中止当前 fetch 并让上层按同一轮消息自动重试；不写入任何持久化存储。
+     3. 不使用 localStorage/sessionStorage，不做双份存储兜底，不过滤长文本内容。
+     ====================================================================== */
+  requestSignal = undefined
 } = {}) {
   const promptContext = await collectPromptRuntimeContext({
     db,
@@ -2898,19 +2909,19 @@ export async function chat({
   switch (profile.provider) {
     case 'openai':
     case 'deepseek': {
-      const requestResult = await requestOpenAiLike(profile, messages);
+      const requestResult = await requestOpenAiLike(profile, messages, { signal: requestSignal });
       rawText = requestResult.rawText;
       tokenUsage = requestResult.tokenUsage;
       break;
     }
     case 'gemini': {
-      const requestResult = await requestGemini(profile, messages);
+      const requestResult = await requestGemini(profile, messages, { signal: requestSignal });
       rawText = requestResult.rawText;
       tokenUsage = requestResult.tokenUsage;
       break;
     }
     case 'claude': {
-      const requestResult = await requestClaude(profile, messages);
+      const requestResult = await requestClaude(profile, messages, { signal: requestSignal });
       rawText = requestResult.rawText;
       tokenUsage = requestResult.tokenUsage;
       break;

@@ -314,6 +314,105 @@ export function sleep(ms) {
   return new Promise(resolve => window.setTimeout(resolve, ms));
 }
 
+/* ========================================================================
+   [区域标注·已完成·闲谈后台恢复请求保护] 页面后台返回后的 API 请求恢复
+   说明：
+   1. 浏览器/PWA 在切到其它应用或长时间后台时，可能冻结当前页面 JS 与网络 fetch；
+      “后台保活”只能尽量保持运行，不能保证移动端浏览器一定持续连接主 API。
+   2. 本区域只处理闲谈主 API 请求：页面从后台恢复后，如果本轮 fetch 仍悬挂，
+      会先给浏览器一个短暂恢复窗口；仍未返回则中止本次 fetch，并在同一轮消息内自动重试一次。
+   3. 不写入任何持久化存储，不使用 localStorage/sessionStorage，不做双份存储兜底，
+      不过滤长文本或媒体字段；消息最终仍只通过 DB.js / IndexedDB 落库。
+   ======================================================================== */
+const CHAT_BACKGROUND_API_MIN_HIDDEN_MS = 5000;
+const CHAT_BACKGROUND_API_RESUME_GRACE_MS = 900;
+const CHAT_BACKGROUND_API_RETRY_DELAY_MS = 240;
+const CHAT_BACKGROUND_API_MAX_RETRY_COUNT = 1;
+
+function isAbortLikeError(error) {
+  return String(error?.name || '') === 'AbortError'
+    || /abort/i.test(String(error?.message || ''));
+}
+
+function isLikelyBackgroundFetchFailure(error) {
+  const message = String(error?.message || error || '');
+  return isAbortLikeError(error)
+    || /failed to fetch|networkerror|load failed|拉取\s*api\s*失败|fetch/i.test(message);
+}
+
+async function requestChatWithBackgroundResumeProtection(chatOptions = {}, options = {}) {
+  const appendLog = typeof options.appendLog === 'function' ? options.appendLog : null;
+  let retryCount = 0;
+
+  while (true) {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    let hiddenAt = document.visibilityState === 'hidden' ? Date.now() : 0;
+    let resumedFromBackground = false;
+    let abortedForBackgroundResume = false;
+    let resumeAbortTimer = 0;
+
+    const clearResumeAbortTimer = () => {
+      if (!resumeAbortTimer) return;
+      window.clearTimeout(resumeAbortTimer);
+      resumeAbortTimer = 0;
+    };
+
+    const markHidden = () => {
+      if (document.visibilityState === 'hidden' && !hiddenAt) hiddenAt = Date.now();
+    };
+
+    const handleResume = () => {
+      if (document.visibilityState === 'hidden') {
+        markHidden();
+        return;
+      }
+
+      if (!hiddenAt || !controller || controller.signal.aborted) return;
+      const hiddenDuration = Date.now() - hiddenAt;
+      hiddenAt = 0;
+      if (hiddenDuration < CHAT_BACKGROUND_API_MIN_HIDDEN_MS) return;
+
+      resumedFromBackground = true;
+      appendLog?.(
+        'warn',
+        `检测到页面后台停留 ${Math.round(hiddenDuration / 1000)} 秒后恢复，正在保护本轮 AI 请求`
+      );
+
+      clearResumeAbortTimer();
+      resumeAbortTimer = window.setTimeout(() => {
+        if (controller.signal.aborted) return;
+        abortedForBackgroundResume = true;
+        appendLog?.('warn', '后台恢复后主 API 请求仍未返回，已中止悬挂连接并准备自动重试');
+        controller.abort();
+      }, CHAT_BACKGROUND_API_RESUME_GRACE_MS);
+    };
+
+    document.addEventListener('visibilitychange', handleResume);
+    window.addEventListener('pageshow', handleResume);
+
+    try {
+      return await chat({
+        ...chatOptions,
+        requestSignal: controller?.signal
+      });
+    } catch (error) {
+      const canRetry = retryCount < CHAT_BACKGROUND_API_MAX_RETRY_COUNT
+        && (abortedForBackgroundResume || resumedFromBackground)
+        && isLikelyBackgroundFetchFailure(error);
+
+      if (!canRetry) throw error;
+
+      retryCount += 1;
+      appendLog?.('warn', `后台恢复后的 AI 请求已自动重试第 ${retryCount} 次`);
+      await sleep(CHAT_BACKGROUND_API_RETRY_DELAY_MS);
+    } finally {
+      clearResumeAbortTimer();
+      document.removeEventListener('visibilitychange', handleResume);
+      window.removeEventListener('pageshow', handleResume);
+    }
+  }
+}
+
 
 export function getAiBubbleDelayMs(bubbleText, index) {
   const length = String(bubbleText || '').length;
@@ -648,7 +747,7 @@ export async function sendMessage(container, state, db, content, settingsManager
       targetAsideHistory = [];
     }
 
-    const result = await chat({
+    const result = await requestChatWithBackgroundResumeProtection({
       userInput: userInputForAi,
       history: promptPayload.history,
       /* [区域标注·已完成·AI识图当前轮媒体] 把本轮用户图片/表情包消息原始字段传给 prompt.js 组装视觉输入。 */
@@ -684,6 +783,8 @@ export async function sendMessage(container, state, db, content, settingsManager
       asideModeActive: targetAsideModeActive,
       asideSettings: targetAsideSettings,
       asideHistory: targetAsideHistory
+    }, {
+      appendLog: appendTargetChatConsoleLog
     });
 
     /* ======================================================================
