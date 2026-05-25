@@ -883,7 +883,22 @@ export async function sendMessage(container, state, db, content, settingsManager
                       ? message.imageName || message.content || 'AI 生图'
                       : message.content || '')))
       ).trim();
-      if (index > 0) await sleep(getAiBubbleDelayMs(visibleText, index));
+      /* ======================================================================
+         [区域标注·已完成·本次后台保活完整消息组即时落库修复] AI 气泡延迟仅限当前前台会话
+         说明：
+         1. 逐条气泡 sleep 只用于用户正在查看当前聊天页时的前台动效。
+         2. 用户退出到聊天列表、切到其它会话或页面进入后台后，不再等待气泡动效延迟；
+            本轮已解析出的 AI 消息组会连续写入 targetMessages 并逐条落库到 DB.js / IndexedDB。
+         3. 这样后台保活返回的完整 AI 消息组和对应控制台日志会立即进入目标会话，
+            下一轮短期记忆与长期记忆总结读取到的是完整上一轮回复，不会只看到最先出现的几条气泡。
+         4. 本区域不使用 localStorage/sessionStorage，不写双份存储兜底，不过滤长文本或媒体字段。
+         ====================================================================== */
+      const shouldDelayVisibleAiBubble = (
+        index > 0
+        && targetChatId === state.currentChatId
+        && document.visibilityState !== 'hidden'
+      );
+      if (shouldDelayVisibleAiBubble) await sleep(getAiBubbleDelayMs(visibleText, index));
       targetMessages.push(message);
       appendTargetChatConsoleLog(
         'info',
