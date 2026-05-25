@@ -19,8 +19,16 @@
    4. 上层仍通过 facade 保持原导出名不变，避免影响既有调用方。
    ========================================================================== */
 export function buildPromptPayloadForLatestUserRound(messages = [], shortTermMemoryRounds = 8) {
+  /* ========================================================================
+     [区域标注·已完成·本次修复·AI拍一拍重复问题]
+     说明：
+     1. ai_pat_system 消息虽然 role='user'，但它代表的是 AI 上一轮主动发起的拍一拍动作，不是用户输入。
+     2. 如果不排除，它会被当作"用户最新一轮消息"发给 AI，导致 AI 在新一轮重复生成相同拍一拍。
+     3. 这里在 normalized 阶段直接过滤掉 ai_pat_system，使其既不进入 currentRoundMessages 也不进入 history。
+     4. 本区只调整运行时 Prompt Payload 组装，不新增持久化存储，不使用 localStorage/sessionStorage。
+     ======================================================================== */
   const normalized = Array.isArray(messages)
-    ? messages.filter(item => item && (item.role === 'user' || item.role === 'assistant') && String(item.content || '').trim())
+    ? messages.filter(item => item && (item.role === 'user' || item.role === 'assistant') && String(item.content || '').trim() && String(item.type || '') !== 'ai_pat_system')
     : [];
 
   let latestUserStart = -1;

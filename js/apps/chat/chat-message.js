@@ -889,10 +889,12 @@ export async function sendMessage(container, state, db, content, settingsManager
       
       await dbPut(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId, targetMessages);
       await dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions);
-      
-      // 如果当前不是该聊天的页面，则不渲染 UI
-      // 但是如果目标聊天是当前打开的聊天，我们就动态追加气泡
+
+      /* [区域标注·已修改·后台保活消息同步] AI消息循环中同步 state.currentMessages
+         说明：每次 push 新消息后，若用户已切回本聊天页面，需将 state.currentMessages
+         指向 targetMessages，确保后续渲染和 openChatMessage 重入时数据一致。 */
       if (targetChatId === state.currentChatId) {
+        state.currentMessages = targetMessages;
         appendCurrentMessageBubble(container, state, targetMessages[targetMessages.length - 1]);
       }
     }
@@ -983,8 +985,13 @@ export async function sendMessage(container, state, db, content, settingsManager
       dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions),
       persistChatConsoleRuntimeLogs(state, db)
     ]);
-    
+
+    /* [区域标注·已修改·后台保活finally同步] finally块中同步 state.currentMessages 并刷新UI
+       说明：AI回复全部完成后（或出错后），若用户已切回本聊天页面，需确保
+       state.currentMessages 指向最终完整的 targetMessages，并做一次完整刷新，
+       避免用户从聊天列表重新进入时只看到部分消息或状态卡在"正在回复"。 */
     if (state.currentChatId === targetChatId) {
+      state.currentMessages = targetMessages;
       if (hasRenderedAiBubble) {
         updateCurrentChatSendingUi(container, state);
       } else {

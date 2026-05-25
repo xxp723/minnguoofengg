@@ -72,6 +72,17 @@ export async function openChatMessage(container, state, db, chatId) {
   state.currentMessages = (await dbGet(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + chatId)) || [];
 
   /* ========================================================================
+     [区域标注·已完成·本次修复·后台保活重入同步isAiSending]
+     说明：
+     1. 用户退出聊天页后 AI 可能仍在后台生成回复（activeAiRequests 中有该 chatId）。
+     2. 重新进入时必须根据 activeAiRequests 正确恢复 isAiSending 状态，否则：
+        - AI 已完成但 isAiSending 仍为 true → 状态栏永远显示"正在回复"。
+        - AI 未完成但 isAiSending 为 false → 状态栏不显示生成中提示。
+     3. 本区只同步运行时 UI 状态，不新增持久化存储，不使用 localStorage/sessionStorage。
+     ======================================================================== */
+  state.isAiSending = Boolean(state.activeAiRequests?.has?.(chatId));
+
+  /* ========================================================================
      [区域标注·已完成·旁白模式防自动退出修复] 打开会话时恢复旁白模式状态
      说明：
      1. 旁白模式 active/settings/history 按“当前面具 + 当前会话”从 DB.js / IndexedDB 读取。
