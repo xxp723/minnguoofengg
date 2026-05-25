@@ -220,12 +220,30 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
                 if (fallbackTriggered) return;
                 swAttempts.push('register_ok');
                 
-                // [区域标注·已修改] 优化 SW 补注册后的通知发送逻辑
-                // 取消死等 active 或 ready 状态，因为即使在 installing 或 waiting 状态，
-                // ServiceWorkerRegistration 对象也具备 showNotification 的能力，底层会自动排队处理。
-                // 这样可以避免因生命周期卡顿导致的超时报错。
-                if (!executeShowNotification(newReg, 'newReg_direct')) {
-                   fallbackNotification('newReg_no_showNotification');
+                // [区域标注·已修改] 彻底解决 SW 未激活时发送通知报错的问题
+                // 浏览器规范要求必须有 active 的 worker 才能调用 showNotification，否则会抛出 "No active registration available"
+                if (newReg.active) {
+                  // 如果已经激活，直接发送
+                  if (!executeShowNotification(newReg, 'newReg_active')) {
+                     fallbackNotification('newReg_no_showNotification');
+                  }
+                } else {
+                  // 尚未激活时（通常在 installing 或 waiting），不能强行发送，也不能死等 ready，
+                  // 而是监听 statechange 事件，一旦激活就发送。
+                  let waitingOrInstallingWorker = newReg.installing || newReg.waiting;
+                  if (waitingOrInstallingWorker) {
+                    swAttempts.push('listen_statechange');
+                    waitingOrInstallingWorker.addEventListener('statechange', function() {
+                      if (waitingOrInstallingWorker.state === 'activated') {
+                        if (fallbackTriggered) return; // 如果已经超时就不再处理
+                        swAttempts.push('state_activated');
+                        executeShowNotification(newReg, 'newReg_activated');
+                      }
+                    });
+                  } else {
+                     // 理论上不可能走到这里，如果真的连 installing/waiting 都没有，直接尝试降级
+                     fallbackNotification('no_worker_found_on_reg');
+                  }
                 }
               }).catch(err => {
                 if (fallbackTriggered) return;
