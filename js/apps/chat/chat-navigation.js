@@ -67,6 +67,8 @@ export async function openChatMessage(container, state, db, chatId) {
   state.chatMessageVisibleCount = CHAT_MESSAGE_INITIAL_VISIBLE_COUNT;
 
   /* [区域标注] 从 IndexedDB 加载该会话的消息记录 */
+  // 这里保留赋值给 state.currentMessages 主要是为了向前兼容和其他组件（如渲染等）目前默认使用 currentMessages，
+  // 实际上在 sendMessage 中我们已经支持通过 targetChatId 来独立获取，但当前活动窗口的还是放在这里。
   state.currentMessages = (await dbGet(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + chatId)) || [];
 
   /* ========================================================================

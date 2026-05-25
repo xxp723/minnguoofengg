@@ -7,6 +7,7 @@
 
 import {
   TAB_ICONS,
+  dbGet,
   dbPut,
   escapeHtml,
   getCurrentChatPromptSettingsKey
@@ -542,10 +543,11 @@ async function summarizeAndSaveLongTermMemory({
   db = null,
   settingsManager = null,
   source = 'auto',
-  rounds = []
+  rounds = [],
+  targetSession = null
 } = {}) {
   const summaryTriggeredAt = Date.now();
-  const session = getCurrentSessionForMemory(state);
+  const session = targetSession || getCurrentSessionForMemory(state);
   if (!session || !rounds.length) return false;
 
   const contact = getContactForMemory(state, session);
@@ -607,13 +609,23 @@ export async function maybeRunAutoLongTermMemorySummary({
   state = {},
   container = null,
   db = null,
-  settingsManager = null
+  settingsManager = null,
+  targetChatId = null,
+  targetMessages = null
 } = {}) {
   try {
-    const settings = ensureLongTermMemorySettings(state);
+    const isCurrentChat = !targetChatId || targetChatId === state.currentChatId;
+    let settings = ensureLongTermMemorySettings(state);
+    
+    if (!isCurrentChat) {
+      const rawSettings = await dbGet(db, `chat_prompt_settings::${state.activeMaskId}::${targetChatId}`);
+      settings = normalizeLongTermMemorySettings(rawSettings || {});
+    }
+
     if (!settings.longTermMemoryAutoSummaryEnabled) return false;
 
-    const rounds = buildConversationRounds(state.currentMessages || []);
+    const messages = targetMessages || state.currentMessages || [];
+    const rounds = buildConversationRounds(messages);
     const totalRounds = rounds.length;
     const requiredRounds = getLongTermMemorySummaryRoundCount(settings);
     if (requiredRounds <= 0) return false;
@@ -625,20 +637,34 @@ export async function maybeRunAutoLongTermMemorySummary({
     }
 
     const selectedRounds = rounds.slice(-requiredRounds);
+    
+    let sessionForMemory = getCurrentSessionForMemory(state);
+    if (!isCurrentChat) {
+      sessionForMemory = state.sessions.find(s => s.id === targetChatId) || null;
+    }
+
     const saved = await summarizeAndSaveLongTermMemory({
       state,
       container,
       db,
       settingsManager,
       source: 'auto',
-      rounds: selectedRounds
+      rounds: selectedRounds,
+      targetSession: sessionForMemory
     });
 
     if (saved) {
-      state.chatPromptSettings.longTermMemoryLastAutoSummaryRoundIndex = totalRounds;
-      await persistLongTermMemorySettings(state, db);
+      if (isCurrentChat) {
+        state.chatPromptSettings.longTermMemoryLastAutoSummaryRoundIndex = totalRounds;
+        await persistLongTermMemorySettings(state, db);
+      } else {
+        const key = `chat_prompt_settings::${state.activeMaskId}::${targetChatId}`;
+        const rawSettings = await dbGet(db, key) || {};
+        rawSettings.longTermMemoryLastAutoSummaryRoundIndex = totalRounds;
+        await dbPut(db, key, rawSettings);
+      }
     } else {
-      showLongTermMemoryFailureModal(container, { source: 'auto' });
+      if (isCurrentChat) showLongTermMemoryFailureModal(container, { source: 'auto' });
     }
 
     return saved;

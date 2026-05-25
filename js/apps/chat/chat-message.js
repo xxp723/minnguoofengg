@@ -9,6 +9,7 @@
 import {
   DATA_KEY_SESSIONS,
   DATA_KEY_MESSAGES_PREFIX,
+  dbGet,
   dbPut,
   normalizeStickerData,
   normalizeWalletData,
@@ -464,10 +465,28 @@ function bindAsideSegmentsToAiMessages(aiMessages = [], asideSegments = [], disp
 export async function sendMessage(container, state, db, content, settingsManager, options = {}) {
   const userText = String(content || '').trim();
   const triggerAi = options.triggerAi !== false;
-  if ((!userText && !options.skipAppendUser) || !state.currentChatId || (triggerAi && state.isAiSending)) return;
+  // targetChatId 允许在后台为非当前窗口发送消息
+  const targetChatId = options.targetChatId || state.currentChatId;
+  if ((!userText && !options.skipAppendUser) || !targetChatId) return;
 
-  const session = state.sessions.find(s => s.id === state.currentChatId);
+  // 初始化 activeAiRequests
+  if (!state.activeAiRequests) state.activeAiRequests = new Set();
+  
+  if (triggerAi && state.activeAiRequests.has(targetChatId)) return;
+
+  const session = state.sessions.find(s => s.id === targetChatId);
   if (!session) return;
+
+  // 判断是否是当前窗口的消息
+  const isCurrentChat = targetChatId === state.currentChatId;
+
+  // 读取对应窗口的 messages
+  let targetMessages = [];
+  if (isCurrentChat) {
+    targetMessages = state.currentMessages;
+  } else {
+    targetMessages = (await dbGet(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId)) || [];
+  }
 
   /* ======================================================================
      [区域标注·已完成·本次控制台日志开关增强] 用户发送与触发记录
@@ -483,7 +502,7 @@ export async function sendMessage(container, state, db, content, settingsManager
   /* ===== 闲谈：发送消息去重 START ===== */
   let appendedUserMessage = null;
   if (!options.skipAppendUser) {
-    const pendingQuote = state.pendingQuote && state.pendingQuote.id ? { ...state.pendingQuote } : null;
+    const pendingQuote = isCurrentChat && state.pendingQuote && state.pendingQuote.id ? { ...state.pendingQuote } : null;
     appendedUserMessage = {
       id: `user_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       role: 'user',
@@ -495,17 +514,19 @@ export async function sendMessage(container, state, db, content, settingsManager
       ...(pendingQuote ? { quote: pendingQuote } : {}),
       timestamp: Date.now()
     };
-    state.currentMessages.push(appendedUserMessage);
-    state.pendingQuote = null;
-    /* ======================================================================
-       [区域标注·已完成·本次引用残留修复] 发送后立即移除底栏引用框
-       说明：只清理运行时 pendingQuote 与当前 DOM 引用预览；消息 quote 字段已随消息对象写入 IndexedDB。
-       ====================================================================== */
-    syncPendingQuoteComposer(container, state);
+    targetMessages.push(appendedUserMessage);
+    if (isCurrentChat) {
+      state.pendingQuote = null;
+      /* ======================================================================
+         [区域标注·已完成·本次引用残留修复] 发送后立即移除底栏引用框
+         说明：只清理运行时 pendingQuote 与当前 DOM 引用预览；消息 quote 字段已随消息对象写入 IndexedDB。
+         ====================================================================== */
+      syncPendingQuoteComposer(container, state);
+    }
   }
   /* ===== 闲谈：发送消息去重 END ===== */
 
-  await persistCurrentMessages(state, db);
+  await dbPut(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId, targetMessages);
 
   if (userText) {
     session.lastMessage = userText;
@@ -514,7 +535,7 @@ export async function sendMessage(container, state, db, content, settingsManager
   }
 
   /* ===== 闲谈：发送消息去重 START ===== */
-  if (appendedUserMessage) {
+  if (appendedUserMessage && state.currentChatId === targetChatId) {
     appendCurrentMessageBubble(container, state, appendedUserMessage);
   }
   /* ===== 闲谈：发送消息去重 END ===== */
@@ -529,21 +550,36 @@ export async function sendMessage(container, state, db, content, settingsManager
            第一次渲染用户消息，第二次仅为了显示“正在回复...”又重建整个 msgWrap。
            这里改为只更新发送状态相关 DOM，不重建聊天页面，避免点击纸飞机后闪屏。
   /* ========================================================================== */
-  state.isAiSending = true;
-  updateCurrentChatSendingUi(container, state);
+  state.activeAiRequests.add(targetChatId);
+  if (state.currentChatId === targetChatId) {
+    state.isAiSending = true;
+    updateCurrentChatSendingUi(container, state);
+  }
 
   let hasRenderedAiBubble = false;
 
+  // 如果是在后台发送，需要单独获取其设置
+  let targetChatSettings = state.chatPromptSettings;
+  if (!isCurrentChat) {
+    const rawSettings = await dbGet(db, `chat_prompt_settings::${state.activeMaskId}::${targetChatId}`);
+    // 这里简单处理，实际上可能需要引入 normalizeChatPromptSettings
+    targetChatSettings = rawSettings || {}; 
+  }
+
   try {
     /* ===== 闲谈应用：短期记忆与最新一轮消息 START ===== */
-    const promptPayload = buildPromptPayloadForLatestUserRound(state.currentMessages, state.chatPromptSettings.shortTermMemoryRounds);
+    const promptPayload = buildPromptPayloadForLatestUserRound(targetMessages, targetChatSettings.shortTermMemoryRounds || 8);
     /* ===== 闲谈应用：短期记忆与最新一轮消息 END ===== */
 
     /* ========================================================================
        [区域标注·已完成·本次转账待确认修复] 纸飞机触发时把待确认转账交给 AI 决策
        说明：用户转账不再立即显示“AI 已接收”；仅在本次 API 请求中注入临时状态指令。
        ======================================================================== */
-    const pendingOutgoingTransfers = getPendingOutgoingTransfers(state);
+    const pendingOutgoingTransfers = targetMessages.filter(message => (
+      String(message?.type || '') === 'transfer'
+      && String(message?.transferDirection || '') === 'outgoing'
+      && String(message?.transferStatus || 'pending') === 'pending'
+    ));
     const pendingTransferTemp = buildPendingOutgoingTransferSystemTemp(pendingOutgoingTransfers);
     const userInputForAi = [promptPayload.userInput, pendingTransferTemp].filter(Boolean).join('\n\n');
 
@@ -574,12 +610,22 @@ export async function sendMessage(container, state, db, content, settingsManager
        ====================================================================== */
     state.chatConsoleTokenUsage = null;
     syncChatConsoleDock(container, state);
+    // 后台请求旁白相关状态可能需要额外处理，这里暂用 state 的，或者如果不在当前窗口，也可以不用旁白（看具体需求）
+    let targetAsideModeActive = state.asideModeActive;
+    let targetAsideSettings = state.asideSettings;
+    let targetAsideHistory = state.asideHistory;
+
+    if (!isCurrentChat) {
+      targetAsideModeActive = false; // 后台暂不开启旁白
+      targetAsideHistory = [];
+    }
+
     const result = await chat({
       userInput: userInputForAi,
       history: promptPayload.history,
       /* [区域标注·已完成·AI识图当前轮媒体] 把本轮用户图片/表情包消息原始字段传给 prompt.js 组装视觉输入。 */
       currentUserRoundMessages: promptPayload.currentUserRoundMessages,
-      chatSettings: state.chatPromptSettings,
+      chatSettings: targetChatSettings,
       /* [区域标注·已完成·本次时间断层强化] 时间感知请求上下文：把当前用户轮次、上一条 AI 回复与上一条历史聊天记录时间传给 prompt.js，避免 AI 把凌晨旧语境误当成早上当前语境。 */
       conversationTimeContext: promptPayload.conversationTimeContext,
       settingsManager,
@@ -607,9 +653,9 @@ export async function sendMessage(container, state, db, content, settingsManager
          2. asideSettings — 旁白人称/风格/字数/显示模式，供 buildAsideModeSystemPrompt 使用。
          3. asideHistory — 旁白历史摘要数组，退出旁白模式后由 buildAsideHistorySummary 注入上下文。
          ====================================================================== */
-      asideModeActive: state.asideModeActive,
-      asideSettings: state.asideSettings,
-      asideHistory: state.asideHistory
+      asideModeActive: targetAsideModeActive,
+      asideSettings: targetAsideSettings,
+      asideHistory: targetAsideHistory
     });
 
     /* ======================================================================
@@ -619,8 +665,10 @@ export async function sendMessage(container, state, db, content, settingsManager
        2. 仅用于控制台标题最右侧实时显示“发送 / 返回”tokens，不做任何持久化。
        3. 不使用 localStorage/sessionStorage，也不新增兜底估算或长文本过滤逻辑。
        ====================================================================== */
-    state.chatConsoleTokenUsage = result?.tokenUsage || null;
-    syncChatConsoleDock(container, state);
+    if (state.currentChatId === targetChatId) {
+      state.chatConsoleTokenUsage = result?.tokenUsage || null;
+      syncChatConsoleDock(container, state);
+    }
 
     const rawAiTextOriginal = result?.rawText || result?.text || '';
 
@@ -667,18 +715,78 @@ export async function sendMessage(container, state, db, content, settingsManager
          3. 本区域不写入 localStorage/sessionStorage，不新增双份存储兜底。
          ====================================================================== */
       appendChatConsoleRuntimeLog(state, 'warn', 'AI 返回为空文本，已改为显示 API 报错弹窗');
-      showApiErrorModal(container, {
-        code: 'empty_response',
-        title: 'AI 本轮没有成功回复',
-        message: 'API 请求已完成，但本轮 AI 没有返回可展示的聊天内容。'
-      });
+      if (state.currentChatId === targetChatId) {
+        showApiErrorModal(container, {
+          code: 'empty_response',
+          title: 'AI 本轮没有成功回复',
+          message: 'API 请求已完成，但本轮 AI 没有返回可展示的聊天内容。'
+        });
+      }
       return;
     } else {
       appendChatConsoleRuntimeLog(state, 'info', `AI 原始返回长度：${String(rawAiText).length}`);
     }
-    const hasAppliedPendingTransferDecision = await applyAiPendingTransferDecisions(state, db, rawAiText);
+    
+    // applyAiPendingTransferDecisions 需要修改为接收 targetMessages 和 targetChatId
+    const decisions = extractAiPendingTransferDecisions(rawAiText);
+    let hasAppliedPendingTransferDecision = false;
+    if (decisions.length) {
+      const decisionMap = new Map(decisions.map(item => [String(item.transferId), item.action]));
+      const now = Date.now();
+      
+      for (const message of targetMessages) {
+        if (
+          String(message?.type || '') !== 'transfer'
+          || String(message?.transferDirection || '') !== 'outgoing'
+          || String(message?.transferStatus || 'pending') !== 'pending'
+        ) continue;
+
+        const action = decisionMap.get(String(message.id || ''));
+        if (!action) continue;
+
+        message.transferStatus = action;
+        message.transferHandledAt = now;
+        hasAppliedPendingTransferDecision = true;
+
+        const roleName = String(message.transferCounterpartyName || session?.name || '对方').trim() || '对方';
+        const transferBaseCny = Math.max(0, Number(message.transferBaseCny || 0) || 0);
+
+        if (action === 'returned' && transferBaseCny > 0) {
+          state.walletData = normalizeWalletData({
+            ...state.walletData,
+            balanceBaseCny: Number(state.walletData?.balanceBaseCny || 0) + transferBaseCny,
+            ledger: [
+              {
+                id: `wallet_ledger_${now}_${Math.random().toString(16).slice(2)}`,
+                kind: 'transfer',
+                direction: 'in',
+                title: `${roleName} 退回转账`,
+                amountBaseCny: Number(transferBaseCny.toFixed(2)),
+                timestamp: now
+              },
+              ...(Array.isArray(state.walletData?.ledger) ? state.walletData.ledger : [])
+            ],
+            updatedAt: now
+          });
+        }
+
+        targetMessages.push({
+          id: `transfer_system_${now}_${Math.random().toString(16).slice(2)}`,
+          role: 'user',
+          type: 'transfer_system',
+          content: action === 'accepted' ? `${roleName} 已接收` : `${roleName} 已退回`,
+          transferStatus: action,
+          timestamp: now + 1
+        });
+      }
+    }
+    
     if (hasAppliedPendingTransferDecision) {
-      refreshCurrentMessageListOnly(container, state);
+      session.lastMessage = '[转账]';
+      session.lastTime = Date.now();
+      await dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions);
+      await persistWalletData(state, db);
+      if (state.currentChatId === targetChatId) refreshCurrentMessageListOnly(container, state);
     }
 
     /* ========================================================================
@@ -725,7 +833,7 @@ export async function sendMessage(container, state, db, content, settingsManager
         const aiMessages = bindAsideSegmentsToAiMessages(
           aiMessagesWithoutCurrentUserEcho,
           extractedAsideSegments,
-          state.asideSettings?.displayMode || 'top',
+          targetAsideSettings?.displayMode || 'top',
           rawAiTextAfterInnerVoice
         );
     if (!aiMessages.length) {
@@ -751,7 +859,7 @@ export async function sendMessage(container, state, db, content, settingsManager
                       : message.content || '')))
       ).trim();
       if (index > 0) await sleep(getAiBubbleDelayMs(visibleText, index));
-      state.currentMessages.push(message);
+      targetMessages.push(message);
       appendChatConsoleRuntimeLog(
         state,
         'info',
@@ -778,9 +886,15 @@ export async function sendMessage(container, state, db, content, settingsManager
                     ? (isTextImageMessage(message) ? `[文字图] ${message.textImageText || '文字图'}` : `[图片] ${message.imageName || 'AI 生图'}`)
                     : (message.content || '（AI 没有返回内容）'))));
       session.lastTime = Date.now();
-      await persistCurrentMessages(state, db);
+      
+      await dbPut(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId, targetMessages);
       await dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions);
-      appendCurrentMessageBubble(container, state, state.currentMessages[state.currentMessages.length - 1]);
+      
+      // 如果当前不是该聊天的页面，则不渲染 UI
+      // 但是如果目标聊天是当前打开的聊天，我们就动态追加气泡
+      if (targetChatId === state.currentChatId) {
+        appendCurrentMessageBubble(container, state, targetMessages[targetMessages.length - 1]);
+      }
     }
 
     session.lastMessage = aiMessages[aiMessages.length - 1]?.type === 'sticker'
@@ -804,16 +918,16 @@ export async function sendMessage(container, state, db, content, settingsManager
        ======================================================================== */
     if (extractedInnerVoice) {
       let innerVoiceMessageId = '';
-      for (let i = state.currentMessages.length - 1; i >= 0; i--) {
-        if (state.currentMessages[i]?.role === 'assistant') {
-          state.currentMessages[i].innerVoice = extractedInnerVoice;
-          innerVoiceMessageId = String(state.currentMessages[i]?.id || '');
+      for (let i = targetMessages.length - 1; i >= 0; i--) {
+        if (targetMessages[i]?.role === 'assistant') {
+          targetMessages[i].innerVoice = extractedInnerVoice;
+          innerVoiceMessageId = String(targetMessages[i]?.id || '');
           break;
         }
       }
       await Promise.all([
-        persistCurrentMessages(state, db),
-        persistInnerVoiceHistoryEntry(db, state, extractedInnerVoice, innerVoiceMessageId)
+        dbPut(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId, targetMessages),
+        persistInnerVoiceHistoryEntry(db, state, extractedInnerVoice, innerVoiceMessageId, targetChatId)
       ]);
     }
 
@@ -828,19 +942,22 @@ export async function sendMessage(container, state, db, content, settingsManager
        4. 持久化只走 DB.js / IndexedDB，不使用 localStorage/sessionStorage。
        ======================================================================== */
     if (extractedAsideText) {
-      if (!Array.isArray(state.asideHistory)) state.asideHistory = [];
-      const lastUserMsg = [...state.currentMessages].reverse().find(m => m.role === 'user');
-      const lastAiMsg = [...state.currentMessages].reverse().find(m => m.role === 'assistant');
-      state.asideHistory.push({
+      if (!Array.isArray(targetAsideHistory)) targetAsideHistory = [];
+      const lastUserMsg = [...targetMessages].reverse().find(m => m.role === 'user');
+      const lastAiMsg = [...targetMessages].reverse().find(m => m.role === 'assistant');
+      targetAsideHistory.push({
         asideText: extractedAsideText,
         asideSegments: extractedAsideSegments.map(segment => ({ text: String(segment?.text || '').trim() })).filter(segment => segment.text),
         userMessage: lastUserMsg ? String(lastUserMsg.content || '').slice(0, 200) : '',
         aiMessage: lastAiMsg ? String(lastAiMsg.content || '').slice(0, 200) : '',
         timestamp: Date.now()
       });
-      await persistCurrentMessages(state, db);
-      const asideHistoryKey = `chat_aside_history::${state.activeMaskId}::${state.currentChatId}`;
-      await dbPut(db, asideHistoryKey, state.asideHistory);
+      await dbPut(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId, targetMessages);
+      const asideHistoryKey = `chat_aside_history::${state.activeMaskId}::${targetChatId}`;
+      await dbPut(db, asideHistoryKey, targetAsideHistory);
+      if (state.currentChatId === targetChatId) {
+        state.asideHistory = targetAsideHistory;
+      }
     }
   } catch (error) {
     /* ========================================================================
@@ -851,17 +968,31 @@ export async function sendMessage(container, state, db, content, settingsManager
        3. 聊天记录持久化仍只走 DB.js / IndexedDB；本错误弹窗不做任何持久化存储。
        ======================================================================== */
     appendChatConsoleRuntimeLog(state, 'error', `API 调用失败，已显示报错弹窗：${error?.message || '未知错误'}`);
-    showApiErrorModal(container, error);
+    if (state.currentChatId === targetChatId) {
+      showApiErrorModal(container, error);
+    }
   } finally {
-    state.isAiSending = false;
+    state.activeAiRequests.delete(targetChatId);
+    if (state.currentChatId === targetChatId) {
+      state.isAiSending = false;
+      updateCurrentChatSendingUi(container, state);
+    }
+    
     await Promise.all([
-      persistCurrentMessages(state, db),
+      dbPut(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId, targetMessages),
       dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions),
       persistChatConsoleRuntimeLogs(state, db)
     ]);
-    if (hasRenderedAiBubble) {
-      updateCurrentChatSendingUi(container, state);
+    
+    if (state.currentChatId === targetChatId) {
+      if (hasRenderedAiBubble) {
+        updateCurrentChatSendingUi(container, state);
+      } else {
+        renderCurrentChatMessage(container, state);
+      }
+    }
 
+    if (hasRenderedAiBubble) {
       /* ========================================================================
          [区域标注·已完成·长期记忆自动总结触发点]
          说明：
@@ -869,14 +1000,15 @@ export async function sendMessage(container, state, db, content, settingsManager
          2. 达到“长期记忆 → 总结轮数”要求时，后台调用设置应用副 API，并写入旧事应用 IndexedDB。
          3. 不使用 localStorage/sessionStorage，不做主 API 兜底，不使用原生浏览器弹窗，不重绘聊天页以避免闪屏。
          ======================================================================== */
+      // 修改 maybeRunAutoLongTermMemorySummary 以支持非当前窗口
       void maybeRunAutoLongTermMemorySummary({
         state,
         container,
         db,
-        settingsManager
+        settingsManager,
+        targetChatId,
+        targetMessages
       });
-    } else {
-      renderCurrentChatMessage(container, state);
     }
   }
 }
@@ -1241,7 +1373,7 @@ async function compressLocalImageDataUrlForChat(dataUrl = {}) {
 }
 
 export async function sendImageMessage(container, state, db, imageUrl, settingsManager, options = {}) {
-  if (!state.currentChatId || state.isAiSending) return;
+  if (!state.currentChatId || (state.activeAiRequests && state.activeAiRequests.has(state.currentChatId))) return;
 
   let safeUrl = String(imageUrl || '').trim();
   if (!safeUrl) return;
@@ -1288,13 +1420,13 @@ export async function sendImageMessage(container, state, db, imageUrl, settingsM
   renderCurrentChatMessage(container, state);
 
   if (options.triggerAi === true) {
-    await sendMessage(container, state, db, '', settingsManager, { skipAppendUser: true, triggerAi: true });
+    await sendMessage(container, state, db, '', settingsManager, { skipAppendUser: true, triggerAi: true, targetChatId: session.id });
   }
 }
 
 
 export async function sendStickerMessage(container, state, db, stickerId, settingsManager, options = {}) {
-  if (!state.currentChatId || state.isAiSending) return;
+  if (!state.currentChatId || (state.activeAiRequests && state.activeAiRequests.has(state.currentChatId))) return;
 
   const data = normalizeStickerData(state.stickerData);
   const sticker = data.items.find(item => String(item.id) === String(stickerId));
@@ -1341,7 +1473,7 @@ export async function sendStickerMessage(container, state, db, stickerId, settin
      3. 不做双份存储兜底，不使用 localStorage/sessionStorage。
      ======================================================================== */
   if (options.triggerAi === true) {
-    await sendMessage(container, state, db, '', settingsManager, { skipAppendUser: true, triggerAi: true });
+    await sendMessage(container, state, db, '', settingsManager, { skipAppendUser: true, triggerAi: true, targetChatId: session.id });
   }
 }
 
@@ -1425,7 +1557,8 @@ export function refreshCurrentSessionLastMessage(state) {
 
 /* ========================================================================== */
 export async function retryLatestAiReply(container, state, db, settingsManager) {
-  if (!state.currentChatId || state.isAiSending) return;
+  const targetChatId = state.currentChatId;
+  if (!targetChatId || (state.activeAiRequests && state.activeAiRequests.has(targetChatId))) return;
 
   /* ========================================================================
      [区域标注·已完成·重回清理AI拍一拍系统小字] 清空最新一轮角色回复
@@ -1477,7 +1610,7 @@ export async function retryLatestAiReply(container, state, db, settingsManager) 
     dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions)
   ]);
   refreshCurrentMessageListOnly(container, state);
-  await sendMessage(container, state, db, '', settingsManager, { skipAppendUser: true, triggerAi: true });
+  await sendMessage(container, state, db, '', settingsManager, { skipAppendUser: true, triggerAi: true, targetChatId });
   /* ===== 闲谈：用户最新一轮消息触发AI END ===== */
 }
 
