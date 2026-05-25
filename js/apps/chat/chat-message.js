@@ -1006,10 +1006,22 @@ export async function sendMessage(container, state, db, content, settingsManager
             if (lastAiMsg && lastAiMsg.content) {
                notificationBody = String(lastAiMsg.content).replace(/\[.*?\]/g, '').trim().slice(0, 50) + '...';
             }
-            new Notification(session?.name || '闲谈', {
+            const title = session?.name || '闲谈';
+            const options = {
               body: notificationBody,
               icon: session?.avatar || ''
-            });
+            };
+            try {
+              new Notification(title, options);
+            } catch (e) {
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistration().then(reg => {
+                  if (reg && typeof reg.showNotification === 'function') {
+                    reg.showNotification(title, options);
+                  }
+                }).catch(err => console.error('SW 通知发送失败:', err));
+              }
+            }
           }
         }).catch(err => console.error('读取保活设置失败:', err));
       }
