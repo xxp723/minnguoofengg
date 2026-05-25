@@ -227,13 +227,14 @@ export class AppManager {
   }
 
   /* ==========================================================================
-     [区域标注·本次需求·常用及地图旧事轨迹应用点击即进预热]
+     [区域标注·本次修改·常用及地图旧事轨迹梦笺应用点击即进预热]
      说明：
-     - 预热用户点名的设置、世情、档案、闲谈、地图、旧事、轨迹应用。
+     - 预热用户点名的设置、世情、档案、闲谈、地图、旧事、轨迹、梦笺(textgame)应用。
+     - 解决闲谈、梦笺等每次进去加载半天的问题。
      - 只提前加载入口模块和关键 CSS；不 mount、不读写持久化数据。
      - 持久化仍统一使用项目 DB/IndexedDB 链路，不引入浏览器同步存储。
      ========================================================================== */
-  async warmupCriticalApps(appIds = ['settings', 'worldbook', 'archive', 'chat', 'map', 'memory', 'trace']) {
+  async warmupCriticalApps(appIds = ['settings', 'worldbook', 'archive', 'chat', 'map', 'memory', 'trace', 'textgame']) {
     const cssTasks = [
       this.preloadStylesheet('./js/apps/chat/chat.css', 'chat-app-css'),
       /* ======================================================================
@@ -318,13 +319,33 @@ export class AppManager {
     }
   }
 
+  /* ==========================================================================
+     [区域标注·本次修改·模块加载与热更新防失效重试机制]
+     说明：
+     - 防止应用更新后，由于页面未刷新导致请求旧路径文件报错显示“应用启动失败”。
+     - 首次 import 失败时，捕获异常并在路径后追加时间戳重新尝试绕过缓存拉取最新文件。
+     ========================================================================== */
   async loadModule(appMeta) {
     if (this.loadedModules.has(appMeta.id)) {
       return this.loadedModules.get(appMeta.id);
     }
 
-    const moduleRef = await import(appMeta.entry);
-    this.loadedModules.set(appMeta.id, moduleRef);
-    return moduleRef;
+    try {
+      const moduleRef = await import(appMeta.entry);
+      this.loadedModules.set(appMeta.id, moduleRef);
+      return moduleRef;
+    } catch (error) {
+      Logger.warn(`加载应用模块[${appMeta.id}]失败，尝试清除缓存重试...`, error);
+      try {
+        /* [区域标注·本次修改·失败重试追加时间戳] */
+        const separator = appMeta.entry.includes('?') ? '&' : '?';
+        const moduleRef = await import(`${appMeta.entry}${separator}t=${Date.now()}`);
+        this.loadedModules.set(appMeta.id, moduleRef);
+        return moduleRef;
+      } catch (retryError) {
+        Logger.error(`重试加载应用模块[${appMeta.id}]仍失败:`, retryError);
+        throw retryError;
+      }
+    }
   }
 }
