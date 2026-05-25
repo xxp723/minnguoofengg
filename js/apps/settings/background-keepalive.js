@@ -176,11 +176,11 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
           let fallbackTriggered = false;
           let swAttempts = [];
 
-          // 增加超时机制：考虑到我们可能需要现场重新注册，给足 1500ms
+          // [区域标注·已修改] 增加超时机制：考虑到我们可能需要现场重新注册（尤其是在网络较慢或首次访问时），将超时时间延长至 5000ms
           const fallbackTimer = setTimeout(() => {
             fallbackTriggered = true;
-            fallbackNotification(`SW处理超时1500ms [${swAttempts.join(',')}]`);
-          }, 1500);
+            fallbackNotification(`SW处理超时5000ms [${swAttempts.join(',')}]`);
+          }, 5000);
 
           // 封装执行通知的逻辑
           const executeShowNotification = (reg, source) => {
