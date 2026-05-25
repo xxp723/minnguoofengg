@@ -1007,30 +1007,65 @@ export async function sendMessage(container, state, db, content, settingsManager
                notificationBody = String(lastAiMsg.content).replace(/\[.*?\]/g, '').trim().slice(0, 50) + '...';
             }
             const title = session?.name || '闲谈';
+            // 使用带域名的绝对路径，防止 PWA 解析出错
+            let iconUrl = '';
+            if (session?.avatar) {
+              try {
+                iconUrl = new URL(session.avatar, window.location.href).href;
+              } catch(e) {
+                iconUrl = session.avatar;
+              }
+            }
             const options = {
               body: notificationBody,
-              icon: session?.avatar || ''
+              icon: iconUrl,
+              vibrate: [200, 100, 200] // 增加震动，帮助手机端唤起横幅
             };
-            // 优先使用 ServiceWorker，这是移动端（如安卓 Chrome PWA）弹出横幅通知的推荐方式
-            options.vibrate = [200, 100, 200]; // 增加震动，帮助手机端唤起横幅
-            
-            if ('serviceWorker' in navigator) {
-              navigator.serviceWorker.ready.then(reg => {
-                if (reg && typeof reg.showNotification === 'function') {
-                  reg.showNotification(title, options);
-                } else {
-                  new Notification(title, options);
-                }
-              }).catch(err => {
-                console.error('SW 通知发送失败:', err);
-                new Notification(title, options);
-              });
-            } else {
+
+            const fallbackNotification = () => {
               try {
                 new Notification(title, options);
               } catch (e) {
-                console.error('原生 Notification 发送失败:', e);
+                console.error('原生 Notification 发送失败 (受限于PWA环境):', e);
               }
+            };
+
+            if ('serviceWorker' in navigator) {
+              const executeShowNotification = (reg) => {
+                if (!reg || typeof reg.showNotification !== 'function') return false;
+                reg.showNotification(title, options).catch(err => {
+                  console.error('SW 通知发送失败:', err);
+                  fallbackNotification();
+                });
+                return true;
+              };
+
+              navigator.serviceWorker.getRegistration().then(reg => {
+                if (reg) {
+                  if (!executeShowNotification(reg)) {
+                    fallbackNotification();
+                  }
+                } else {
+                  // PWA 环境下可能 getRegistration 返回 null，此时尝试当场重新注册
+                  const swUrl = new URL('../../service-worker.js', window.location.href).href;
+                  const scopeUrl = new URL('../../', window.location.href).pathname;
+                  
+                  navigator.serviceWorker.register(swUrl, { scope: scopeUrl }).then(newReg => {
+                    if (newReg.active) {
+                      executeShowNotification(newReg);
+                    } else {
+                      navigator.serviceWorker.ready.then(readyReg => {
+                        executeShowNotification(readyReg);
+                      }).catch(() => fallbackNotification());
+                    }
+                  }).catch(() => fallbackNotification());
+                }
+              }).catch(err => {
+                console.error('获取 SW 失败:', err);
+                fallbackNotification();
+              });
+            } else {
+              fallbackNotification();
             }
           }
         }).catch(err => console.error('读取保活设置失败:', err));

@@ -176,46 +176,74 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
           let fallbackTriggered = false;
           let swAttempts = [];
 
-          // 增加超时机制：部分安卓环境下 getRegistration 可能永远挂起不返回
+          // 增加超时机制：考虑到我们可能需要现场重新注册，给足 1500ms
           const fallbackTimer = setTimeout(() => {
             fallbackTriggered = true;
-            fallbackNotification(`getReg超时800ms [${swAttempts.join(',')}]`);
-          }, 800);
+            fallbackNotification(`SW处理超时1500ms [${swAttempts.join(',')}]`);
+          }, 1500);
+
+          // 封装执行通知的逻辑
+          const executeShowNotification = (reg, source) => {
+            if (!reg || typeof reg.showNotification !== 'function') {
+              swAttempts.push(`${source}_invalid`);
+              return false;
+            }
+            clearTimeout(fallbackTimer);
+            reg.showNotification(title, options).then(() => {
+              showResult('success', `测试通知已发送 (SW_${source})。如果没弹窗，请检查手机系统通知设置。`);
+            }).catch(err => {
+              swAttempts.push(`${source}_err:` + err.message);
+              fallbackNotification(`SW_${source}发送报错:${err.message}`);
+            });
+            return true;
+          };
 
           // 尝试一：通过 getRegistration
           navigator.serviceWorker.getRegistration().then(reg => {
-            swAttempts.push('getReg_ok');
             if (fallbackTriggered) return;
+            swAttempts.push('getReg_ok');
 
-            if (reg && typeof reg.showNotification === 'function') {
-              clearTimeout(fallbackTimer);
-              reg.showNotification(title, options).then(() => {
-                showResult('success', '测试通知已发送 (SW_reg)。如果没弹窗，请检查手机系统设置里的“允许通知”。');
-              }).catch(err => {
-                swAttempts.push('showErr:' + err.message);
-                fallbackNotification(`发送报错:${err.message}`);
-              });
+            if (reg) {
+              if (!executeShowNotification(reg, 'reg')) {
+                fallbackNotification('reg_no_showNotification');
+              }
             } else {
-              // 尝试二：如果 getRegistration 返回空或者没有 showNotification 方法，尝试使用 ready
-              swAttempts.push(reg ? 'no_showNotification' : 'reg_null');
-              navigator.serviceWorker.ready.then(readyReg => {
-                swAttempts.push('ready_ok');
+              // 关键修复：如果在 PWA 环境下 getRegistration 返回 null，则说明当前 Scope 下没找到 SW
+              // 我们必须当场按照 main.js 的规则强行注册一个，然后发送！
+              swAttempts.push('reg_null');
+              const swUrl = new URL('../../service-worker.js', window.location.href).href;
+              const scopeUrl = new URL('../../', window.location.href).pathname;
+              
+              swAttempts.push(`try_register`);
+              navigator.serviceWorker.register(swUrl, { scope: scopeUrl }).then(newReg => {
                 if (fallbackTriggered) return;
-                clearTimeout(fallbackTimer);
+                swAttempts.push('register_ok');
                 
-                if (readyReg && typeof readyReg.showNotification === 'function') {
-                  readyReg.showNotification(title, options).then(() => {
-                    showResult('success', '测试通知已发送 (SW_ready)。如果没弹窗，请检查手机系统设置里的“允许通知”。');
-                  }).catch(err => {
-                    fallbackNotification(`ready发送报错:${err.message}`);
-                  });
+                // 注册完后可能需要等它 active 才能 showNotification
+                if (newReg.active) {
+                  if (!executeShowNotification(newReg, 'newReg_active')) {
+                     fallbackNotification('newReg_no_showNotification');
+                  }
                 } else {
-                  fallbackNotification('ready仍无showNotification');
+                  // 如果没 active，等 ready
+                  swAttempts.push('wait_ready');
+                  navigator.serviceWorker.ready.then(readyReg => {
+                    if (fallbackTriggered) return;
+                    swAttempts.push('ready_ok');
+                    if (!executeShowNotification(readyReg, 'ready')) {
+                      fallbackNotification('ready_no_showNotification');
+                    }
+                  }).catch(err => {
+                    if (fallbackTriggered) return;
+                    clearTimeout(fallbackTimer);
+                    fallbackNotification(`ready报错:${err.message}`);
+                  });
                 }
               }).catch(err => {
                 if (fallbackTriggered) return;
                 clearTimeout(fallbackTimer);
-                fallbackNotification(`ready报错:${err.message}`);
+                swAttempts.push('register_err');
+                fallbackNotification(`补注册SW失败:${err.message}`);
               });
             }
           }).catch(err => {
