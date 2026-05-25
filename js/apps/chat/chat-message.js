@@ -24,6 +24,7 @@ import { chat } from './prompt.js';
    3. 弹窗只操作运行时 DOM，不写入聊天记录，不涉及持久化存储。
    ========================================================================== */
 import { showApiErrorModal } from '../../core/ui/components/ApiErrorModal.js';
+import { startBackgroundKeepalivePulse } from '../settings/background-keepalive.js';
 import { ensureChatHtmlCardMessageBridge } from './chat-message-card-bridge.js';
 import {
   buildPromptPayloadForLatestUserRound as buildPromptPayloadForLatestUserRoundModule
@@ -329,6 +330,35 @@ const CHAT_BACKGROUND_API_RESUME_GRACE_MS = 900;
 const CHAT_BACKGROUND_API_RETRY_DELAY_MS = 240;
 const CHAT_BACKGROUND_API_MAX_RETRY_COUNT = 1;
 
+/* ========================================================================
+   [区域标注·已完成·纯前端后台保活增强] AI 进行中任务状态持久化
+   说明：
+   1. 这里仅记录“当前会话是否有 AI 请求正在进行/恢复/完成/失败”的轻量状态，
+      用于页面后台返回后巡检和诊断，不保存额外聊天正文副本。
+   2. 持久化统一使用项目 DB.js / IndexedDB 封装入口 dbPut/dbGet；
+      不使用 localStorage/sessionStorage，不写双份存储兜底，不过滤长文本或媒体字段。
+   3. 纯前端后台保活仍受系统限制：若浏览器冻结网页，代码会在恢复后继续巡检并重试，
+      但无法突破系统级冻结让 JS 在冻结期间继续执行。
+   ======================================================================== */
+const DATA_KEY_CHAT_AI_BACKGROUND_TASK = (maskId, chatId) => `chat_ai_background_task::${maskId}::${chatId}`;
+
+function buildChatAiBackgroundTaskPatch(patch = {}) {
+  const now = Date.now();
+  return {
+    updatedAt: now,
+    ...patch
+  };
+}
+
+async function persistChatAiBackgroundTask(db, state, targetChatId, patch = {}) {
+  if (!db || !state?.activeMaskId || !targetChatId) return;
+  await dbPut(
+    db,
+    DATA_KEY_CHAT_AI_BACKGROUND_TASK(state.activeMaskId, targetChatId),
+    buildChatAiBackgroundTaskPatch(patch)
+  );
+}
+
 function isAbortLikeError(error) {
   return String(error?.name || '') === 'AbortError'
     || /abort/i.test(String(error?.message || ''));
@@ -342,6 +372,8 @@ function isLikelyBackgroundFetchFailure(error) {
 
 async function requestChatWithBackgroundResumeProtection(chatOptions = {}, options = {}) {
   const appendLog = typeof options.appendLog === 'function' ? options.appendLog : null;
+  const onBackgroundResume = typeof options.onBackgroundResume === 'function' ? options.onBackgroundResume : null;
+  const onBackgroundRetry = typeof options.onBackgroundRetry === 'function' ? options.onBackgroundRetry : null;
   let retryCount = 0;
 
   while (true) {
@@ -377,6 +409,10 @@ async function requestChatWithBackgroundResumeProtection(chatOptions = {}, optio
         'warn',
         `检测到页面后台停留 ${Math.round(hiddenDuration / 1000)} 秒后恢复，正在保护本轮 AI 请求`
       );
+      onBackgroundResume?.({
+        hiddenDuration,
+        retryCount
+      });
 
       clearResumeAbortTimer();
       resumeAbortTimer = window.setTimeout(() => {
@@ -404,6 +440,10 @@ async function requestChatWithBackgroundResumeProtection(chatOptions = {}, optio
 
       retryCount += 1;
       appendLog?.('warn', `后台恢复后的 AI 请求已自动重试第 ${retryCount} 次`);
+      onBackgroundRetry?.({
+        retryCount,
+        error
+      });
       await sleep(CHAT_BACKGROUND_API_RETRY_DELAY_MS);
     } finally {
       clearResumeAbortTimer();
@@ -677,6 +717,34 @@ export async function sendMessage(container, state, db, content, settingsManager
            这里改为只更新发送状态相关 DOM，不重建聊天页面，避免点击纸飞机后闪屏。
   /* ========================================================================== */
   state.activeAiRequests.add(targetChatId);
+
+  /* ======================================================================
+     [区域标注·已完成·纯前端后台保活增强] 本轮 AI 请求启动保活与状态落库
+     说明：
+     1. 纸飞机触发主 API 后，立即启动静音保活脉冲，尽量降低浏览器切后台后暂停 fetch 的概率。
+     2. 同步把“AI 请求进行中”轻量状态写入 DB.js / IndexedDB，供页面恢复后巡检和诊断。
+     3. 不使用 localStorage/sessionStorage，不写双份存储兜底，不复制聊天正文。
+     ====================================================================== */
+  let stopBackgroundKeepalivePulse = () => {};
+  try {
+    const allSettings = await settingsManager.getAll();
+    if (allSettings?.backgroundKeepaliveEnabled) {
+      stopBackgroundKeepalivePulse = startBackgroundKeepalivePulse(`chat-ai:${targetChatId}`);
+      appendTargetChatConsoleLog('info', '后台保活已接入本轮 AI 请求：正在尝试维持静音音频与 Wake Lock');
+    }
+  } catch (keepaliveError) {
+    appendTargetChatConsoleLog('warn', `后台保活启动状态读取失败：${keepaliveError?.message || '未知错误'}`);
+  }
+
+  await persistChatAiBackgroundTask(db, state, targetChatId, {
+    status: 'running',
+    targetChatId,
+    startedAt: Date.now(),
+    retryCount: 0,
+    lastError: '',
+    lastEvent: 'AI 请求已启动，正在尝试后台保活生成'
+  });
+
   if (state.currentChatId === targetChatId) {
     state.isAiSending = true;
     updateCurrentChatSendingUi(container, state);
@@ -784,7 +852,32 @@ export async function sendMessage(container, state, db, content, settingsManager
       asideSettings: targetAsideSettings,
       asideHistory: targetAsideHistory
     }, {
-      appendLog: appendTargetChatConsoleLog
+      appendLog: appendTargetChatConsoleLog,
+      onBackgroundResume: ({ hiddenDuration }) => {
+        void persistChatAiBackgroundTask(db, state, targetChatId, {
+          status: 'resuming',
+          targetChatId,
+          hiddenDuration,
+          lastEvent: `页面从后台恢复，正在巡检 AI 请求状态（后台约 ${Math.round(hiddenDuration / 1000)} 秒）`
+        });
+      },
+      onBackgroundRetry: ({ retryCount, error }) => {
+        void persistChatAiBackgroundTask(db, state, targetChatId, {
+          status: 'retrying',
+          targetChatId,
+          retryCount,
+          lastError: String(error?.message || error || ''),
+          lastEvent: `后台恢复后检测到请求疑似挂起，已自动重试第 ${retryCount} 次`
+        });
+      }
+    });
+
+    await persistChatAiBackgroundTask(db, state, targetChatId, {
+      status: 'completed',
+      targetChatId,
+      completedAt: Date.now(),
+      lastError: '',
+      lastEvent: 'AI 请求已返回，开始解析并写入聊天记录'
     });
 
     /* ======================================================================
@@ -1144,6 +1237,14 @@ export async function sendMessage(container, state, db, content, settingsManager
       }
     }
   } catch (error) {
+    await persistChatAiBackgroundTask(db, state, targetChatId, {
+      status: 'failed',
+      targetChatId,
+      failedAt: Date.now(),
+      lastError: String(error?.message || error || ''),
+      lastEvent: 'AI 请求失败，已停止本轮后台保活并交给应用内错误提示'
+    });
+
     /* ========================================================================
        [区域标注·已完成·全局API报错弹窗接入] API 调用失败不写入聊天气泡
        说明：
@@ -1156,6 +1257,18 @@ export async function sendMessage(container, state, db, content, settingsManager
       showApiErrorModal(container, error);
     }
   } finally {
+    try {
+      stopBackgroundKeepalivePulse();
+    } catch (_keepaliveStopError) {}
+
+    await persistChatAiBackgroundTask(db, state, targetChatId, {
+      status: hasRenderedAiBubble ? 'done' : 'settled',
+      targetChatId,
+      finishedAt: Date.now(),
+      hasRenderedAiBubble,
+      lastEvent: hasRenderedAiBubble ? 'AI 回复已完成并写入 IndexedDB' : 'AI 请求已结束，未生成可入列的 AI 气泡'
+    });
+
     state.activeAiRequests.delete(targetChatId);
     if (state.currentChatId === targetChatId) {
       state.isAiSending = false;

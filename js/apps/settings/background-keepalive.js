@@ -112,6 +112,83 @@ function escapeHtml(text) {
 }
 
 /* ==========================================================================
+   [区域标注·已完成·纯前端后台保活增强] AI 请求期间的静音保活脉冲
+   说明：
+   1. 闲谈主 API 请求开始后会调用本函数，主动维持静音音频播放，并在支持的环境中尝试 Wake Lock。
+   2. 这是纯前端“尽量保活”：能提高部分安卓/桌面浏览器后台继续执行 fetch 的概率，
+      但不能突破 iOS/安卓系统冻结网页、暂停 JS 或断开网络请求的硬限制。
+   3. 本区域不使用 localStorage/sessionStorage，不写入任何双份存储兜底；AI 任务状态仍由聊天模块走 DB.js / IndexedDB。
+   ========================================================================== */
+export function startBackgroundKeepalivePulse(reason = 'ai-request') {
+  const releaseFns = [];
+  const normalizedReason = String(reason || 'ai-request').trim() || 'ai-request';
+
+  if (typeof window === 'undefined') {
+    return () => {};
+  }
+
+  const audio = window.__keepaliveAudio;
+  if (audio && typeof audio.play === 'function') {
+    try {
+      audio.loop = true;
+      audio.volume = 0.01;
+      const playPromise = audio.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(err => {
+          console.warn(`[后台保活] 静音音频保活被浏览器拦截(${normalizedReason}):`, err);
+        });
+      }
+    } catch (err) {
+      console.warn(`[后台保活] 静音音频保活启动失败(${normalizedReason}):`, err);
+    }
+  }
+
+  if (typeof navigator !== 'undefined' && navigator.wakeLock && typeof navigator.wakeLock.request === 'function') {
+    let wakeLockSentinel = null;
+    let released = false;
+
+    navigator.wakeLock.request('screen')
+      .then(sentinel => {
+        wakeLockSentinel = sentinel;
+        sentinel.addEventListener?.('release', () => {
+          wakeLockSentinel = null;
+        });
+      })
+      .catch(err => {
+        console.warn(`[后台保活] Wake Lock 不可用或被拒绝(${normalizedReason}):`, err);
+      });
+
+    releaseFns.push(() => {
+      released = true;
+      if (wakeLockSentinel && typeof wakeLockSentinel.release === 'function') {
+        wakeLockSentinel.release().catch(() => {});
+      }
+      wakeLockSentinel = null;
+    });
+
+    const restoreWakeLock = () => {
+      if (released || document.visibilityState === 'hidden' || wakeLockSentinel) return;
+      navigator.wakeLock.request('screen')
+        .then(sentinel => {
+          wakeLockSentinel = sentinel;
+        })
+        .catch(() => {});
+    };
+
+    document.addEventListener('visibilitychange', restoreWakeLock);
+    releaseFns.push(() => document.removeEventListener('visibilitychange', restoreWakeLock));
+  }
+
+  return () => {
+    releaseFns.forEach(fn => {
+      try {
+        fn();
+      } catch (_err) {}
+    });
+  };
+}
+
+/* ==========================================================================
    [区域标注·本次需求] 渲染“后台保活与通知”板块 UI
    说明：提供独立面板，分为“静音保活”、“网页内横幅通知”和“系统消息通知”。
    ========================================================================== */
