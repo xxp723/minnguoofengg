@@ -61,41 +61,6 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
   const checkbox = container.querySelector('#setting-background-keepalive');
   if (!checkbox) return;
 
-  // 自定义应用内确认弹窗
-  const showPermissionModal = () => {
-    return new Promise((resolve) => {
-      const modalHtml = `
-        <div class="chat-modal" id="keepalive-permission-modal">
-          <div class="chat-modal__backdrop"></div>
-          <div class="chat-modal__content">
-            <h3 class="chat-modal__title">需要通知权限</h3>
-            <p class="chat-modal__text">为了在后台通知你 AI 回复了消息，我们需要申请浏览器的通知权限。请在接下来的浏览器提示中选择“允许”。</p>
-            <div class="chat-modal__actions">
-              <button class="ui-button ui-button--ghost" data-action="cancel">取消</button>
-              <button class="ui-button ui-button--primary" data-action="confirm">去授权</button>
-            </div>
-          </div>
-        </div>
-      `;
-      document.body.insertAdjacentHTML('beforeend', modalHtml);
-      const modalEl = document.getElementById('keepalive-permission-modal');
-      
-      const cleanup = () => {
-        if (modalEl) modalEl.remove();
-      };
-
-      modalEl.querySelector('[data-action="cancel"]').addEventListener('click', () => {
-        cleanup();
-        resolve(false);
-      });
-
-      modalEl.querySelector('[data-action="confirm"]').addEventListener('click', () => {
-        cleanup();
-        resolve(true);
-      });
-    });
-  };
-
   checkbox.addEventListener('change', async (e) => {
     const isChecked = e.target.checked;
 
