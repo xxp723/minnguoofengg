@@ -163,103 +163,31 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
           vibrate: [200, 100, 200]
         };
 
-        function fallbackNotification(reason) {
-          try {
-            new Notification(title, options);
-            showResult('success', `尝试原生发送 (${reason})。若无弹窗，可能被系统拦截或禁用。`);
-          } catch (e) {
-            showResult('error', `原生发送失败: ${e.message} [SW原因: ${reason}]`);
-          }
+        // [区域标注·已修改] 改变“测试通知”的策略，直接使用原生弹窗
+        // 考虑到在测试场景下，强依赖 Service Worker (SW) 会因为等待生命周期(installing, waiting)或异步拦截导致不弹窗甚至报错，
+        // 我们直接在用户点击的瞬间使用原生 Notification 发送测试弹窗，绕开 SW 复杂的生命周期，确保“即点即弹”。
+        // 同时，默默地在后台为真正的 PWA 环境检查和补注册 SW。
+        
+        try {
+          // 立刻执行原生弹窗
+          new Notification(title, options);
+          showResult('success', '测试通知已发送！如果没弹窗，请检查手机系统通知设置或是否允许悬浮窗。');
+        } catch (e) {
+          showResult('error', `发送失败，您的浏览器可能不支持直接推送: ${e.message}`);
         }
 
+        // 后台静默检查并修复 SW，不阻塞当前测试弹窗的逻辑
         if ('serviceWorker' in navigator) {
-          let fallbackTriggered = false;
-          let swAttempts = [];
-
-          // [区域标注·已修改] 增加超时机制：考虑到我们可能需要现场重新注册（尤其是在网络较慢或首次访问时），将超时时间延长至 5000ms
-          const fallbackTimer = setTimeout(() => {
-            fallbackTriggered = true;
-            fallbackNotification(`SW处理超时5000ms [${swAttempts.join(',')}]`);
-          }, 5000);
-
-          // 封装执行通知的逻辑
-          const executeShowNotification = (reg, source) => {
-            if (!reg || typeof reg.showNotification !== 'function') {
-              swAttempts.push(`${source}_invalid`);
-              return false;
-            }
-            clearTimeout(fallbackTimer);
-            reg.showNotification(title, options).then(() => {
-              showResult('success', `测试通知已发送 (SW_${source})。如果没弹窗，请检查手机系统通知设置。`);
-            }).catch(err => {
-              swAttempts.push(`${source}_err:` + err.message);
-              fallbackNotification(`SW_${source}发送报错:${err.message}`);
-            });
-            return true;
-          };
-
-          // 尝试一：通过 getRegistration
           navigator.serviceWorker.getRegistration().then(reg => {
-            if (fallbackTriggered) return;
-            swAttempts.push('getReg_ok');
-
-            if (reg) {
-              if (!executeShowNotification(reg, 'reg')) {
-                fallbackNotification('reg_no_showNotification');
-              }
-            } else {
-              // 关键修复：如果在 PWA 环境下 getRegistration 返回 null，则说明当前 Scope 下没找到 SW
-              // 我们必须当场按照 main.js 的规则强行注册一个，然后发送！
-              // [区域标注·已修改] 修正 SW 注册路径，确保在根目录和子目录部署都能正确找到 service-worker.js
-              swAttempts.push('reg_null');
+            if (!reg) {
+              console.log('[测试通知] 发现环境无SW注册，进行后台静默补注册...');
               const swUrl = new URL('service-worker.js', window.location.href).href;
               const scopeUrl = new URL('./', window.location.href).pathname;
-              
-              swAttempts.push(`try_register`);
-              navigator.serviceWorker.register(swUrl, { scope: scopeUrl }).then(newReg => {
-                if (fallbackTriggered) return;
-                swAttempts.push('register_ok');
-                
-                // [区域标注·已修改] 彻底解决 SW 未激活时发送通知报错的问题
-                // 浏览器规范要求必须有 active 的 worker 才能调用 showNotification，否则会抛出 "No active registration available"
-                if (newReg.active) {
-                  // 如果已经激活，直接发送
-                  if (!executeShowNotification(newReg, 'newReg_active')) {
-                     fallbackNotification('newReg_no_showNotification');
-                  }
-                } else {
-                  // 尚未激活时（通常在 installing 或 waiting），不能强行发送，也不能死等 ready，
-                  // 而是监听 statechange 事件，一旦激活就发送。
-                  let waitingOrInstallingWorker = newReg.installing || newReg.waiting;
-                  if (waitingOrInstallingWorker) {
-                    swAttempts.push('listen_statechange');
-                    waitingOrInstallingWorker.addEventListener('statechange', function() {
-                      if (waitingOrInstallingWorker.state === 'activated') {
-                        if (fallbackTriggered) return; // 如果已经超时就不再处理
-                        swAttempts.push('state_activated');
-                        executeShowNotification(newReg, 'newReg_activated');
-                      }
-                    });
-                  } else {
-                     // 理论上不可能走到这里，如果真的连 installing/waiting 都没有，直接尝试降级
-                     fallbackNotification('no_worker_found_on_reg');
-                  }
-                }
-              }).catch(err => {
-                if (fallbackTriggered) return;
-                clearTimeout(fallbackTimer);
-                swAttempts.push('register_err');
-                fallbackNotification(`补注册SW失败:${err.message}`);
-              });
+              navigator.serviceWorker.register(swUrl, { scope: scopeUrl })
+                .then(() => console.log('[测试通知] 后台静默补注册SW成功'))
+                .catch(err => console.error('[测试通知] 后台静默补注册SW失败', err));
             }
-          }).catch(err => {
-            swAttempts.push('getReg_err');
-            if (fallbackTriggered) return;
-            clearTimeout(fallbackTimer);
-            fallbackNotification(`getReg报错:${err.message}`);
-          });
-        } else {
-          fallbackNotification('环境不支持SW');
+          }).catch(err => console.error('[测试通知] 检查SW状态出错', err));
         }
 
       } else {
