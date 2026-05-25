@@ -751,6 +751,7 @@ export async function sendMessage(container, state, db, content, settingsManager
   }
 
   let hasRenderedAiBubble = false;
+  let allSettings = null;
 
   // 如果是在后台发送，需要单独获取其设置
   let targetChatSettings = state.chatPromptSettings;
@@ -1074,6 +1075,44 @@ export async function sendMessage(container, state, db, content, settingsManager
           targetAsideSettings?.displayMode || 'top',
           rawAiTextAfterInnerVoice
         );
+
+    if (!allSettings) {
+      try {
+        allSettings = await settingsManager.getAll();
+      } catch (settingsError) {
+        console.error('读取设置失败:', settingsError);
+      }
+    }
+
+    const buildReplyNotificationPayload = (replyMessage = {}) => {
+      let notificationBody = 'AI 回复了你的消息';
+      if (replyMessage?.type === 'sticker') {
+        notificationBody = `[表情包] ${replyMessage.stickerName || ''}`;
+      } else if (replyMessage?.type === 'voice') {
+        notificationBody = '[语音消息]';
+      } else if (replyMessage?.type === 'image') {
+        notificationBody = '[图片消息]';
+      } else if (replyMessage?.type === 'gift') {
+        notificationBody = `[礼物] ${replyMessage.giftTitle || ''}`;
+      } else if (replyMessage?.type === 'transfer') {
+        notificationBody = `[转账] ${replyMessage.transferDisplayAmount || ''}`;
+      } else if (replyMessage?.content) {
+        notificationBody = String(replyMessage.content).replace(/\[.*?\]/g, '').trim().slice(0, 50) + (String(replyMessage.content).length > 50 ? '...' : '');
+      }
+
+      const title = session?.name || '闲谈';
+      let iconUrl = '';
+      if (session?.avatar) {
+        try {
+          iconUrl = new URL(session.avatar, window.location.href).href;
+        } catch (e) {
+          iconUrl = session.avatar;
+        }
+      }
+
+      return { title, notificationBody, iconUrl };
+    };
+
     if (!aiMessages.length) {
       appendTargetChatConsoleLog('warn', '解析后无可显示消息');
     } else {
@@ -1138,6 +1177,9 @@ export async function sendMessage(container, state, db, content, settingsManager
                     ? (isTextImageMessage(message) ? `[文字图] ${message.textImageText || '文字图'}` : `[图片] ${message.imageName || 'AI 生图'}`)
                     : (message.content || '（AI 没有返回内容）'))));
       session.lastTime = Date.now();
+      session.unread = !isCurrentChat || document.visibilityState === 'hidden'
+        ? (Number(session.unread || 0) + 1)
+        : 0;
       
       /* ======================================================================
          [区域标注·已完成·本次后台保活完整消息组与日志同步] AI 消息逐条持久化与安全渲染
@@ -1162,6 +1204,12 @@ export async function sendMessage(container, state, db, content, settingsManager
           'warn',
           `AI消息[${index + 1}]后台同步暂未完成，结束阶段将再次保存：${dbError?.message || 'IndexedDB 写入失败'}`
         );
+      }
+
+      if (document.visibilityState !== 'hidden' && allSettings?.inAppNotificationEnabled !== false && typeof window.showInAppNotification === 'function') {
+        const { title, notificationBody, iconUrl } = buildReplyNotificationPayload(message);
+        /* [区域标注·已修改·逐条横幅通知] 每一条 AI 回复都单独触发一次网页内横幅，避免整轮只弹最后一条。 */
+        window.showInAppNotification(title, notificationBody, iconUrl);
       }
 
       if (targetChatId === state.currentChatId) {
@@ -1307,89 +1355,54 @@ export async function sendMessage(container, state, db, content, settingsManager
 
     if (hasRenderedAiBubble) {
       /* ========================================================================
-         [区域标注·本次需求] 后台保活通知触发点 与 网页内横幅通知
+         [区域标注·已修改·逐条通知与系统通知分离] 横幅通知按每条 AI 回复触发，系统通知继续仅在后台页面触发。
          说明：
-         1. 如果开启了 inAppNotificationEnabled 且页面在前端，触发网页内横幅。
-         2. 如果开启了 backgroundKeepaliveEnabled 且页面在后台，触发系统通知。
+         1. 网页内横幅已前移到消息入列循环内，保证每一句回复都单独弹出。
+         2. 这里仅保留后台页面的系统级 PWA 通知，避免与前台横幅重复。
+         3. 通知文案与图标仍只从当前会话与最新 AI 消息计算，不引入额外存储。
          ======================================================================== */
-      settingsManager.getAll().then(allSettings => {
-        if (allSettings) {
-          const lastAiMsg = targetMessages[targetMessages.length - 1];
-          let notificationBody = 'AI 回复了你的消息';
-          if (lastAiMsg?.type === 'sticker') {
-            notificationBody = `[表情包] ${lastAiMsg.stickerName || ''}`;
-          } else if (lastAiMsg?.type === 'voice') {
-            notificationBody = '[语音消息]';
-          } else if (lastAiMsg?.type === 'image') {
-            notificationBody = '[图片消息]';
-          } else if (lastAiMsg?.type === 'gift') {
-            notificationBody = `[礼物] ${lastAiMsg.giftTitle || ''}`;
-          } else if (lastAiMsg?.type === 'transfer') {
-            notificationBody = `[转账] ${lastAiMsg.transferDisplayAmount || ''}`;
-          } else if (lastAiMsg?.content) {
-            notificationBody = String(lastAiMsg.content).replace(/\[.*?\]/g, '').trim().slice(0, 50) + (String(lastAiMsg.content).length > 50 ? '...' : '');
+      if (allSettings && document.visibilityState === 'hidden' && allSettings.backgroundKeepaliveEnabled && 'Notification' in window && Notification.permission === 'granted') {
+        const lastAiMsg = targetMessages[targetMessages.length - 1];
+        const { title, notificationBody, iconUrl } = buildReplyNotificationPayload(lastAiMsg);
+        const options = {
+          body: notificationBody,
+          icon: iconUrl,
+          vibrate: [200, 100, 200]
+        };
+
+        const fallbackNotification = () => {
+          try {
+            new Notification(title, options);
+          } catch (e) {
+            console.error('原生 Notification 发送失败:', e);
           }
+        };
 
-          const title = session?.name || '闲谈';
-          let iconUrl = '';
-          if (session?.avatar) {
-            try {
-              iconUrl = new URL(session.avatar, window.location.href).href;
-            } catch(e) {
-              iconUrl = session.avatar;
-            }
-          }
-
-          // 网页内横幅通知（页面在前台时）
-          if (document.visibilityState !== 'hidden' && allSettings.inAppNotificationEnabled !== false && typeof window.showInAppNotification === 'function') {
-             // 只有当AI在后台聊天（非当前窗口），或者虽然是当前窗口但用户滚动到很上面时，才需要弹横幅，当前窗口且在看最新消息时弹横幅有点吵。
-             // 如果你要不管三七二十一只要在页面内收到回复就弹，把 && targetChatId !== state.currentChatId 去掉即可。这里我们保守一点，既然用户提到了没弹，我们就不加限制条件。
-             window.showInAppNotification(title, notificationBody, iconUrl);
-          }
-
-          // 系统 PWA 通知（页面在后台时）
-          if (document.visibilityState === 'hidden' && allSettings.backgroundKeepaliveEnabled && 'Notification' in window && Notification.permission === 'granted') {
-            const options = {
-              body: notificationBody,
-              icon: iconUrl,
-              vibrate: [200, 100, 200]
-            };
-
-            const fallbackNotification = () => {
-              try {
-                new Notification(title, options);
-              } catch (e) {
-                console.error('原生 Notification 发送失败:', e);
-              }
-            };
-
-            if ('serviceWorker' in navigator) {
-              const executeShowNotification = (reg) => {
-                if (!reg || typeof reg.showNotification !== 'function') return false;
-                reg.showNotification(title, options).catch(err => {
-                  fallbackNotification();
-                });
-                return true;
-              };
-
-              navigator.serviceWorker.getRegistration().then(reg => {
-                if (reg) {
-                  if (!executeShowNotification(reg)) fallbackNotification();
-                } else {
-                  const swUrl = new URL('../../service-worker.js', window.location.href).href;
-                  const scopeUrl = new URL('../../', window.location.href).pathname;
-                  navigator.serviceWorker.register(swUrl, { scope: scopeUrl }).then(newReg => {
-                    if (newReg.active) executeShowNotification(newReg);
-                    else navigator.serviceWorker.ready.then(readyReg => executeShowNotification(readyReg)).catch(() => fallbackNotification());
-                  }).catch(() => fallbackNotification());
-                }
-              }).catch(() => fallbackNotification());
-            } else {
+        if ('serviceWorker' in navigator) {
+          const executeShowNotification = (reg) => {
+            if (!reg || typeof reg.showNotification !== 'function') return false;
+            reg.showNotification(title, options).catch(() => {
               fallbackNotification();
+            });
+            return true;
+          };
+
+          navigator.serviceWorker.getRegistration().then(reg => {
+            if (reg) {
+              if (!executeShowNotification(reg)) fallbackNotification();
+            } else {
+              const swUrl = new URL('../../service-worker.js', window.location.href).href;
+              const scopeUrl = new URL('../../', window.location.href).pathname;
+              navigator.serviceWorker.register(swUrl, { scope: scopeUrl }).then(newReg => {
+                if (newReg.active) executeShowNotification(newReg);
+                else navigator.serviceWorker.ready.then(readyReg => executeShowNotification(readyReg)).catch(() => fallbackNotification());
+              }).catch(() => fallbackNotification());
             }
-          }
+          }).catch(() => fallbackNotification());
+        } else {
+          fallbackNotification();
         }
-      }).catch(err => console.error('读取设置失败:', err));
+      }
 
       /* ========================================================================
          [区域标注·已完成·长期记忆自动总结触发点]

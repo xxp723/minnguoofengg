@@ -53,6 +53,19 @@ export async function openChatMessage(container, state, db, chatId) {
   if (!session) return;
 
   state.currentChatId = chatId;
+
+  /* ========================================================================
+     [区域标注·已完成·进入会话清空未读] 聊天列表未读数重置
+     说明：
+     1. 用户点进该角色聊天窗口后，立即清空该会话红点未读数，符合 QQ/微信查看后消失的行为。
+     2. 未读数保存在会话列表数据里，并且只通过 dbPut -> DB.js / IndexedDB 持久化。
+     3. 本区域不使用 localStorage/sessionStorage，不写双份存储兜底，不改其它会话状态。
+     ======================================================================== */
+  if (Number(session.unread || 0) > 0) {
+    session.unread = 0;
+    await dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions);
+  }
+
   resetMessageSelectionState(state);
   state.stickerPanelOpen = false;
   state.stickerPanelGroupId = 'all';

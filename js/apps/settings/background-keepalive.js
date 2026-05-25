@@ -21,83 +21,121 @@ if (typeof window !== 'undefined' && !window.__keepaliveAudio) {
   window.__keepaliveAudio.volume = 0.01;
 }
 
-// [区域标注·已修改] 增加“应用内横幅通知”策略
-// 初始化全局横幅通知函数，避免依赖系统权限
+// [区域标注·已完成·逐条横幅通知队列] 应用内横幅通知策略
+// 说明：同一轮 AI 多条回复会多次调用 showInAppNotification；这里按队列逐条展示，避免只看到最后一条或多条横幅互相覆盖。
+if (typeof window !== 'undefined' && !window.__inAppNotificationQueueState) {
+  window.__inAppNotificationQueueState = {
+    items: [],
+    processing: false,
+    activeBanner: null
+  };
+}
+
 if (typeof window !== 'undefined' && !window.showInAppNotification) {
   window.showInAppNotification = (title, body, iconUrl) => {
-    const banner = document.createElement('div');
-    // 仿照iOS原生的顶部弹窗风格
-    banner.style.cssText = `
-      position: fixed;
-      top: -120px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 92%;
-      max-width: 420px;
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0,0,0,0.05);
-      border-radius: 20px;
-      padding: 14px 16px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      z-index: 2147483647;
-      transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      pointer-events: auto;
-      cursor: pointer;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    `;
+    const queueState = window.__inAppNotificationQueueState;
+    if (!queueState) return;
 
-    const iconStr = iconUrl ? `<img src="${iconUrl}" style="width: 42px; height: 42px; border-radius: 10px; object-fit: cover; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">` : '';
+    queueState.items.push({
+      title: String(title || ''),
+      body: String(body || ''),
+      iconUrl: String(iconUrl || '')
+    });
 
-    banner.innerHTML = `
-      ${iconStr}
-      <div style="display: flex; flex-direction: column; gap: 4px; overflow: hidden;">
-        <div style="font-size: 15px; font-weight: 600; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(title)}</div>
-        <div style="font-size: 14px; color: #444; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(body)}</div>
-      </div>
-    `;
+    const processQueue = () => {
+      if (queueState.processing) return;
+      if (!queueState.items.length) return;
+      if (!document.body) {
+        window.requestAnimationFrame(processQueue);
+        return;
+      }
 
-    document.body.appendChild(banner);
-    
-    // 触发回流后执行滑入动画
-    banner.offsetHeight;
-    banner.style.top = '16px';
+      queueState.processing = true;
+      const nextItem = queueState.items.shift();
+      const banner = document.createElement('div');
+      queueState.activeBanner = banner;
 
-    let isHiding = false;
-    const hide = () => {
-      if (isHiding) return;
-      isHiding = true;
-      banner.style.top = '-120px';
-      setTimeout(() => {
-        if (banner.parentNode) {
-          banner.parentNode.removeChild(banner);
+      // 仿照 iOS 原生顶部横幅风格，保持设置应用内卡片主题，不使用浏览器原生弹窗。
+      banner.style.cssText = `
+        position: fixed;
+        top: -120px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 92%;
+        max-width: 420px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0,0,0,0.05);
+        border-radius: 20px;
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        z-index: 2147483647;
+        transition: top 0.42s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.22s ease;
+        pointer-events: auto;
+        cursor: pointer;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        opacity: 0;
+      `;
+
+      const iconStr = nextItem.iconUrl
+        ? `<img src="${escapeHtml(nextItem.iconUrl)}" alt="" style="width: 42px; height: 42px; border-radius: 10px; object-fit: cover; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">`
+        : '';
+
+      banner.innerHTML = `
+        ${iconStr}
+        <div style="display: flex; flex-direction: column; gap: 4px; overflow: hidden;">
+          <div style="font-size: 15px; font-weight: 600; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(nextItem.title)}</div>
+          <div style="font-size: 14px; color: #444; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(nextItem.body)}</div>
+        </div>
+      `;
+
+      document.body.appendChild(banner);
+
+      let isHiding = false;
+      const hide = () => {
+        if (isHiding) return;
+        isHiding = true;
+        banner.style.opacity = '0';
+        banner.style.top = '-120px';
+        window.setTimeout(() => {
+          if (queueState.activeBanner === banner) queueState.activeBanner = null;
+          if (banner.parentNode) banner.parentNode.removeChild(banner);
+          queueState.processing = false;
+          if (queueState.items.length) window.setTimeout(processQueue, 80);
+        }, 420);
+      };
+
+      let timer = window.setTimeout(hide, 4000);
+
+      // 点击隐藏当前条，随后继续展示队列中的下一条。
+      banner.addEventListener('click', () => {
+        window.clearTimeout(timer);
+        hide();
+      });
+
+      // 向上滑动隐藏当前条。
+      let startY = 0;
+      banner.addEventListener('touchstart', (e) => {
+        startY = e.touches[0].clientY;
+      }, { passive: true });
+      banner.addEventListener('touchmove', (e) => {
+        const currentY = e.touches[0].clientY;
+        if (startY - currentY > 10) {
+          window.clearTimeout(timer);
+          hide();
         }
-      }, 500);
+      }, { passive: true });
+
+      window.requestAnimationFrame(() => {
+        banner.style.opacity = '1';
+        banner.style.top = '16px';
+      });
     };
 
-    let timer = setTimeout(hide, 4000);
-
-    // 点击隐藏
-    banner.addEventListener('click', () => {
-      clearTimeout(timer);
-      hide();
-    });
-    
-    // 向上滑动隐藏
-    let startY = 0;
-    banner.addEventListener('touchstart', (e) => {
-      startY = e.touches[0].clientY;
-    });
-    banner.addEventListener('touchmove', (e) => {
-      let currentY = e.touches[0].clientY;
-      if (startY - currentY > 10) {
-        clearTimeout(timer);
-        hide();
-      }
-    });
+    processQueue();
   };
 }
 
