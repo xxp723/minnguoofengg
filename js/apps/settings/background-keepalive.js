@@ -220,25 +220,12 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
                 if (fallbackTriggered) return;
                 swAttempts.push('register_ok');
                 
-                // 注册完后可能需要等它 active 才能 showNotification
-                if (newReg.active) {
-                  if (!executeShowNotification(newReg, 'newReg_active')) {
-                     fallbackNotification('newReg_no_showNotification');
-                  }
-                } else {
-                  // 如果没 active，等 ready
-                  swAttempts.push('wait_ready');
-                  navigator.serviceWorker.ready.then(readyReg => {
-                    if (fallbackTriggered) return;
-                    swAttempts.push('ready_ok');
-                    if (!executeShowNotification(readyReg, 'ready')) {
-                      fallbackNotification('ready_no_showNotification');
-                    }
-                  }).catch(err => {
-                    if (fallbackTriggered) return;
-                    clearTimeout(fallbackTimer);
-                    fallbackNotification(`ready报错:${err.message}`);
-                  });
+                // [区域标注·已修改] 优化 SW 补注册后的通知发送逻辑
+                // 取消死等 active 或 ready 状态，因为即使在 installing 或 waiting 状态，
+                // ServiceWorkerRegistration 对象也具备 showNotification 的能力，底层会自动排队处理。
+                // 这样可以避免因生命周期卡顿导致的超时报错。
+                if (!executeShowNotification(newReg, 'newReg_direct')) {
+                   fallbackNotification('newReg_no_showNotification');
                 }
               }).catch(err => {
                 if (fallbackTriggered) return;
