@@ -1015,7 +1015,7 @@ export async function sendMessage(container, state, db, content, settingsManager
               new Notification(title, options);
             } catch (e) {
               if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistration().then(reg => {
+                navigator.serviceWorker.ready.then(reg => {
                   if (reg && typeof reg.showNotification === 'function') {
                     reg.showNotification(title, options);
                   }

@@ -156,7 +156,7 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
           showResult('success', '测试通知已发送，请查看系统通知栏。');
         } catch (e) {
           if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistration().then(reg => {
+            navigator.serviceWorker.ready.then(reg => {
               if (reg && typeof reg.showNotification === 'function') {
                 reg.showNotification(title, options);
                 showResult('success', '测试通知已发送（经由服务工作线程），请查看系统通知栏。');
