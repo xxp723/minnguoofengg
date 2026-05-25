@@ -385,9 +385,21 @@ export function extractProtocolReplyContents(text) {
     .filter(Boolean);
 }
 
+/* ========================================================================
+   [区域标注·已完成·本次修复·气泡数量范围计算]
+   说明：
+   1. 修复了 replyBubbleMax 为 falsy 时回退到 min 导致 max=min 的 bug。
+   2. 现在 replyBubbleMax 缺失时使用独立默认值 15（与 UI 设置面板意图一致），
+      不再错误地回退到 min，确保用户设定的气泡范围能正确生效。
+   3. 同时对 replyBubbleMin 也使用独立默认值 1，避免互相依赖。
+   ======================================================================== */
 export function getReplyBubbleCountRange(chatSettings = {}) {
-  const min = Math.max(1, Math.floor(Number(chatSettings.replyBubbleMin || 1)) || 1);
-  const max = Math.max(min, Math.floor(Number(chatSettings.replyBubbleMax || min)) || min);
+  const DEFAULT_MIN = 1;
+  const DEFAULT_MAX = 15;
+  const rawMin = Number(chatSettings.replyBubbleMin);
+  const rawMax = Number(chatSettings.replyBubbleMax);
+  const min = Math.max(1, Number.isFinite(rawMin) && rawMin >= 1 ? Math.floor(rawMin) : DEFAULT_MIN);
+  const max = Math.max(min, Number.isFinite(rawMax) && rawMax >= 1 ? Math.floor(rawMax) : DEFAULT_MAX);
   return { min, max };
 }
 
