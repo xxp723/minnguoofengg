@@ -163,46 +163,69 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
           vibrate: [200, 100, 200]
         };
 
-        function fallbackNotification() {
+        function fallbackNotification(reason) {
           try {
             new Notification(title, options);
-            showResult('success', '测试通知已发送 (原生)。如果没弹窗，请检查手机系统设置里的“允许通知”。');
+            showResult('success', `尝试原生发送 (${reason})。若无弹窗，可能被系统拦截或禁用。`);
           } catch (e) {
-            showResult('error', '原生发送失败: ' + e.message);
+            showResult('error', `原生发送失败: ${e.message} [SW原因: ${reason}]`);
           }
         }
 
         if ('serviceWorker' in navigator) {
           let fallbackTriggered = false;
+          let swAttempts = [];
+
           // 增加超时机制：部分安卓环境下 getRegistration 可能永远挂起不返回
           const fallbackTimer = setTimeout(() => {
             fallbackTriggered = true;
-            console.warn('获取 SW 超时，转为使用原生 Notification');
-            fallbackNotification();
+            fallbackNotification(`getReg超时800ms [${swAttempts.join(',')}]`);
           }, 800);
 
+          // 尝试一：通过 getRegistration
           navigator.serviceWorker.getRegistration().then(reg => {
+            swAttempts.push('getReg_ok');
             if (fallbackTriggered) return;
-            clearTimeout(fallbackTimer);
 
             if (reg && typeof reg.showNotification === 'function') {
+              clearTimeout(fallbackTimer);
               reg.showNotification(title, options).then(() => {
-                showResult('success', '测试通知已发送 (SW)。如果没弹窗，请检查手机系统设置里的“允许通知”。');
+                showResult('success', '测试通知已发送 (SW_reg)。如果没弹窗，请检查手机系统设置里的“允许通知”。');
               }).catch(err => {
-                console.warn('SW 通知报错:', err);
-                fallbackNotification();
+                swAttempts.push('showErr:' + err.message);
+                fallbackNotification(`发送报错:${err.message}`);
               });
             } else {
-              fallbackNotification();
+              // 尝试二：如果 getRegistration 返回空或者没有 showNotification 方法，尝试使用 ready
+              swAttempts.push(reg ? 'no_showNotification' : 'reg_null');
+              navigator.serviceWorker.ready.then(readyReg => {
+                swAttempts.push('ready_ok');
+                if (fallbackTriggered) return;
+                clearTimeout(fallbackTimer);
+                
+                if (readyReg && typeof readyReg.showNotification === 'function') {
+                  readyReg.showNotification(title, options).then(() => {
+                    showResult('success', '测试通知已发送 (SW_ready)。如果没弹窗，请检查手机系统设置里的“允许通知”。');
+                  }).catch(err => {
+                    fallbackNotification(`ready发送报错:${err.message}`);
+                  });
+                } else {
+                  fallbackNotification('ready仍无showNotification');
+                }
+              }).catch(err => {
+                if (fallbackTriggered) return;
+                clearTimeout(fallbackTimer);
+                fallbackNotification(`ready报错:${err.message}`);
+              });
             }
           }).catch(err => {
+            swAttempts.push('getReg_err');
             if (fallbackTriggered) return;
             clearTimeout(fallbackTimer);
-            console.warn('获取 SW 报错:', err);
-            fallbackNotification();
+            fallbackNotification(`getReg报错:${err.message}`);
           });
         } else {
-          fallbackNotification();
+          fallbackNotification('环境不支持SW');
         }
 
       } else {
