@@ -887,15 +887,29 @@ export async function sendMessage(container, state, db, content, settingsManager
                     : (message.content || '（AI 没有返回内容）'))));
       session.lastTime = Date.now();
       
-      await dbPut(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId, targetMessages);
-      await dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions);
+      /* [区域标注·已修改·后台保活消息同步] AI消息循环中持久化与渲染（全部 try-catch 保护）
+         说明：
+         1. dbPut 和 appendCurrentMessageBubble 都必须包裹 try-catch：
+            - 页面进入后台时浏览器可能冻结页面，导致 IndexedDB 事务超时 abort，dbPut 抛出异常。
+            - 用户可能在循环期间退出再重入聊天页，导致 container/DOM 状态不一致，渲染抛出异常。
+         2. 若循环中某次 dbPut 失败，不中断循环；finally 块会做最终一次完整 dbPut 兜底。
+         3. 渲染失败同理不中断循环；用户下次进入时 openChatMessage 会从 DB 加载完整数据。
+         4. 消息数据始终先 push 到内存 targetMessages，确保即使中间 DB 写入失败，
+            最终 finally 块仍能把完整消息数组一次性写入 IndexedDB。 */
+      try {
+        await dbPut(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId, targetMessages);
+        await dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions);
+      } catch (_dbErr) {
+        // DB 写入失败不中断循环，finally 块会兜底写入完整 targetMessages
+      }
 
-      /* [区域标注·已修改·后台保活消息同步] AI消息循环中同步 state.currentMessages
-         说明：每次 push 新消息后，若用户已切回本聊天页面，需将 state.currentMessages
-         指向 targetMessages，确保后续渲染和 openChatMessage 重入时数据一致。 */
       if (targetChatId === state.currentChatId) {
         state.currentMessages = targetMessages;
-        appendCurrentMessageBubble(container, state, targetMessages[targetMessages.length - 1]);
+        try {
+          appendCurrentMessageBubble(container, state, targetMessages[targetMessages.length - 1]);
+        } catch (_renderErr) {
+          // 渲染失败不中断循环
+        }
       }
     }
 
@@ -986,16 +1000,23 @@ export async function sendMessage(container, state, db, content, settingsManager
       persistChatConsoleRuntimeLogs(state, db)
     ]);
 
-    /* [区域标注·已修改·后台保活finally同步] finally块中同步 state.currentMessages 并刷新UI
-       说明：AI回复全部完成后（或出错后），若用户已切回本聊天页面，需确保
-       state.currentMessages 指向最终完整的 targetMessages，并做一次完整刷新，
-       避免用户从聊天列表重新进入时只看到部分消息或状态卡在"正在回复"。 */
+    /* [区域标注·已修改·后台保活finally同步] finally块中同步 state.currentMessages 并安全刷新UI
+       说明：
+       1. AI回复全部完成后（或出错后），若用户已切回本聊天页面，需确保
+          state.currentMessages 指向最终完整的 targetMessages。
+       2. 渲染调用包裹 try-catch：finally 块中若渲染抛出异常会变成 unhandled rejection，
+          可能导致后续逻辑（通知、长期记忆总结）无法执行。
+       3. 数据已在上方 dbPut 写入 IndexedDB，即使渲染失败，用户下次进入仍能看到完整消息。 */
     if (state.currentChatId === targetChatId) {
       state.currentMessages = targetMessages;
-      if (hasRenderedAiBubble) {
-        updateCurrentChatSendingUi(container, state);
-      } else {
-        renderCurrentChatMessage(container, state);
+      try {
+        if (hasRenderedAiBubble) {
+          updateCurrentChatSendingUi(container, state);
+        } else {
+          renderCurrentChatMessage(container, state);
+        }
+      } catch (_finalRenderErr) {
+        // finally 块渲染失败不影响数据完整性
       }
     }
 
