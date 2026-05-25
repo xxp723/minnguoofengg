@@ -152,35 +152,57 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
       }
 
       if (Notification.permission === 'granted') {
+        showResult('success', '准备发送通知...');
+        
         const title = '后台保活测试';
+        // 修复相对路径问题：使用 href 以确保在子目录下也能正确解析
+        const iconUrl = new URL('assets/icons/icon-192.png', window.location.href).href;
         const options = {
           body: '如果你能看到这条消息，说明浏览器通知功能正常！',
-          icon: 'assets/icons/icon-192.png',
-          // 增加震动模式，帮助手机端唤起横幅
+          icon: iconUrl,
           vibrate: [200, 100, 200]
         };
 
-        // 优先使用 ServiceWorker 发送通知，避免安卓 PWA 中 new Notification() 被静默拦截
-        if ('serviceWorker' in navigator) {
+        function fallbackNotification() {
           try {
-            const reg = await navigator.serviceWorker.ready;
-            if (reg && typeof reg.showNotification === 'function') {
-              await reg.showNotification(title, options);
-              showResult('success', '测试通知已发送，请查看系统通知栏。');
-              return;
-            }
-          } catch (err) {
-            console.warn('ServiceWorker 发送通知失败，尝试回退方法:', err);
+            new Notification(title, options);
+            showResult('success', '测试通知已发送 (原生)。如果没弹窗，请检查手机系统设置里的“允许通知”。');
+          } catch (e) {
+            showResult('error', '原生发送失败: ' + e.message);
           }
         }
 
-        // 如果 ServiceWorker 失败或不存在，回退到原生 Notification
-        try {
-          new Notification(title, options);
-          showResult('success', '测试通知已发送 (回退模式)，请查看系统通知栏。');
-        } catch (e) {
-          console.error('原生 Notification 发送失败:', e);
-          showResult('error', '发送通知失败，可能由于环境限制 (如需通过 ServiceWorker)。');
+        if ('serviceWorker' in navigator) {
+          let fallbackTriggered = false;
+          // 增加超时机制：部分安卓环境下 getRegistration 可能永远挂起不返回
+          const fallbackTimer = setTimeout(() => {
+            fallbackTriggered = true;
+            console.warn('获取 SW 超时，转为使用原生 Notification');
+            fallbackNotification();
+          }, 800);
+
+          navigator.serviceWorker.getRegistration().then(reg => {
+            if (fallbackTriggered) return;
+            clearTimeout(fallbackTimer);
+
+            if (reg && typeof reg.showNotification === 'function') {
+              reg.showNotification(title, options).then(() => {
+                showResult('success', '测试通知已发送 (SW)。如果没弹窗，请检查手机系统设置里的“允许通知”。');
+              }).catch(err => {
+                console.warn('SW 通知报错:', err);
+                fallbackNotification();
+              });
+            } else {
+              fallbackNotification();
+            }
+          }).catch(err => {
+            if (fallbackTriggered) return;
+            clearTimeout(fallbackTimer);
+            console.warn('获取 SW 报错:', err);
+            fallbackNotification();
+          });
+        } else {
+          fallbackNotification();
         }
 
       } else {
