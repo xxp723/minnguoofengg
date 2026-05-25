@@ -994,39 +994,59 @@ export async function sendMessage(container, state, db, content, settingsManager
 
     if (hasRenderedAiBubble) {
       /* ========================================================================
-         [区域标注·本次需求] 后台保活通知触发点
-         说明：如果当前页面在后台（visibilityState === 'hidden'）且开启了保活设置，
-               则在 AI 回复完成时触发原生 Notification。
+         [区域标注·本次需求] 后台保活通知触发点 与 网页内横幅通知
+         说明：
+         1. 如果开启了 inAppNotificationEnabled 且页面在前端，触发网页内横幅。
+         2. 如果开启了 backgroundKeepaliveEnabled 且页面在后台，触发系统通知。
          ======================================================================== */
-      if (document.visibilityState === 'hidden') {
-        settingsManager.getAll().then(allSettings => {
-          if (allSettings && allSettings.backgroundKeepaliveEnabled && 'Notification' in window && Notification.permission === 'granted') {
-            const lastAiMsg = targetMessages[targetMessages.length - 1];
-            let notificationBody = 'AI 回复了你的消息';
-            if (lastAiMsg && lastAiMsg.content) {
-               notificationBody = String(lastAiMsg.content).replace(/\[.*?\]/g, '').trim().slice(0, 50) + '...';
+      settingsManager.getAll().then(allSettings => {
+        if (allSettings) {
+          const lastAiMsg = targetMessages[targetMessages.length - 1];
+          let notificationBody = 'AI 回复了你的消息';
+          if (lastAiMsg?.type === 'sticker') {
+            notificationBody = `[表情包] ${lastAiMsg.stickerName || ''}`;
+          } else if (lastAiMsg?.type === 'voice') {
+            notificationBody = '[语音消息]';
+          } else if (lastAiMsg?.type === 'image') {
+            notificationBody = '[图片消息]';
+          } else if (lastAiMsg?.type === 'gift') {
+            notificationBody = `[礼物] ${lastAiMsg.giftTitle || ''}`;
+          } else if (lastAiMsg?.type === 'transfer') {
+            notificationBody = `[转账] ${lastAiMsg.transferDisplayAmount || ''}`;
+          } else if (lastAiMsg?.content) {
+            notificationBody = String(lastAiMsg.content).replace(/\[.*?\]/g, '').trim().slice(0, 50) + (String(lastAiMsg.content).length > 50 ? '...' : '');
+          }
+
+          const title = session?.name || '闲谈';
+          let iconUrl = '';
+          if (session?.avatar) {
+            try {
+              iconUrl = new URL(session.avatar, window.location.href).href;
+            } catch(e) {
+              iconUrl = session.avatar;
             }
-            const title = session?.name || '闲谈';
-            // 使用带域名的绝对路径，防止 PWA 解析出错
-            let iconUrl = '';
-            if (session?.avatar) {
-              try {
-                iconUrl = new URL(session.avatar, window.location.href).href;
-              } catch(e) {
-                iconUrl = session.avatar;
-              }
-            }
+          }
+
+          // 网页内横幅通知（页面在前台时）
+          if (document.visibilityState !== 'hidden' && allSettings.inAppNotificationEnabled !== false && typeof window.showInAppNotification === 'function') {
+             // 只有当AI在后台聊天（非当前窗口），或者虽然是当前窗口但用户滚动到很上面时，才需要弹横幅，当前窗口且在看最新消息时弹横幅有点吵。
+             // 如果你要不管三七二十一只要在页面内收到回复就弹，把 && targetChatId !== state.currentChatId 去掉即可。这里我们保守一点，既然用户提到了没弹，我们就不加限制条件。
+             window.showInAppNotification(title, notificationBody, iconUrl);
+          }
+
+          // 系统 PWA 通知（页面在后台时）
+          if (document.visibilityState === 'hidden' && allSettings.backgroundKeepaliveEnabled && 'Notification' in window && Notification.permission === 'granted') {
             const options = {
               body: notificationBody,
               icon: iconUrl,
-              vibrate: [200, 100, 200] // 增加震动，帮助手机端唤起横幅
+              vibrate: [200, 100, 200]
             };
 
             const fallbackNotification = () => {
               try {
                 new Notification(title, options);
               } catch (e) {
-                console.error('原生 Notification 发送失败 (受限于PWA环境):', e);
+                console.error('原生 Notification 发送失败:', e);
               }
             };
 
@@ -1034,7 +1054,6 @@ export async function sendMessage(container, state, db, content, settingsManager
               const executeShowNotification = (reg) => {
                 if (!reg || typeof reg.showNotification !== 'function') return false;
                 reg.showNotification(title, options).catch(err => {
-                  console.error('SW 通知发送失败:', err);
                   fallbackNotification();
                 });
                 return true;
@@ -1042,34 +1061,22 @@ export async function sendMessage(container, state, db, content, settingsManager
 
               navigator.serviceWorker.getRegistration().then(reg => {
                 if (reg) {
-                  if (!executeShowNotification(reg)) {
-                    fallbackNotification();
-                  }
+                  if (!executeShowNotification(reg)) fallbackNotification();
                 } else {
-                  // PWA 环境下可能 getRegistration 返回 null，此时尝试当场重新注册
                   const swUrl = new URL('../../service-worker.js', window.location.href).href;
                   const scopeUrl = new URL('../../', window.location.href).pathname;
-                  
                   navigator.serviceWorker.register(swUrl, { scope: scopeUrl }).then(newReg => {
-                    if (newReg.active) {
-                      executeShowNotification(newReg);
-                    } else {
-                      navigator.serviceWorker.ready.then(readyReg => {
-                        executeShowNotification(readyReg);
-                      }).catch(() => fallbackNotification());
-                    }
+                    if (newReg.active) executeShowNotification(newReg);
+                    else navigator.serviceWorker.ready.then(readyReg => executeShowNotification(readyReg)).catch(() => fallbackNotification());
                   }).catch(() => fallbackNotification());
                 }
-              }).catch(err => {
-                console.error('获取 SW 失败:', err);
-                fallbackNotification();
-              });
+              }).catch(() => fallbackNotification());
             } else {
               fallbackNotification();
             }
           }
-        }).catch(err => console.error('读取保活设置失败:', err));
-      }
+        }
+      }).catch(err => console.error('读取设置失败:', err));
 
       /* ========================================================================
          [区域标注·已完成·长期记忆自动总结触发点]

@@ -134,9 +134,9 @@ export function renderBackgroundKeepaliveSection(state = {}) {
             <h3 style="margin: 0;">静音保活</h3>
           </div>
           <div style="font-size: 13px; color: #666; margin-bottom: 16px; display: flex; gap: 8px;">
-            <span>状态: <span id="keepalive-status-text" style="color: ${isKeepaliveEnabled ? '#34c759' : '#999'}">${isKeepaliveEnabled ? '已开启' : '未开启'}</span></span>
-            <span>|</span>
-            <span>播放态: <span id="keepalive-play-text" style="color: #999;">未播放</span></span>
+            <span>状态: <span id="keepalive-status-text" class="${isKeepaliveEnabled ? 'ui-theme-color' : 'ui-muted'}">${isKeepaliveEnabled ? '已开启' : '未开启'}</span></span>
+            <span class="ui-muted">|</span>
+            <span>播放态: <span id="keepalive-play-text" class="ui-muted">未播放</span></span>
           </div>
 
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
@@ -154,7 +154,7 @@ export function renderBackgroundKeepaliveSection(state = {}) {
         <section class="ui-card" style="margin-top: 16px;">
           <h3 style="margin-bottom: 12px;">网页内横幅通知 (推荐)</h3>
           <div style="font-size: 13px; color: #666; margin-bottom: 16px;">
-            <span>状态: <span id="inapp-status-text" style="color: ${isInAppEnabled ? '#34c759' : '#999'}">${isInAppEnabled ? '已开启' : '未开启'}</span></span>
+            <span>状态: <span id="inapp-status-text" class="${isInAppEnabled ? 'ui-theme-color' : 'ui-muted'}">${isInAppEnabled ? '已开启' : '未开启'}</span></span>
           </div>
 
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
@@ -166,7 +166,7 @@ export function renderBackgroundKeepaliveSection(state = {}) {
           </div>
 
           <div class="appearance-inline-actions" style="margin-bottom: 12px;">
-            <button class="ui-button" type="button" id="btn-test-inapp-notification" style="width: 100%; justify-content: center; background: rgba(52, 199, 89, 0.1); color: #28a745; border: none;">${ICON_MESSAGE}<span style="margin-left: 4px;">测试横幅弹窗</span></button>
+            <button class="ui-button" type="button" id="btn-test-inapp-notification" style="width: 100%; justify-content: center;">${ICON_MESSAGE}<span style="margin-left: 4px;">测试横幅弹窗</span></button>
           </div>
 
           <p class="ui-muted" style="font-size: 12px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 12px; margin-bottom: 0;">在网页打开时不依赖系统权限，当收到新消息时从屏幕顶部优雅滑出横幅。</p>
@@ -176,14 +176,14 @@ export function renderBackgroundKeepaliveSection(state = {}) {
         <section class="ui-card" style="margin-top: 16px;">
           <h3 style="margin-bottom: 12px;">系统通知 (需添加到主屏幕)</h3>
           <div style="font-size: 13px; color: #666; margin-bottom: 16px; display: flex; gap: 8px;">
-            <span>支持: <span style="color: ${hasSystemNotif ? '#34c759' : '#ff3b30'}">${hasSystemNotif ? '是' : '否'}</span></span>
-            <span>|</span>
-            <span>权限: <span id="system-perm-text" style="color: ${permColor}">${sysPerm}</span></span>
+            <span>支持: <span class="${hasSystemNotif ? 'ui-theme-color' : 'ui-muted'}">${hasSystemNotif ? '是' : '否'}</span></span>
+            <span class="ui-muted">|</span>
+            <span>权限: <span id="system-perm-text" class="ui-muted">${sysPerm}</span></span>
           </div>
           
           <div class="appearance-inline-actions appearance-inline-actions--icon-dual" style="margin-bottom: 12px;">
-            <button class="ui-button" type="button" id="btn-request-notification" style="flex: 1; background: #e8f5e9; color: #2e7d32; border: none; padding: 0 8px;"><span>开启通知</span></button>
-            <button class="ui-button" type="button" id="btn-test-notification" style="flex: 1; background: #e3f2fd; color: #1565c0; border: none; padding: 0 8px;"><span>测试系统弹窗</span></button>
+            <button class="ui-button" type="button" id="btn-request-notification" style="flex: 1; padding: 0 8px;"><span>开启通知</span></button>
+            <button class="ui-button primary" type="button" id="btn-test-notification" style="flex: 1; padding: 0 8px;"><span>测试系统弹窗</span></button>
           </div>
 
           <div class="api-test-result" id="keepalive-notification-result" style="display: none; margin-bottom: 12px; border-radius: 12px; font-size: 12px; padding: 9px 10px; min-height: 38px; align-items: flex-start; gap: 6px;">
@@ -212,10 +212,10 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
     if (!playText) return;
     if (isPlaying) {
       playText.textContent = '正在循环';
-      playText.style.color = '#34c759'; // green
+      playText.className = 'ui-theme-color';
     } else {
       playText.textContent = '未播放';
-      playText.style.color = '#999';
+      playText.className = 'ui-muted';
     }
   };
 
@@ -227,7 +227,7 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
         console.warn('静音音频播放被拦截:', err);
         if (playText) {
           playText.textContent = '播放被拦截(需交互)';
-          playText.style.color = '#ff3b30';
+          playText.className = 'ui-muted';
         }
       });
     }
@@ -254,7 +254,7 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
       
       if (statusText) {
         statusText.textContent = isChecked ? '已开启' : '未开启';
-        statusText.style.color = isChecked ? '#34c759' : '#999';
+        statusText.className = isChecked ? 'ui-theme-color' : 'ui-muted';
       }
 
       if (isChecked) {
@@ -281,7 +281,7 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
       const isChecked = e.target.checked;
       if (inAppStatusText) {
         inAppStatusText.textContent = isChecked ? '已开启' : '未开启';
-        inAppStatusText.style.color = isChecked ? '#34c759' : '#999';
+        inAppStatusText.className = isChecked ? 'ui-theme-color' : 'ui-muted';
       }
       try {
         await settings.update({ inAppNotificationEnabled: isChecked });
@@ -310,7 +310,7 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
     if (!sysPermText || !('Notification' in window)) return;
     const perm = Notification.permission;
     sysPermText.textContent = perm;
-    sysPermText.style.color = perm === 'granted' ? '#34c759' : (perm === 'denied' ? '#ff3b30' : '#ff9500');
+    sysPermText.className = perm === 'granted' ? 'ui-theme-color' : 'ui-muted';
   };
 
   const showResult = (status, text) => {
