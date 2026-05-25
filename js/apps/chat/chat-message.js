@@ -994,6 +994,27 @@ export async function sendMessage(container, state, db, content, settingsManager
 
     if (hasRenderedAiBubble) {
       /* ========================================================================
+         [区域标注·本次需求] 后台保活通知触发点
+         说明：如果当前页面在后台（visibilityState === 'hidden'）且开启了保活设置，
+               则在 AI 回复完成时触发原生 Notification。
+         ======================================================================== */
+      if (document.visibilityState === 'hidden') {
+        settingsManager.getAll().then(allSettings => {
+          if (allSettings && allSettings.backgroundKeepaliveEnabled && 'Notification' in window && Notification.permission === 'granted') {
+            const lastAiMsg = targetMessages[targetMessages.length - 1];
+            let notificationBody = 'AI 回复了你的消息';
+            if (lastAiMsg && lastAiMsg.content) {
+               notificationBody = String(lastAiMsg.content).replace(/\[.*?\]/g, '').trim().slice(0, 50) + '...';
+            }
+            new Notification(session?.name || '闲谈', {
+              body: notificationBody,
+              icon: session?.avatar || ''
+            });
+          }
+        }).catch(err => console.error('读取保活设置失败:', err));
+      }
+
+      /* ========================================================================
          [区域标注·已完成·长期记忆自动总结触发点]
          说明：
          1. 仅在本轮 AI 回复已成功落入当前聊天消息后触发长期记忆自动总结检查。

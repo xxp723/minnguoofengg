@@ -17,6 +17,7 @@ import { renderApiSection, bindApiEvents } from './api.js';
 import { renderImageApiSection, bindImageApiEvents } from './image-api.js';
 import { renderDataSection, bindDataEvents } from './data.js';
 import { renderLogsSection, bindLogsEvents } from './logs.js';
+import { renderBackgroundKeepaliveSection, bindBackgroundKeepaliveEvents } from './background-keepalive.js';
 
 const {
   defaultTemplate
@@ -233,6 +234,10 @@ export async function mount(container, context) {
             <div class="settings-card__icon">${ICONS.data}</div>
             <h3 class="settings-card__title">数据设置</h3>
           </div>
+          <div class="settings-card" data-page="keepalive">
+            <div class="settings-card__icon"><svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><path d="M24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M24 16V24" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="32" r="2" fill="currentColor"/></svg></div>
+            <h3 class="settings-card__title">后台保活</h3>
+          </div>
           <div class="settings-card settings-card--logs" data-page="logs">
             <div class="settings-card__icon">${ICONS.logs}</div>
             <h3 class="settings-card__title">查看日志</h3>
@@ -245,6 +250,7 @@ export async function mount(container, context) {
       ${renderApiSection({ current })}
       ${renderImageApiSection({ current })}
       ${renderDataSection()}
+      ${renderBackgroundKeepaliveSection(current)}
       ${renderLogsSection()}
     </div>
   `;
@@ -266,6 +272,7 @@ export async function mount(container, context) {
       api: 'API设置',
       'image-api': '生图API',
       data: '数据设置',
+      keepalive: '后台保活',
       logs: '查看日志'
     };
 
@@ -282,6 +289,7 @@ export async function mount(container, context) {
       api: 'home',
       'image-api': 'home',
       data: 'home',
+      keepalive: 'home',
       logs: 'home'
     };
 
@@ -320,6 +328,7 @@ export async function mount(container, context) {
   bindApiEvents(container, { settings });
   bindImageApiEvents(container, { settings });
   bindDataEvents(container, { settings });
+  bindBackgroundKeepaliveEvents(container, { settings });
   bindLogsEvents(container);
 
   // 初始化显示首页
