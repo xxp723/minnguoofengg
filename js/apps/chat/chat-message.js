@@ -887,20 +887,30 @@ export async function sendMessage(container, state, db, content, settingsManager
                     : (message.content || '（AI 没有返回内容）'))));
       session.lastTime = Date.now();
       
-      /* [区域标注·已修改·后台保活消息同步] AI消息循环中持久化与渲染（全部 try-catch 保护）
+      /* ======================================================================
+         [区域标注·已完成·本次后台保活完整消息组与日志同步] AI 消息逐条持久化与安全渲染
          说明：
-         1. dbPut 和 appendCurrentMessageBubble 都必须包裹 try-catch：
-            - 页面进入后台时浏览器可能冻结页面，导致 IndexedDB 事务超时 abort，dbPut 抛出异常。
-            - 用户可能在循环期间退出再重入聊天页，导致 container/DOM 状态不一致，渲染抛出异常。
-         2. 若循环中某次 dbPut 失败，不中断循环；finally 块会做最终一次完整 dbPut 兜底。
-         3. 渲染失败同理不中断循环；用户下次进入时 openChatMessage 会从 DB 加载完整数据。
-         4. 消息数据始终先 push 到内存 targetMessages，确保即使中间 DB 写入失败，
-            最终 finally 块仍能把完整消息数组一次性写入 IndexedDB。 */
+         1. 每条已解析的 AI 消息先加入 targetMessages，再立即通过 DB.js / IndexedDB 保存完整快照；
+            用户离开消息页或应用进入后台后，再次进入会话仍可读取当时已经返回的全部气泡。
+         2. 与每条 AI 消息同时持久化控制台运行日志，避免后台生成/返回记录仅留在内存中，
+            便于确认该轮 AI 回复确实已进入后续短期记忆及长期记忆所依赖的消息数组。
+         3. 页面切换造成的单次 IndexedDB 写入异常不应截断本轮余下 AI 气泡生成；
+            失败会追加诊断日志，finally 阶段仍会再次提交最终完整 targetMessages 与日志。
+         4. 本区域只使用既有 DB.js / IndexedDB 持久化入口，不使用 localStorage/sessionStorage，
+            不添加双份存储兜底，也不按长文本或媒体字段过滤消息内容。
+         ====================================================================== */
       try {
-        await dbPut(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId, targetMessages);
-        await dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions);
-      } catch (_dbErr) {
-        // DB 写入失败不中断循环，finally 块会兜底写入完整 targetMessages
+        await Promise.all([
+          dbPut(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId, targetMessages),
+          dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions),
+          persistChatConsoleRuntimeLogs(state, db)
+        ]);
+      } catch (dbError) {
+        appendChatConsoleRuntimeLog(
+          state,
+          'warn',
+          `AI消息[${index + 1}]后台同步暂未完成，结束阶段将再次保存：${dbError?.message || 'IndexedDB 写入失败'}`
+        );
       }
 
       if (targetChatId === state.currentChatId) {
@@ -1000,13 +1010,17 @@ export async function sendMessage(container, state, db, content, settingsManager
       persistChatConsoleRuntimeLogs(state, db)
     ]);
 
-    /* [区域标注·已修改·后台保活finally同步] finally块中同步 state.currentMessages 并安全刷新UI
+    /* ========================================================================
+       [区域标注·已完成·本次后台保活完整消息组与日志同步] 最终快照落库后的当前页安全同步
        说明：
-       1. AI回复全部完成后（或出错后），若用户已切回本聊天页面，需确保
+       1. 上方最终提交会把本轮 targetMessages 完整数组、会话摘要与控制台日志统一写入
+          DB.js / IndexedDB；后台完成的 AI 整组回复因此可被重进页面及后续记忆流程读取。
+       2. AI 回复完成后（或出错后），若用户已切回本聊天页面，需确保
           state.currentMessages 指向最终完整的 targetMessages。
-       2. 渲染调用包裹 try-catch：finally 块中若渲染抛出异常会变成 unhandled rejection，
-          可能导致后续逻辑（通知、长期记忆总结）无法执行。
-       3. 数据已在上方 dbPut 写入 IndexedDB，即使渲染失败，用户下次进入仍能看到完整消息。 */
+       3. 渲染调用包裹 try-catch：finally 块中若渲染抛出异常不影响已提交的完整消息数据，
+          也不阻断后续通知与长期记忆总结触发。
+       4. 本区域不使用 localStorage/sessionStorage，不写双份存储兜底，不过滤长文本内容。
+       ======================================================================== */
     if (state.currentChatId === targetChatId) {
       state.currentMessages = targetMessages;
       try {
