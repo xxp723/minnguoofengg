@@ -210,9 +210,10 @@ export function bindBackgroundKeepaliveEvents(container, { settings }) {
             } else {
               // 关键修复：如果在 PWA 环境下 getRegistration 返回 null，则说明当前 Scope 下没找到 SW
               // 我们必须当场按照 main.js 的规则强行注册一个，然后发送！
+              // [区域标注·已修改] 修正 SW 注册路径，确保在根目录和子目录部署都能正确找到 service-worker.js
               swAttempts.push('reg_null');
-              const swUrl = new URL('../../service-worker.js', window.location.href).href;
-              const scopeUrl = new URL('../../', window.location.href).pathname;
+              const swUrl = new URL('service-worker.js', window.location.href).href;
+              const scopeUrl = new URL('./', window.location.href).pathname;
               
               swAttempts.push(`try_register`);
               navigator.serviceWorker.register(swUrl, { scope: scopeUrl }).then(newReg => {
