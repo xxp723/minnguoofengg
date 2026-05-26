@@ -1227,6 +1227,13 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
       break;
     }
 
+    /* ========================================================================
+       [区域标注·已完成·本次红包发送金额校验修复]
+       说明：
+       1. 已与 chat-red-packet.js 的 parseRedPacketDraftFromModal 返回字段对齐，统一读取 packetAmount / packetBaseCny。
+       2. 修复输入大于 0 的红包金额仍被误判为 0 的问题。
+       3. 本区域只处理红包发送确认；钱包与消息持久化仍通过红包模块写入 DB.js / IndexedDB。
+       ======================================================================== */
     case 'confirm-msg-red-packet-send': {
       if (!state.currentChatId) break;
 
@@ -1704,19 +1711,33 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
       break;
     }
 
+    /* ========================================================================
+       [区域标注·已完成·本次AI红包金额与备注弹窗显示修复]
+       说明：
+       1. 红包操作弹窗统一读取 redPacket* 字段，避免 AI 红包备注一直回落为默认文案。
+       2. 弹窗展示 redPacketDisplayAmount，确保角色发送的红包可见金额。
+       3. 本区域只打开应用内红包弹窗，不使用浏览器原生弹窗，不读写任何持久化存储。
+       ======================================================================== */
     case 'msg-red-packet-open-actions': {
       const messageId = String(target.dataset.messageId || '').trim();
       const packetMessage = (state.currentMessages || []).find(item => String(item.id) === messageId);
       if (!packetMessage || String(packetMessage.type || '') !== 'red_packet') break;
 
-      const packetStatus = String(packetMessage.packetStatus || 'pending').trim();
-      const packetDirection = String(packetMessage.packetDirection || '').trim() || (packetMessage.role === 'assistant' ? 'incoming' : 'outgoing');
-      const statusLabel = packetStatus === 'accepted' ? '已领取' : '等待操作';
-      const canOperate = packetStatus === 'pending' && packetDirection === 'incoming';
+      const redPacketStatus = String(packetMessage.redPacketStatus || 'pending').trim();
+      const redPacketDirection = String(packetMessage.redPacketDirection || '').trim() || (packetMessage.role === 'assistant' ? 'incoming' : 'outgoing');
+      const statusLabel = redPacketStatus === 'accepted' ? '已领取' : '等待操作';
+      const canOperate = redPacketStatus === 'pending' && redPacketDirection === 'incoming';
+      const redPacketAmount = Number(packetMessage.redPacketAmount || 0);
+      const redPacketCurrency = String(packetMessage.redPacketCurrency || 'CNY').toUpperCase();
+      const amountLabel = String(packetMessage.redPacketDisplayAmount || '').trim()
+        || (Number.isFinite(redPacketAmount) && redPacketAmount > 0 ? formatWalletMoney(redPacketAmount, redPacketCurrency) : '');
 
       showRedPacketActionModal(container, {
         messageId,
-        note: String(packetMessage.packetNote || '恭喜发财，大吉大利'),
+        note: String(packetMessage.redPacketNote || '恭喜发财，大吉大利'),
+        payer: String(packetMessage.redPacketPayer || '对方'),
+        amount: amountLabel,
+        status: redPacketStatus,
         statusLabel,
         actionHint: canOperate ? '请选择领取' : `当前红包状态：${statusLabel}`,
         canAccept: canOperate
@@ -1827,6 +1848,13 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
       break;
     }
 
+    /* ========================================================================
+       [区域标注·已完成·本次AI红包领取字段统一修复]
+       说明：
+       1. 领取红包统一读取并更新 redPacketStatus / redPacketDirection / redPacketHandledAt。
+       2. 入账金额统一来自 redPacketBaseCny，避免 packet* 旧字段导致 AI 红包金额丢失。
+       3. 钱包、聊天消息和会话摘要继续通过 DB.js / IndexedDB 持久化，不新增任何其它存储。
+       ======================================================================== */
     case 'msg-red-packet-accept': {
       const messageId = String(target.dataset.messageId || '').trim();
       if (!messageId) break;
@@ -1836,39 +1864,39 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
 
       const packetMessage = state.currentMessages[messageIndex];
       if (String(packetMessage.type || '') !== 'red_packet') break;
-      if (String(packetMessage.packetStatus || 'pending') !== 'pending') {
+      if (String(packetMessage.redPacketStatus || 'pending') !== 'pending') {
         closeModal(container);
         break;
       }
 
-      const packetDirection = String(packetMessage.packetDirection || '').trim() || (packetMessage.role === 'assistant' ? 'incoming' : 'outgoing');
-      if (packetDirection !== 'incoming') {
+      const redPacketDirection = String(packetMessage.redPacketDirection || '').trim() || (packetMessage.role === 'assistant' ? 'incoming' : 'outgoing');
+      if (redPacketDirection !== 'incoming') {
         closeModal(container);
         break;
       }
 
       const now = Date.now();
-      const packetBaseCny = Math.max(0, Number(packetMessage.packetBaseCny || 0) || 0);
+      const redPacketBaseCny = Math.max(0, Number(packetMessage.redPacketBaseCny || 0) || 0);
 
       state.currentMessages[messageIndex] = {
         ...packetMessage,
-        packetDirection,
-        packetStatus: 'accepted',
-        packetHandledAt: now
+        redPacketDirection,
+        redPacketStatus: 'accepted',
+        redPacketHandledAt: now
       };
 
-      if (packetBaseCny > 0) {
+      if (redPacketBaseCny > 0) {
         const session = state.sessions.find(s => s.id === state.currentChatId);
         state.walletData = normalizeWalletData({
           ...state.walletData,
-          balanceBaseCny: Number(state.walletData?.balanceBaseCny || 0) + packetBaseCny,
+          balanceBaseCny: Number(state.walletData?.balanceBaseCny || 0) + redPacketBaseCny,
           ledger: [
             {
               id: `wallet_ledger_${now}_${Math.random().toString(16).slice(2)}`,
               kind: 'transfer',
               direction: 'in',
-              title: `领取 ${String(session?.name || '对方').trim() || '对方'} 红包`,
-              amountBaseCny: Number(packetBaseCny.toFixed(2)),
+              title: `领取 ${String(packetMessage.redPacketPayer || session?.name || '对方').trim() || '对方'} 红包`,
+              amountBaseCny: Number(redPacketBaseCny.toFixed(2)),
               timestamp: now
             },
             ...(Array.isArray(state.walletData?.ledger) ? state.walletData.ledger : [])

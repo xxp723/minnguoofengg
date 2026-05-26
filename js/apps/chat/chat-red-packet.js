@@ -44,9 +44,21 @@ export function isRedPacketMessage(message = {}) {
   return String(message?.type || '') === 'red_packet';
 }
 
+function formatRedPacketAmountLabel(message = {}, fallbackCurrency = 'CNY') {
+  const displayAmount = String(message?.redPacketDisplayAmount || '').trim();
+  if (displayAmount) return displayAmount;
+
+  const amount = Number(message?.redPacketAmount || message?.amount || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return '';
+
+  const currencyCode = String(message?.redPacketCurrency || fallbackCurrency || 'CNY').toUpperCase();
+  return currencyCode === 'CNY' ? `¥${amount.toFixed(2)}` : `${currencyCode} ${amount.toFixed(2)}`;
+}
+
 export function getRedPacketMessageDisplayText(message = {}) {
-  const note = String(message?.redPacketNote || '恭喜发财，大吉大利').trim();
-  return `[红包] ${note}`;
+  const note = String(message?.redPacketNote || message?.remark || '恭喜发财，大吉大利').trim();
+  const amountLabel = formatRedPacketAmountLabel(message);
+  return `[红包] ${note}${amountLabel ? ` · ${amountLabel}` : ''}`;
 }
 
 export function isRedPacketSystemMessage(message = {}) {
@@ -89,11 +101,15 @@ export function createAiRedPacketMessageFromProtocol(block = {}) {
   if (!payload) return null;
 
   const roleName = String(block?.roleName || '').trim() || '对方';
+  const redPacketDisplayAmount = `¥${Number(payload.amount || 0).toFixed(2)}`;
   return {
     role: 'assistant',
     type: 'red_packet',
-    content: `[红包] ${payload.note}`,
-    redPacketAmount: payload.amount,
+    content: `[红包] ${payload.note}${redPacketDisplayAmount ? ` · ${redPacketDisplayAmount}` : ''}`,
+    redPacketAmount: Number(Number(payload.amount || 0).toFixed(2)),
+    redPacketBaseCny: Number(Number(payload.amount || 0).toFixed(2)),
+    redPacketDisplayAmount,
+    redPacketCurrency: 'CNY',
     redPacketNote: payload.note,
     redPacketPayer: roleName,
     redPacketSource: 'ai_protocol',
@@ -119,11 +135,15 @@ export function parseAiRedPacketReceiveProtocol(content = {}) {
 }
 
 /* ==========================================================================
-   [区域标注·本次新增红包模块] 红包卡片气泡渲染
-   说明：防微信红包样式，使用特定的红/橙配色。
+   [区域标注·已完成·本次红包金额与备注显示修复] 红包卡片气泡渲染
+   说明：
+   1. 红包卡片统一读取 redPacket* 字段，避免 AI 红包备注回落成默认文案。
+   2. 卡片直接展示红包金额标签，用户和 AI 红包都能看到金额。
+   3. 本区域只负责渲染，不读写存储；持久化仍由上层 DB.js / IndexedDB 链路完成。
    ========================================================================== */
 export function renderRedPacketBubble(message = {}) {
-  const note = String(message?.redPacketNote || '恭喜发财，大吉大利').trim();
+  const note = String(message?.redPacketNote || message?.remark || '恭喜发财，大吉大利').trim();
+  const amountLabel = formatRedPacketAmountLabel(message);
   const status = String(message?.redPacketStatus || 'pending').trim();
   const isAccepted = status === 'accepted';
   const statusLabel = isAccepted ? '已领取' : (status === 'returned' ? '已退回' : '');
@@ -134,6 +154,7 @@ export function renderRedPacketBubble(message = {}) {
         <span class="msg-red-packet-card__icon">${RED_PACKET_ICONS.redPacket}</span>
         <div class="msg-red-packet-card__text">
           <h3 class="msg-red-packet-card__note">${escapeHtml(note)}</h3>
+          ${amountLabel ? `<strong class="msg-red-packet-card__amount">${escapeHtml(amountLabel)}</strong>` : ''}
           ${statusLabel ? `<span class="msg-red-packet-card__status">${escapeHtml(statusLabel)}</span>` : ''}
         </div>
       </div>
@@ -155,7 +176,7 @@ export function showRedPacketActionModal(container, options = {}) {
   const messageId = String(options.messageId || '').trim();
   const note = String(options.note || '恭喜发财，大吉大利').trim();
   const payer = String(options.payer || '对方').trim();
-  const amount = options.amount ? String(options.amount) : '';
+  const amount = String(options.amount || options.amountLabel || '').trim();
   const isAccepted = options.status === 'accepted';
 
   panel.innerHTML = `
@@ -168,7 +189,7 @@ export function showRedPacketActionModal(container, options = {}) {
         <div class="msg-red-packet-action-avatar">${RED_PACKET_ICONS.redPacket}</div>
         <h3 class="msg-red-packet-action-payer">${escapeHtml(payer)}的红包</h3>
         <p class="msg-red-packet-action-note">${escapeHtml(note)}</p>
-        ${isAccepted && amount ? `<div class="msg-red-packet-action-amount"><strong>${escapeHtml(amount)}</strong><small>元</small></div>` : ''}
+        ${amount ? `<div class="msg-red-packet-action-amount"><strong>${escapeHtml(amount)}</strong></div>` : ''}
         ${isAccepted ? `<div class="msg-red-packet-action-status">已领取</div>` : ''}
       </div>
     </div>
@@ -227,39 +248,61 @@ export function showMessageRedPacketModal(container, options = {}) {
 }
 
 /* ==========================================================================
-   [区域标注·本次新增红包模块] 解析弹窗输入
+   [区域标注·已完成·本次红包金额字段统一修复] 解析弹窗输入
+   说明：
+   1. 发送确认分支读取 packetAmount / packetBaseCny / displayRate，本区域已统一返回这些字段。
+   2. 红包输入按当前钱包显示币种解释，再换算为基础人民币余额扣减。
+   3. 不新增任何持久化存储，不使用 localStorage/sessionStorage。
    ========================================================================== */
 export function parseRedPacketDraftFromModal(container, walletDisplay = {}, walletData = {}) {
   const amountInput = container.querySelector('[data-role="msg-red-packet-amount-input"]');
   const noteInput = container.querySelector('[data-role="msg-red-packet-note-input"]');
-  const amount = Number(String(amountInput?.value || '').trim());
-  const note = String(noteInput?.value || '').trim() || '恭喜发财，大吉大利';
+  const packetAmount = Number(String(amountInput?.value || '').trim());
+  const packetNote = String(noteInput?.value || '').trim() || '恭喜发财，大吉大利';
 
-  const currencyCode = 'CNY'; // 红包默认 CNY
-  const giftBaseCny = amount;
+  const currency = walletDisplay.currency || { code: 'CNY', precision: 2 };
+  const currencyCode = String(currency.code || 'CNY').toUpperCase();
+  const precision = Math.max(0, Number(currency.precision ?? 2) || 0);
+  const rates = walletData?.rates && typeof walletData.rates === 'object' ? walletData.rates : {};
+  const displayRate = currencyCode === 'CNY' ? 1 : Math.max(0, Number(rates[currencyCode] || 0) || 0);
+  const packetBaseCny = currencyCode === 'CNY' ? packetAmount : (packetAmount / displayRate);
 
   return {
-    amount,
-    note,
-    giftBaseCny,
-    currencyCode
+    packetAmount,
+    packetBaseCny,
+    packetNote,
+    currencyCode,
+    precision,
+    displayRate,
+    amount: packetAmount,
+    note: packetNote,
+    giftBaseCny: packetBaseCny
   };
 }
 
 /* ==========================================================================
-   [区域标注·本次新增红包模块] 发送红包消息
-   说明：发送后仅入列，不自动触发 AI 回复（要求用户点击纸飞机）。
+   [区域标注·已完成·本次红包发送字段统一修复] 发送红包消息
+   说明：
+   1. 发送后仅入列，不自动触发 AI 回复（要求用户点击纸飞机）。
+   2. 统一使用 packet* 入参并写入 redPacket* 消息字段，避免金额校验与卡片显示字段错位。
+   3. 钱包、当前聊天消息、会话摘要统一写入 DB.js / IndexedDB。
    ========================================================================== */
-export async function sendRedPacketMessage(container, state, db, draft = {}) {
+export async function sendRedPacketMessage(container, state, db, draft = {}, helpers = {}) {
   if (!state.currentChatId) return false;
   const session = state.sessions.find(item => String(item.id) === String(state.currentChatId));
   if (!session) return false;
 
   const now = Date.now();
-  const amount = Number(draft.amount || 0);
-  const note = String(draft.note || '恭喜发财，大吉大利').trim();
-  const giftBaseCny = Number(draft.giftBaseCny || 0);
-  const nextBalanceBaseCny = Math.max(0, Number(state.walletData?.balanceBaseCny || 0) - giftBaseCny);
+  const amount = Number(draft.packetAmount ?? draft.amount ?? 0);
+  const note = String(draft.packetNote || draft.note || '恭喜发财，大吉大利').trim();
+  const packetBaseCny = Number(draft.packetBaseCny ?? draft.giftBaseCny ?? 0);
+  const currencyCode = String(draft.currencyCode || 'CNY').toUpperCase();
+  const precision = Math.max(0, Number(draft.precision ?? 2) || 0);
+  const formatWalletMoney = typeof helpers.formatWalletMoney === 'function'
+    ? helpers.formatWalletMoney
+    : ((value, code) => (code === 'CNY' ? `¥${Number(value || 0).toFixed(precision)}` : `${code} ${Number(value || 0).toFixed(precision)}`));
+  const redPacketDisplayAmount = String(draft.packetDisplayAmount || '').trim() || formatWalletMoney(amount, currencyCode);
+  const nextBalanceBaseCny = Math.max(0, Number(state.walletData?.balanceBaseCny || 0) - packetBaseCny);
 
   state.walletData = normalizeWalletData({
     ...state.walletData,
@@ -270,7 +313,7 @@ export async function sendRedPacketMessage(container, state, db, draft = {}) {
         kind: 'red_packet',
         direction: 'out',
         title: `发红包给 ${String(session.name || '对方').trim()}`,
-        amountBaseCny: Number(giftBaseCny.toFixed(2)),
+        amountBaseCny: Number(packetBaseCny.toFixed(2)),
         timestamp: now
       },
       ...(Array.isArray(state.walletData?.ledger) ? state.walletData.ledger : [])
@@ -282,8 +325,11 @@ export async function sendRedPacketMessage(container, state, db, draft = {}) {
     id: `user_red_packet_${now}_${Math.random().toString(16).slice(2)}`,
     role: 'user',
     type: 'red_packet',
-    content: `[红包] ${note}`,
-    redPacketAmount: amount,
+    content: `[红包] ${note}${redPacketDisplayAmount ? ` · ${redPacketDisplayAmount}` : ''}`,
+    redPacketAmount: Number(amount.toFixed(precision)),
+    redPacketBaseCny: Number(packetBaseCny.toFixed(2)),
+    redPacketDisplayAmount,
+    redPacketCurrency: currencyCode,
     redPacketNote: note,
     redPacketPayer: '我',
     redPacketDirection: 'outgoing',
