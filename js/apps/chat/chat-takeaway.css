@@ -20,6 +20,16 @@
 /* ==========================================================================
    [区域标注·已更新·外卖模块] 高级杂志风外卖气泡样式
    ========================================================================== */
+.msg-bubble--takeaway-wrap {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.msg-bubble--takeaway-wrap::before {
+  display: none !important;
+}
+
 .msg-bubble--takeaway {
   background: linear-gradient(145deg, #fefefe 0%, #f9f9fa 100%);
   border: 1px solid rgba(0, 0, 0, 0.05);

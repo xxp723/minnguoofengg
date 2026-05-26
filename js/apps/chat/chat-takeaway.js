@@ -10,7 +10,14 @@
  * 3. 持久化统一交由外部的 chat-event-click.js 和 DB.js / IndexedDB 进行，不使用 localStorage/sessionStorage。
  */
 
-import { escapeHtml } from './chat-utils.js';
+import { 
+  escapeHtml,
+  normalizeWalletData,
+  persistWalletData,
+  dbPut,
+  DATA_KEY_MESSAGES_PREFIX,
+  DATA_KEY_SESSIONS
+} from './chat-utils.js';
 import { MSG_ICONS } from './chat-message-icons.js';
 import { renderMessageBubble } from './chat-message-render.js';
 import { getWalletDisplayAmount } from './profile-wallet.js';
