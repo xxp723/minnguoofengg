@@ -98,89 +98,92 @@ export function renderTakeawayBubble(msg) {
 }
 
 /* ==========================================================================
-   [区域标注·外卖模块] 弹窗展示
+   [区域标注·已更新·外卖模块] 弹窗展示
    ========================================================================== */
 export function showTakeawayModal(container, walletData, onConfirm) {
-  const existingModal = document.getElementById('msg-takeaway-modal');
-  if (existingModal) existingModal.remove();
+  const mask = container.querySelector('[data-role="modal-mask"]');
+  const panel = container.querySelector('[data-role="modal-panel"]');
+  if (!mask || !panel) return;
 
   const walletDisplay = getWalletDisplayAmount(walletData || {});
+  const closeIcon = `<svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 14L34 34M34 14L14 34" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-  const modalHtml = `
-    <div class="modal" id="msg-takeaway-modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3 class="modal-title">点外卖</h3>
-          <button class="modal-close" id="msg-takeaway-close" type="button" aria-label="关闭">${MSG_ICONS.close}</button>
+  panel.innerHTML = `
+    <div class="chat-modal-header">
+      <span>点外卖</span>
+      <button class="chat-modal-close" id="msg-takeaway-close" type="button" aria-label="关闭">${closeIcon}</button>
+    </div>
+    <div class="chat-modal-body msg-takeaway-modal-content">
+      <div class="msg-takeaway-modal-header">
+        <div class="msg-takeaway-modal-header__icon">
+          ${MSG_ICONS.takeaway}
         </div>
-        <div class="modal-body msg-takeaway-modal-content">
-          <div class="msg-takeaway-modal-header">
-            <div class="msg-takeaway-modal-header__icon">
-              ${MSG_ICONS.takeaway}
-            </div>
-          </div>
-          
-          <div class="msg-takeaway-form">
-            <div class="msg-takeaway-field">
-              <label class="msg-takeaway-field__label">外卖名称</label>
-              <input type="text" class="msg-takeaway-input" id="msg-takeaway-name" placeholder="想吃点什么？" maxlength="30" autocomplete="off">
-            </div>
-            
-            <div class="msg-takeaway-field">
-              <label class="msg-takeaway-field__label">金额</label>
-              <input type="number" class="msg-takeaway-input" id="msg-takeaway-amount" placeholder="0.00" min="0.01" step="0.01">
-            </div>
-            
-            <div class="msg-takeaway-wallet-info">
-              面具钱包余额 <strong>¥${escapeHtml(walletDisplay)}</strong>
-            </div>
-            
-            <div class="msg-takeaway-actions">
-              <button class="msg-takeaway-btn msg-takeaway-btn--request" id="msg-takeaway-btn-request" type="button">发起代付</button>
-              <button class="msg-takeaway-btn msg-takeaway-btn--pay" id="msg-takeaway-btn-pay" type="button">确认支付</button>
-            </div>
-          </div>
+      </div>
+      
+      <div class="msg-takeaway-form">
+        <div class="msg-takeaway-field">
+          <label class="msg-takeaway-field__label">外卖名称</label>
+          <input type="text" class="msg-takeaway-input" id="msg-takeaway-name" placeholder="想吃点什么？" maxlength="30" autocomplete="off">
+        </div>
+        
+        <div class="msg-takeaway-field">
+          <label class="msg-takeaway-field__label">金额</label>
+          <input type="number" class="msg-takeaway-input" id="msg-takeaway-amount" placeholder="0.00" min="0.01" step="0.01">
+        </div>
+        
+        <div class="msg-takeaway-wallet-info">
+          面具钱包余额 <strong>¥${escapeHtml(walletDisplay)}</strong>
+        </div>
+        
+        <div id="msg-takeaway-error" class="msg-takeaway-error" style="display: none; color: #ff4d4f; font-size: 13px; text-align: center;"></div>
+        
+        <div class="msg-takeaway-actions">
+          <button class="msg-takeaway-btn msg-takeaway-btn--request" id="msg-takeaway-btn-request" type="button">发起代付</button>
+          <button class="msg-takeaway-btn msg-takeaway-btn--pay" id="msg-takeaway-btn-pay" type="button">确认支付</button>
         </div>
       </div>
     </div>
   `;
 
-  container.insertAdjacentHTML('beforeend', modalHtml);
-  const modal = document.getElementById('msg-takeaway-modal');
-  const nameInput = document.getElementById('msg-takeaway-name');
-  const amountInput = document.getElementById('msg-takeaway-amount');
-  const btnRequest = document.getElementById('msg-takeaway-btn-request');
-  const btnPay = document.getElementById('msg-takeaway-btn-pay');
-  const closeBtn = document.getElementById('msg-takeaway-close');
+  const nameInput = panel.querySelector('#msg-takeaway-name');
+  const amountInput = panel.querySelector('#msg-takeaway-amount');
+  const btnRequest = panel.querySelector('#msg-takeaway-btn-request');
+  const btnPay = panel.querySelector('#msg-takeaway-btn-pay');
+  const closeBtn = panel.querySelector('#msg-takeaway-close');
+  const errorTip = panel.querySelector('#msg-takeaway-error');
 
-  requestAnimationFrame(() => {
-    modal.classList.add('is-active');
-    setTimeout(() => nameInput.focus(), 50);
-  });
+  mask.classList.remove('is-hidden');
+  setTimeout(() => nameInput.focus(), 50);
 
   const closeModal = () => {
-    modal.classList.remove('is-active');
-    setTimeout(() => modal.remove(), 300);
+    mask.classList.add('is-hidden');
+    panel.innerHTML = '';
   };
 
   closeBtn.addEventListener('click', closeModal);
+
+  const showError = (msg) => {
+    errorTip.textContent = msg;
+    errorTip.style.display = 'block';
+    setTimeout(() => { errorTip.style.display = 'none'; }, 3000);
+  };
 
   const handleSubmit = (type) => {
     const name = nameInput.value.trim();
     const amount = parseFloat(amountInput.value);
 
     if (!name) {
-      alert('请输入外卖名称');
+      showError('请输入外卖名称');
       return;
     }
 
     if (isNaN(amount) || amount <= 0) {
-      alert('请输入有效的金额');
+      showError('请输入有效的金额');
       return;
     }
 
     if (type === 'pay' && amount > parseFloat(walletDisplay)) {
-      alert('余额不足');
+      showError('余额不足');
       return;
     }
 
@@ -243,10 +246,13 @@ export function showTakeawayActionModal(container, options = {}) {
   const actionHint = String(options.actionHint || '').trim() || '请选择处理方式';
   const canAccept = Boolean(options.canAccept);
 
+  const closeIcon = `<svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 14L34 34M34 14L14 34" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const checkIcon = `<svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 24L20 34L40 14" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
   panel.innerHTML = `
     <div class="chat-modal-header">
       <span>外卖操作</span>
-      <button class="chat-modal-close" data-action="close-modal" type="button">${TAB_ICONS.close}</button>
+      <button class="chat-modal-close" data-action="close-modal" type="button">${closeIcon}</button>
     </div>
     <div class="chat-modal-body msg-transfer-action-modal-body">
       <div class="msg-transfer-action-card">
@@ -269,7 +275,7 @@ export function showTakeawayActionModal(container, options = {}) {
       <div class="chat-modal-notice">${escapeHtml(actionHint)}</div>
     </div>
     <div class="chat-modal-footer">
-      ${canAccept ? `<button class="chat-modal-btn chat-modal-btn--primary" data-action="msg-takeaway-accept" data-message-id="${escapeHtml(messageId)}" type="button">${GIFT_ICONS.check}<span>代付</span></button>` : ''}
+      ${canAccept ? `<button class="chat-modal-btn chat-modal-btn--primary" data-action="msg-takeaway-accept" data-message-id="${escapeHtml(messageId)}" type="button">${checkIcon}<span>代付</span></button>` : ''}
     </div>
   `;
 
