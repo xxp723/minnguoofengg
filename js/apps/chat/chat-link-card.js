@@ -28,6 +28,7 @@ export function detectSharedLink(text) {
 
 export async function fetchLinkCardData(url) {
   if (!url) return null;
+  const siteName = /xiaohongshu\.com|xhslink\.com/i.test(url) ? '小红书' : '微博';
 
   try {
     const targetUrl = `https://r.jina.ai/${url}`;
@@ -37,8 +38,9 @@ export async function fetchLinkCardData(url) {
     const response = await fetch(targetUrl, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json',
-        'X-No-Cache': 'true', // 要求 Jina 返回新鲜数据
+        // 请求返回 Markdown 格式，以兼容重定向等复杂页面情况
+        'Accept': 'text/plain',
+        'X-No-Cache': 'true',
         'X-Return-Format': 'markdown'
       },
       signal: controller.signal
@@ -50,19 +52,27 @@ export async function fetchLinkCardData(url) {
       throw new Error(`Jina API Error: ${response.status}`);
     }
 
-    const data = await response.json();
-    const result = data?.data || data; // 兼容 Jina 返回的 JSON 结构
+    const textContent = await response.text();
+    
+    // 从纯文本中提取 Title, Source, Content
+    let titleMatch = textContent.match(/Title:\s*(.+)/i);
+    let title = titleMatch ? titleMatch[1].trim() : '';
+    
+    let contentMatch = textContent.match(/Markdown Content:\s*([\s\S]*)/i);
+    let content = contentMatch ? contentMatch[1].trim() : textContent.trim();
+    
+    let imageUrl = ''; // 稍后从正文匹配
 
-    // 提取所需字段
-    let title = String(result.title || '').trim();
-    let content = String(result.content || '').trim();
-    let imageUrl = String(result.image || '').trim(); // Jina API 可能返回首图
-
-    // 如果 Jina 没有直接返回 imageUrl，尝试从 Markdown 内容中提取第一张图片
-    if (!imageUrl && content) {
-      const imgMatch = content.match(/!\[.*?\]\((https?:\/\/[^\s\)]+)\)/);
-      if (imgMatch) {
-        imageUrl = imgMatch[1];
+    // 从 Markdown 内容中提取第一张有效图片作为首图
+    if (content) {
+      // 过滤常见的小图标、验证码等图片
+      const imgRegex = /!\[.*?\]\((https?:\/\/[^\s\)]+)\)/g;
+      let match;
+      while ((match = imgRegex.exec(content)) !== null) {
+        if (!/icon|captcha|avatar|logo/i.test(match[1])) {
+          imageUrl = match[1];
+          break;
+        }
       }
     }
 
@@ -84,19 +94,26 @@ export async function fetchLinkCardData(url) {
     }
 
     if (!title && !snippet) {
-      return null;
+      throw new Error('Jina API 提取到的内容为空');
     }
 
     return {
       url,
-      title: title || '分享链接',
+      title: title || `${siteName}分享`,
       snippet,
       imageUrl,
-      site: /xiaohongshu\.com|xhslink\.com/i.test(url) ? '小红书' : '微博'
+      site: siteName
     };
   } catch (error) {
-    console.error('抓取分享链接失败:', error);
-    return null;
+    console.error('抓取分享链接失败, 启用兜底卡片:', error);
+    // 启用兜底卡片数据，确保前端始终能渲染出链接卡片，同时告知 AI 页面无法访问
+    return {
+      url,
+      title: `${siteName}链接`,
+      snippet: '由于该平台访问限制或重定向，暂时无法自动提取文字详情。',
+      imageUrl: '',
+      site: siteName
+    };
   }
 }
 
