@@ -33,7 +33,8 @@ import {
   normalizeFavoriteData
 } from './chat-utils.js';
 import { normalizeChatPromptSettings } from './prompt.js';
-import { resetMessageSelectionState, syncChatConsoleDock } from './chat-message.js';
+import { syncChatConsoleDock } from './chat-message.js';
+import { resetMessageSelectionState } from './chat-message-selection.js';
 import { getDefaultAsideSettings } from './chat-aside.js';
 import {
   createMomentsComposeDraft,

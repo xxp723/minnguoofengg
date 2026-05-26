@@ -28,9 +28,11 @@ import {
   loadAsideModeState
 } from './chat-aside.js';
 import {
-  renderCurrentChatMessage,
-  resetMessageSelectionState
+  renderCurrentChatMessage
 } from './chat-message.js';
+import {
+  resetMessageSelectionState
+} from './chat-message-selection.js';
 import { normalizeTranslationSettings } from './chat-translation.js';
 import { renderSubPage } from './profile.js';
 import { refreshPanel } from './chat-shell.js';
