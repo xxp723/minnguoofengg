@@ -134,7 +134,12 @@ export async function mount(container, context) {
        [区域标注·已完成·聊天记录导入导出CSS] 预加载设置页导入导出板块样式
        说明：样式拆分到 chat-export-import.css，挂载时预加载以避免首次进入聊天设置页闪屏。
        ====================================================================== */
-    loadCSS('./js/apps/chat/chat-export-import.css', 'chat-export-import-css')
+    loadCSS('./js/apps/chat/chat-export-import.css', 'chat-export-import-css'),
+    /* ======================================================================
+       [区域标注·外卖板块独立样式预加载]
+       说明：外卖弹窗与外卖气泡样式拆分到 chat-takeaway.css，挂载时预加载以避免首次打开闪屏。
+       ====================================================================== */
+    loadCSS('./js/apps/chat/chat-takeaway.css', 'chat-takeaway-css')
   ]);
 
   const archiveRecord = await dbGetArchiveData(db, ARCHIVE_DB_RECORD_ID);
@@ -393,6 +398,7 @@ export async function mount(container, context) {
       removeCSS('chat-aside-css');
       removeCSS('chat-translation-css');
       removeCSS('chat-export-import-css');
+      removeCSS('chat-takeaway-css');
     }
   };
 }

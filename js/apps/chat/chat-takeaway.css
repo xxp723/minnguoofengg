@@ -1,0 +1,398 @@
+/**
+ * 文件名: js/apps/chat/chat-takeaway.css
+ * 用途: 闲谈应用 — 咖啡功能区“外卖”独立模块样式
+ * 说明: 高级时尚杂志风，防闪屏设计。
+ */
+
+/* ==========================================================================
+   [区域标注·本次新增] 外卖功能区入口与图标样式
+   ========================================================================== */
+.msg-feature-dock__item--takeaway svg {
+  color: #d97736;
+}
+.msg-feature-dock__item--takeaway:active {
+  background: rgba(217, 119, 54, 0.14);
+}
+.msg-feature-dock__item--takeaway span {
+  letter-spacing: 0.04em;
+}
+
+/* ==========================================================================
+   [区域标注·本次新增] 高级杂志风外卖气泡样式
+   ========================================================================== */
+.msg-bubble--takeaway {
+  background: linear-gradient(145deg, #fefefe 0%, #f9f9fa 100%);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.04);
+  color: #1a1a1a;
+  min-width: 240px;
+  max-width: 280px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s ease;
+}
+
+.msg-bubble--takeaway::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: #d97736;
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
+}
+
+.msg-bubble--user.msg-bubble--takeaway::before {
+  left: auto;
+  right: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+.msg-bubble--takeaway:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05), 0 2px 5px rgba(0, 0, 0, 0.03);
+}
+
+.msg-bubble--takeaway:active {
+  transform: scale(0.98);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.msg-takeaway-bubble__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.msg-takeaway-bubble__icon {
+  width: 24px;
+  height: 24px;
+  color: #d97736;
+  flex-shrink: 0;
+}
+
+.msg-takeaway-bubble__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.msg-takeaway-bubble__divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.06);
+  margin: 4px 0;
+}
+
+.msg-takeaway-bubble__content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.msg-takeaway-bubble__item-name {
+  font-size: 16px;
+  color: #333;
+  line-height: 1.4;
+  font-weight: 500;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.msg-takeaway-bubble__price {
+  font-size: 20px;
+  font-weight: 700;
+  color: #d97736;
+  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.msg-takeaway-bubble__price::before {
+  content: '¥';
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.msg-takeaway-bubble__footer {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #8c8c8c;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.msg-takeaway-bubble__status {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(217, 119, 54, 0.1);
+  color: #d97736;
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.msg-takeaway-bubble__status--completed {
+  background: rgba(82, 196, 26, 0.1);
+  color: #52c41a;
+}
+
+.msg-takeaway-bubble__status--timeout {
+  background: rgba(255, 77, 79, 0.1);
+  color: #ff4d4f;
+}
+
+/* ==========================================================================
+   [区域标注·本次新增] 外卖距离横幅样式
+   ========================================================================== */
+.msg-takeaway-banner-wrapper {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.msg-takeaway-banner {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
+  border-radius: 24px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: auto;
+  animation: takeawayBannerSlideDown 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  max-width: 90%;
+  transition: all 0.3s ease;
+}
+
+.msg-takeaway-banner.is-closing {
+  animation: takeawayBannerSlideUp 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes takeawayBannerSlideDown {
+  0% { transform: translateY(-100%) scale(0.9); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes takeawayBannerSlideUp {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-100%) scale(0.9); opacity: 0; }
+}
+
+.msg-takeaway-banner__icon {
+  width: 28px;
+  height: 28px;
+  background: #fdf2eb;
+  color: #d97736;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.msg-takeaway-banner__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.msg-takeaway-banner__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.msg-takeaway-banner__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  line-height: 1.2;
+}
+
+.msg-takeaway-banner__desc {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.2;
+}
+
+.msg-takeaway-banner__desc strong {
+  color: #d97736;
+  font-weight: 600;
+  font-family: "SF Pro Display", -apple-system, sans-serif;
+}
+
+/* ==========================================================================
+   [区域标注·本次新增] 代付确认系统小字样式（复用系统提示）
+   ========================================================================== */
+.msg-transfer-system-row[data-action="msg-system-tip-select"] .msg-transfer-system-row__text.msg-takeaway-system-text {
+  color: #d97736;
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   [区域标注·本次新增] 应用内外卖弹窗样式
+   ========================================================================== */
+.msg-takeaway-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.msg-takeaway-modal-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.msg-takeaway-modal-header__icon {
+  width: 48px;
+  height: 48px;
+  background: #fdf2eb;
+  color: #d97736;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.msg-takeaway-modal-header__icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.msg-takeaway-modal-header__title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.msg-takeaway-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.msg-takeaway-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.msg-takeaway-field__label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+.msg-takeaway-input {
+  width: 100%;
+  height: 44px;
+  background: #f5f5f5;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 0 16px;
+  font-size: 15px;
+  color: #1a1a1a;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.msg-takeaway-input:focus {
+  outline: none;
+  background: #fff;
+  border-color: #d97736;
+  box-shadow: 0 0 0 3px rgba(217, 119, 54, 0.1);
+}
+
+.msg-takeaway-input[type="number"] {
+  font-family: "SF Pro Display", -apple-system, sans-serif;
+  font-weight: 600;
+}
+
+.msg-takeaway-wallet-info {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #8c8c8c;
+  padding: 8px 0;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.msg-takeaway-wallet-info strong {
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
+.msg-takeaway-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.msg-takeaway-btn {
+  flex: 1;
+  height: 44px;
+  border-radius: 22px;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  padding: 0;
+}
+
+.msg-takeaway-btn:active {
+  transform: scale(0.96);
+}
+
+.msg-takeaway-btn--pay {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.msg-takeaway-btn--pay:hover {
+  background: #333;
+}
+
+.msg-takeaway-btn--request {
+  background: #fdf2eb;
+  color: #d97736;
+}
+
+.msg-takeaway-btn--request:hover {
+  background: #fae4d6;
+}

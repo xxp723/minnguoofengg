@@ -10,6 +10,11 @@
  */
 
 export const MSG_ICONS = {
+  /* ========================================================================
+     [区域标注·本次修改·外卖功能] IconPark — 外卖按钮图标
+     说明：用于聊天消息页咖啡功能区“外卖”板块。
+     ======================================================================== */
+  takeaway: `<svg viewBox="0 0 48 48" fill="none"><path d="M4 28h8l4-14h16l4 14h8" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="36" r="6" stroke="currentColor" stroke-width="3"/><circle cx="36" cy="36" r="6" stroke="currentColor" stroke-width="3"/><path d="M16 14h16v14H16z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`,
   back: `<svg viewBox="0 0 48 48" fill="none"><path d="M32 36L20 24l12-12" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   send: `<svg viewBox="0 0 48 48" fill="none"><path d="M43 5L25 43l-5-18L2 20L43 5Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M20 25l23-20" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
   magicWand: `<svg viewBox="0 0 48 48" fill="none"><path d="M43 5L5 43" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M35 5l8 8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M20 6l2 6l6 2l-6 2l-2 6l-2-6l-6-2l6-2l2-6Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M36 24l1.5 4l4 1.5l-4 1.5l-1.5 4l-1.5-4l-4-1.5l4-1.5l1.5-4Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`,

@@ -184,7 +184,7 @@ export function repairAiMessageFormatIfPossible(message, state) {
 /* ======================================================================== */
 /* 协议清理与排序 */
 /* ======================================================================== */
-const AI_PROTOCOL_CLOSING_TAG_REGEX = /(?:\[\s*\/\s*(?:回复|表情|转账|礼物|红包|引用|撤回|拍一拍|语音|文字图|图片|卡片|旁白|心声)\s*\]|【\s*\/\s*(?:语音|文字图)\s*】)/gi;
+const AI_PROTOCOL_CLOSING_TAG_REGEX = /(?:\[\s*\/\s*(?:回复|表情|转账|礼物|红包|外卖|引用|撤回|拍一拍|语音|文字图|图片|卡片|旁白|心声)\s*\]|【\s*\/\s*(?:语音|文字图)\s*】)/gi;
 
 function stripAiProtocolClosingTags(value = '') {
   return String(value || '').replace(AI_PROTOCOL_CLOSING_TAG_REGEX, ' ');
@@ -245,7 +245,7 @@ export function cleanAiVisibleBubbleText(text) {
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
     .replace(/<\/?think>/gi, '')
     .replace(/^\s*(?:以下是)?(?:修正后内容|最终输出|回复格式|检查结果|修正结果|正确格式)\s*[：:]\s*/i, '')
-    .replace(/^\s*(?:\*\*)?\s*`?\s*\[\s*(?:回复|表情|引用|礼物|红包|转账|撤回|拍一拍|语音|文字图|图片)\s*\]\s*(?:[^：:\n`*]{1,40}\s*[：:]\s*)?/i, '')
+    .replace(/^\s*(?:\*\*)?\s*`?\s*\[\s*(?:回复|表情|引用|礼物|红包|外卖|转账|撤回|拍一拍|语音|文字图|图片)\s*\]\s*(?:[^：:\n`*]{1,40}\s*[：:]\s*)?/i, '')
     .replace(/^\s*\{(?:user|assistant|role|character|mask)_[^}\n]{3,120}\}\s*/i, '')
     .replace(/(?:`|\*\*)+/g, '')
     .replace(/\[\s*消息发送时间\s*[：:][\s\S]*?\]/gi, ' ')
@@ -514,6 +514,9 @@ export function enforceAiReplyMessageCount(messages, chatSettings = {}) {
           if (String(message.type || '') === 'red_packet') {
             return message;
           }
+          if (String(message.type || '') === 'takeaway') {
+            return message;
+          }
           if (String(message.type || '') === 'card' && String(message.cardHtml || message.content || '').trim()) {
             return message;
           }
@@ -532,7 +535,7 @@ export function enforceAiReplyMessageCount(messages, chatSettings = {}) {
     let bestLength = 0;
 
     normalizedMessages.forEach((message, index) => {
-      if (String(message.type || '') === 'sticker' || String(message.type || '') === 'ai_withdraw_system' || String(message.type || '') === 'ai_pat_system' || isTextImageMessage(message) || isVoiceMessage(message) || String(message.type || '') === 'card' || String(message.type || '') === 'transfer' || String(message.type || '') === 'gift' || String(message.type || '') === 'red_packet') return;
+      if (String(message.type || '') === 'sticker' || String(message.type || '') === 'ai_withdraw_system' || String(message.type || '') === 'ai_pat_system' || isTextImageMessage(message) || isVoiceMessage(message) || String(message.type || '') === 'card' || String(message.type || '') === 'transfer' || String(message.type || '') === 'gift' || String(message.type || '') === 'red_packet' || String(message.type || '') === 'takeaway') return;
       const parts = splitSingleBubbleForCount(message.content);
       if (parts.length <= 1) return;
       const currentLength = String(message.content || '').length;
@@ -711,7 +714,7 @@ export function resolveAiQuotePayloadById(state, quoteId = '') {
 /* ======================================================================== */
 export function repairAiTextMessageFormatIfPossible(message) {
   if (!message || message.role !== 'assistant') return null;
-  if (['sticker', 'image', 'transfer', 'gift', 'red_packet'].includes(String(message.type || ''))) return null;
+  if (['sticker', 'image', 'transfer', 'gift', 'red_packet', 'takeaway'].includes(String(message.type || ''))) return null;
 
   const before = String(message.content || '');
   const protocolBlocks = extractAiProtocolBlocks(before).filter(block => block.type === '回复');
@@ -738,7 +741,7 @@ export function repairAiTextMessageFormatIfPossible(message) {
 
 export function repairAiQuoteMessageFormatIfPossible(message, state) {
   if (!message || message.role !== 'assistant') return null;
-  if (['sticker', 'image', 'transfer', 'gift', 'red_packet'].includes(String(message.type || ''))) return null;
+  if (['sticker', 'image', 'transfer', 'gift', 'red_packet', 'takeaway'].includes(String(message.type || ''))) return null;
 
   const raw = String(message.content || '').trim();
   const quoteMatch = raw.match(/(?:\[\s*引用\s*\]\s*[^：:\n`*]+?\s*[：:]\s*)?\{\s*引用\s*ID\s*[：:]\s*([^}；;，,\s]+)\s*\}\s*([\s\S]*)$/i);
@@ -762,7 +765,7 @@ export function repairAiQuoteMessageFormatIfPossible(message, state) {
 export function repairAiVoiceMessageFormatIfPossible(message) {
   if (!message || message.role !== 'assistant') return null;
   if (isVoiceMessage(message)) return null;
-  if (['sticker', 'image', 'transfer', 'gift', 'card', 'red_packet'].includes(String(message.type || ''))) return null;
+  if (['sticker', 'image', 'transfer', 'gift', 'card', 'red_packet', 'takeaway'].includes(String(message.type || ''))) return null;
 
   const raw = String(message.content || message.voiceText || '').trim();
   if (!/(?:\[\s*语音\s*\]|【\s*语音\s*】)/i.test(raw)) return null;
@@ -786,7 +789,7 @@ export function repairAiVoiceMessageFormatIfPossible(message) {
 
 export function repairAiAsideMessageFormatIfPossible(message) {
   if (!message || message.role !== 'assistant') return null;
-  if (['sticker', 'image', 'transfer', 'gift', 'card', 'red_packet'].includes(String(message.type || ''))) return null;
+  if (['sticker', 'image', 'transfer', 'gift', 'card', 'red_packet', 'takeaway'].includes(String(message.type || ''))) return null;
 
   const raw = String(message.content || '').trim();
   if (!/旁白/i.test(raw)) return null;
@@ -1001,6 +1004,38 @@ export function parseAiRedPacketProtocolPayload(content) {
   };
 }
 
+export function parseAiTakeawayProtocolPayload(content) {
+  const normalized = cleanAiProtocolBlockContent(content);
+  if (!normalized) return null;
+
+  const bodyMatch = normalized.match(/\{\s*([\s\S]*?)\s*\}/);
+  const body = bodyMatch ? String(bodyMatch[1] || '').trim() : normalized;
+  if (!body) return null;
+
+  const actionMatch = body.match(/操作\s*[：:]\s*([^}，,;；]+)/i);
+  if (actionMatch && actionMatch[1].trim() === '确认代付') {
+    const idMatch = body.match(/外卖ID\s*[：:]\s*([^}，,;；]+)/i);
+    return {
+      takeawayAction: 'confirm_pay',
+      takeawayId: idMatch ? idMatch[1].trim() : '',
+      content: `[确认代付]`
+    };
+  }
+
+  const nameMatch = body.match(/名称\s*[：:]\s*([^}，,;；]+)/i);
+  if (!nameMatch) return null;
+  const name = nameMatch[1].trim();
+
+  const noteMatch = body.match(/备注\s*[：:]\s*([^}]*)/i);
+  const remark = noteMatch ? noteMatch[1].trim() : '';
+
+  return {
+    takeawayName: name,
+    remark,
+    content: `[外卖] ${name}`
+  };
+}
+
 function parseProtocolRoleAndContent(raw = '', type = '') {
   const text = cleanAiProtocolBlockContent(raw);
   if (!text) return { roleName: '', content: '' };
@@ -1089,7 +1124,7 @@ export function extractAiProtocolBlocks(rawText) {
     .trim();
   if (!visibleText) return [];
 
-  const markerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情|转账|礼物|红包|引用|撤回|拍一拍|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
+  const markerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情|转账|礼物|红包|外卖|引用|撤回|拍一拍|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
   const matches = [...visibleText.matchAll(markerRegex)];
   if (!matches.length) return [];
 
@@ -1150,7 +1185,7 @@ export function bindAsideSegmentsToAiMessages(aiMessages = [], asideSegments = [
   }
 
   const source = String(rawTextWithAside || '');
-  const protocolMarkerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情|转账|礼物|引用|撤回|拍一拍|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
+  const protocolMarkerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情|转账|礼物|红包|外卖|引用|撤回|拍一拍|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
   const protocolMarkers = [...source.matchAll(protocolMarkerRegex)]
     .map(match => Number(match.index || 0))
     .sort((a, b) => a - b);
@@ -1364,6 +1399,21 @@ export function buildAiReplyMessages(rawText, state, options = {}) {
           type: 'red_packet',
           redPacketStatus: 'pending',
           ...redPacketPayload,
+          __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
+          __protocolEndIndex: block.__protocolEndIndex
+        });
+      }
+      return;
+    }
+
+    if (block.type === '外卖') {
+      const takeawayPayload = parseAiTakeawayProtocolPayload(block.content);
+      if (takeawayPayload) {
+        builtMessages.push({
+          role: 'assistant',
+          type: 'takeaway',
+          takeawayStatus: 'pending',
+          ...takeawayPayload,
           __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
           __protocolEndIndex: block.__protocolEndIndex
         });

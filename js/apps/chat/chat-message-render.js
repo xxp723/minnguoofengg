@@ -414,6 +414,7 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
   const isTransferMessage = String(msg?.type || '') === 'transfer';
   const isGiftBubbleMessage = isGiftMessage(msg);
   const isRedPacketBubbleMessage = isRedPacketMessage(msg);
+  const isTakeawayBubbleMessage = isTakeawayMessage(msg);
   const isMomentShareMessage = String(msg?.type || '') === 'moment_share';
   const isHtmlCardMessage = String(msg?.type || '') === 'card' && String(msg?.cardHtml || msg?.content || '').trim();
   const htmlCardSrcdoc = isHtmlCardMessage
@@ -484,6 +485,7 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
     }
 
     if (isGiftBubbleMessage) return renderGiftBubble(msg);
+    if (isTakeawayBubbleMessage) return renderTakeawayBubble(msg);
     if (isMomentShareMessage) return renderMomentShareBubble(msg);
 
     if (isHtmlCardMessage) {
@@ -554,7 +556,7 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
     ? 'msg-multi-toggle'
         : (isTransferMessage
         ? 'msg-transfer-open-actions'
-        : (isGiftBubbleMessage ? 'msg-gift-open-actions' : (isRedPacketBubbleMessage ? 'msg-red-packet-open-actions' : 'msg-bubble-select')));
+        : (isGiftBubbleMessage ? 'msg-gift-open-actions' : (isRedPacketBubbleMessage ? 'msg-red-packet-open-actions' : (isTakeawayBubbleMessage ? 'msg-takeaway-open-actions' : 'msg-bubble-select'))));
 
   return `
     <div class="msg-bubble-row ${isUser ? 'msg-bubble-row--right' : 'msg-bubble-row--left'} ${multiSelectMode ? 'is-multi-selecting' : ''} ${isSelected ? 'is-selected' : ''}"
@@ -781,6 +783,7 @@ export function renderChatMessage(chatSession, messages, options = {}) {
       <div class="msg-feature-dock__row">
         ${renderGiftFeatureButton()}
         ${renderRedPacketFeatureButton()}
+        ${renderTakeawayFeatureButton()}
         <button class="msg-feature-dock__item msg-feature-dock__item--aside" type="button" data-action="open-msg-aside-modal" data-feature="aside">
           ${MSG_ICONS.aside}<span>旁白</span>
         </button>
@@ -894,6 +897,10 @@ export function renderChatMessage(chatSession, messages, options = {}) {
     mountedStickerGroupIds,
     chatConsoleEnabled
   });
+
+  setTimeout(() => {
+    initTakeawayBanner(document.querySelector('.msg-page'), { currentMessages: allMsgs }, selectedMessageIds);
+  }, 100);
 
   return `
     <div class="${pageClassName}"${chatBackgroundAttrs.styleAttr}>

@@ -177,6 +177,12 @@ import {
   showMessageRedPacketModal
 } from './chat-red-packet.js';
 import {
+  parseTakeawayDraftFromModal,
+  sendTakeawayMessage,
+  showTakeawayActionModal,
+  showMessageTakeawayModal
+} from './chat-takeaway.js';
+import {
   createTextImageMessage,
   openTextImagePreview,
   parseTextImageDraftFromModal,
@@ -1210,6 +1216,17 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
       break;
     }
 
+    case 'open-msg-takeaway-modal': {
+      const walletDisplay = getWalletDisplayAmount(state.walletData || {});
+      const activeMask = (state.archiveMasks || []).find(mask => String(mask?.id || '') === String(state.activeMaskId)) || {};
+      showMessageTakeawayModal(container, {
+        balanceLabel: formatWalletMoney(walletDisplay.value, walletDisplay.currency.code),
+        currencyCode: walletDisplay.currency.code,
+        maskName: String(activeMask?.name || state.profile?.nickname || '当前面具身份')
+      });
+      break;
+    }
+
     case 'confirm-msg-red-packet-send': {
       if (!state.currentChatId) break;
 
@@ -1249,6 +1266,100 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
       const latestPacketMessage = state.currentMessages[state.currentMessages.length - 1];
       closeModal(container);
       appendCurrentMessageBubble(container, state, latestPacketMessage);
+      syncMessageDockOpenState(container, state);
+      refreshPanel(container, state, 'chatList');
+      break;
+    }
+
+    case 'confirm-msg-takeaway-send':
+    case 'request-msg-takeaway-pay': {
+      if (!state.currentChatId) break;
+
+      const walletDisplay = getWalletDisplayAmount(state.walletData || {});
+      const draft = parseTakeawayDraftFromModal(container, walletDisplay, state.walletData || {});
+      const takeawayTitle = String(draft.takeawayTitle || '').trim();
+      const takeawayPrice = Number(draft.takeawayPrice || 0);
+      const takeawayBaseCny = Number(draft.takeawayBaseCny || 0);
+      const currentBaseCny = Math.max(0, Number(state.walletData?.balanceBaseCny || 0) || 0);
+
+      if (!takeawayTitle) {
+        renderModalNotice(container, '请输入商品名称');
+        break;
+      }
+
+      if (!Number.isFinite(takeawayPrice) || takeawayPrice <= 0) {
+        renderModalNotice(container, '请输入大于 0 的商品价格');
+        break;
+      }
+
+      if (!Number.isFinite(Number(draft.displayRate || 0)) || Number(draft.displayRate || 0) <= 0 || !Number.isFinite(takeawayBaseCny)) {
+        renderModalNotice(container, '当前钱包币种汇率不可用，请先切换币种后重试');
+        break;
+      }
+
+      if (action === 'confirm-msg-takeaway-send' && takeawayBaseCny > currentBaseCny + 1e-8) {
+        renderModalNotice(container, '商品价格不能超过当前钱包余额');
+        break;
+      }
+
+      const takeawayDisplayPrice = formatWalletMoney(takeawayPrice, draft.currencyCode);
+      const normalizedDraft = {
+        ...draft,
+        takeawayDisplayPrice
+      };
+
+      if (action === 'confirm-msg-takeaway-send') {
+        const sent = await sendTakeawayMessage(container, state, db, normalizedDraft, { formatWalletMoney });
+        if (!sent) {
+          renderModalNotice(container, '当前聊天不存在，无法点外卖');
+          break;
+        }
+
+        const latestTakeawayMessage = state.currentMessages[state.currentMessages.length - 1];
+        closeModal(container);
+        appendCurrentMessageBubble(container, state, latestTakeawayMessage);
+        syncMessageDockOpenState(container, state);
+        refreshPanel(container, state, 'chatList');
+        // AI不会立刻回复外卖消息，除非用户点纸飞机发送，已经在 utils 里处理，或者不 triggerAi
+        break;
+      }
+
+      const session = state.sessions.find(s => String(s.id) === String(state.currentChatId));
+      if (!session) {
+        renderModalNotice(container, '当前聊天不存在，无法发起外卖代付请求');
+        break;
+      }
+
+      const now = Date.now();
+      const takeawayPayRequestMessage = {
+        id: `takeaway_${now}_${Math.random().toString(16).slice(2)}`,
+        role: 'user',
+        type: 'takeaway',
+        takeawayDirection: 'outgoing',
+        takeawayStatus: 'pending',
+        takeawayTitle,
+        takeawayPrice,
+        takeawayBaseCny,
+        takeawayDisplayPrice,
+        takeawayCurrency: draft.currencyCode,
+        takeawayNote: draft.takeawayNote,
+        content: `[外卖代付请求] ${takeawayTitle}`,
+        timestamp: now
+      };
+
+      state.currentMessages.push(takeawayPayRequestMessage);
+      state.coffeeDockOpen = false;
+      state.stickerPanelOpen = false;
+      session.lastMessage = `[外卖代付请求] ${takeawayTitle}${takeawayDisplayPrice ? ` · ${takeawayDisplayPrice}` : ''}`;
+      session.lastTime = takeawayPayRequestMessage.timestamp;
+
+      await Promise.all([
+        persistCurrentMessages(state, db),
+        dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions)
+      ]);
+
+      closeModal(container);
+      appendCurrentMessageBubble(container, state, takeawayPayRequestMessage);
       syncMessageDockOpenState(container, state);
       refreshPanel(container, state, 'chatList');
       break;
@@ -1610,6 +1721,109 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
         actionHint: canOperate ? '请选择领取' : `当前红包状态：${statusLabel}`,
         canAccept: canOperate
       });
+      break;
+    }
+
+    case 'msg-takeaway-open-actions': {
+      const messageId = String(target.dataset.messageId || '').trim();
+      const takeawayMessage = (state.currentMessages || []).find(item => String(item.id) === messageId);
+      if (!takeawayMessage || String(takeawayMessage.type || '') !== 'takeaway') break;
+
+      const takeawayStatus = String(takeawayMessage.takeawayStatus || 'pending').trim();
+      const takeawayDirection = String(takeawayMessage.takeawayDirection || '').trim() || (takeawayMessage.role === 'assistant' ? 'incoming' : 'outgoing');
+      const statusLabel = takeawayStatus === 'accepted' ? '已接收' : (takeawayStatus === 'returned' ? '已退回' : '等待操作');
+      const canOperate = takeawayStatus === 'pending' && takeawayDirection === 'incoming';
+
+      showTakeawayActionModal(container, {
+        messageId,
+        title: String(takeawayMessage.takeawayTitle || takeawayMessage.content || '外卖'),
+        priceLabel: String(takeawayMessage.takeawayDisplayPrice || ''),
+        note: String(takeawayMessage.takeawayNote || ''),
+        statusLabel,
+        actionHint: canOperate ? '请选择代付' : `当前外卖状态：${statusLabel}`,
+        canAccept: canOperate
+      });
+      break;
+    }
+
+    case 'msg-takeaway-accept': {
+      const messageId = String(target.dataset.messageId || '').trim();
+      if (!messageId) break;
+
+      const messageIndex = (state.currentMessages || []).findIndex(item => String(item.id) === messageId);
+      if (messageIndex < 0) break;
+
+      const takeawayMessage = state.currentMessages[messageIndex];
+      if (String(takeawayMessage.type || '') !== 'takeaway') break;
+      if (String(takeawayMessage.takeawayStatus || 'pending') !== 'pending') {
+        closeModal(container);
+        break;
+      }
+
+      const takeawayDirection = String(takeawayMessage.takeawayDirection || '').trim() || (takeawayMessage.role === 'assistant' ? 'incoming' : 'outgoing');
+      if (takeawayDirection !== 'incoming') {
+        closeModal(container);
+        break;
+      }
+
+      const now = Date.now();
+      const takeawayBaseCny = Math.max(0, Number(takeawayMessage.takeawayBaseCny || 0) || 0);
+
+      if (takeawayBaseCny > 0) {
+        const currentBaseCny = Math.max(0, Number(state.walletData?.balanceBaseCny || 0) || 0);
+        if (takeawayBaseCny > currentBaseCny + 1e-8) {
+          renderModalNotice(container, '钱包余额不足以代付');
+          break;
+        }
+
+        const session = state.sessions.find(s => s.id === state.currentChatId);
+        state.walletData = normalizeWalletData({
+          ...state.walletData,
+          balanceBaseCny: currentBaseCny - takeawayBaseCny,
+          ledger: [
+            {
+              id: `wallet_ledger_${now}_${Math.random().toString(16).slice(2)}`,
+              kind: 'transfer',
+              direction: 'out',
+              title: `代付外卖 ${String(takeawayMessage.takeawayTitle || '')}`,
+              amountBaseCny: Number(takeawayBaseCny.toFixed(2)),
+              timestamp: now
+            },
+            ...(Array.isArray(state.walletData?.ledger) ? state.walletData.ledger : [])
+          ],
+          updatedAt: now
+        });
+      }
+
+      state.currentMessages[messageIndex] = {
+        ...takeawayMessage,
+        takeawayDirection,
+        takeawayStatus: 'accepted',
+        takeawayHandledAt: now
+      };
+
+      state.currentMessages.push({
+        id: `takeaway_system_${now}_${Math.random().toString(16).slice(2)}`,
+        role: 'user',
+        type: 'transfer_system',
+        content: '你已确认代付',
+        timestamp: now + 1
+      });
+
+      const session = state.sessions.find(s => s.id === state.currentChatId);
+      if (session) {
+        session.lastMessage = '[外卖] 已确认代付';
+        session.lastTime = now;
+      }
+
+      await Promise.all([
+        persistCurrentMessages(state, db),
+        dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions),
+        persistWalletData(state, db)
+      ]);
+
+      closeModal(container);
+      renderCurrentChatMessage(container, state);
       break;
     }
 
