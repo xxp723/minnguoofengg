@@ -108,7 +108,8 @@ function parseAiRedPacketBodyFields(body = '') {
     || text.match(/\b([0-9]+(?:\.[0-9]{1,2})?)\b/);
   if (!amountMatch) return null;
 
-  const noteMatch = text.match(/(?:备注|留言|文案|祝福|祝语|互动留言)\s*[：:]\s*([\s\S]*?)(?=\s*(?:金额|金额数|数额|红包金额|金额￥)\s*[：:]|$)/i);
+  const noteMatch = text.match(/(?:备注|留言|文案|祝福|祝语|互动留言)\s*[：:]\s*([\s\S]*?)(?=\s*(?:金额|金额数|数额|红包金额|金额￥)\s*[：:]|$)/i)
+    || text.match(/(?:备注|留言|文案|祝福|祝语|互动留言)\s*[：:]\s*([^]*)/i);
   const rawNote = cleanAiProtocolValue(noteMatch?.[1] || '');
 
   return {
