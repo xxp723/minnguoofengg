@@ -100,18 +100,18 @@ export function renderTakeawayBubble(msg) {
 /* ==========================================================================
    [区域标注·已更新·外卖模块] 弹窗展示
    ========================================================================== */
-export function showTakeawayModal(container, walletData, onConfirm) {
+export function showTakeawayModal(container, options = {}) {
   const mask = container.querySelector('[data-role="modal-mask"]');
   const panel = container.querySelector('[data-role="modal-panel"]');
   if (!mask || !panel) return;
 
-  const walletDisplay = getWalletDisplayAmount(walletData || {});
+  const balanceLabel = String(options.balanceLabel || '0.00');
   const closeIcon = `<svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 14L34 34M34 14L14 34" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
   panel.innerHTML = `
     <div class="chat-modal-header">
       <span>点外卖</span>
-      <button class="chat-modal-close" id="msg-takeaway-close" type="button" aria-label="关闭">${closeIcon}</button>
+      <button class="chat-modal-close" data-action="close-modal" type="button" aria-label="关闭">${closeIcon}</button>
     </div>
     <div class="chat-modal-body msg-takeaway-modal-content">
       <div class="msg-takeaway-modal-header">
@@ -123,82 +123,34 @@ export function showTakeawayModal(container, walletData, onConfirm) {
       <div class="msg-takeaway-form">
         <div class="msg-takeaway-field">
           <label class="msg-takeaway-field__label">外卖名称</label>
-          <input type="text" class="msg-takeaway-input" id="msg-takeaway-name" placeholder="想吃点什么？" maxlength="30" autocomplete="off">
+          <input type="text" class="msg-takeaway-input" data-role="msg-takeaway-title-input" placeholder="想吃点什么？" maxlength="30" autocomplete="off">
         </div>
         
         <div class="msg-takeaway-field">
           <label class="msg-takeaway-field__label">金额</label>
-          <input type="number" class="msg-takeaway-input" id="msg-takeaway-amount" placeholder="0.00" min="0.01" step="0.01">
+          <input type="number" class="msg-takeaway-input" data-role="msg-takeaway-price-input" placeholder="0.00" min="0.01" step="0.01">
         </div>
         
         <div class="msg-takeaway-wallet-info">
-          面具钱包余额 <strong>¥${escapeHtml(walletDisplay)}</strong>
+          钱包余额 <strong>${escapeHtml(balanceLabel)}</strong>
         </div>
         
         <div id="msg-takeaway-error" class="msg-takeaway-error" style="display: none; color: #ff4d4f; font-size: 13px; text-align: center;"></div>
         
         <div class="msg-takeaway-actions">
-          <button class="msg-takeaway-btn msg-takeaway-btn--request" id="msg-takeaway-btn-request" type="button">发起代付</button>
-          <button class="msg-takeaway-btn msg-takeaway-btn--pay" id="msg-takeaway-btn-pay" type="button">确认支付</button>
+          <button class="msg-takeaway-btn msg-takeaway-btn--request" data-action="request-msg-takeaway-pay" type="button">发起代付</button>
+          <button class="msg-takeaway-btn msg-takeaway-btn--pay" data-action="confirm-msg-takeaway-send" type="button">确认支付</button>
         </div>
       </div>
     </div>
   `;
 
-  const nameInput = panel.querySelector('#msg-takeaway-name');
-  const amountInput = panel.querySelector('#msg-takeaway-amount');
-  const btnRequest = panel.querySelector('#msg-takeaway-btn-request');
-  const btnPay = panel.querySelector('#msg-takeaway-btn-pay');
-  const closeBtn = panel.querySelector('#msg-takeaway-close');
-  const errorTip = panel.querySelector('#msg-takeaway-error');
-
   mask.classList.remove('is-hidden');
-  setTimeout(() => nameInput.focus(), 50);
-
-  const closeModal = () => {
-    mask.classList.add('is-hidden');
-    panel.innerHTML = '';
-  };
-
-  closeBtn.addEventListener('click', closeModal);
-
-  const showError = (msg) => {
-    errorTip.textContent = msg;
-    errorTip.style.display = 'block';
-    setTimeout(() => { errorTip.style.display = 'none'; }, 3000);
-  };
-
-  const handleSubmit = (type) => {
-    const name = nameInput.value.trim();
-    const amount = parseFloat(amountInput.value);
-
-    if (!name) {
-      showError('请输入外卖名称');
-      return;
-    }
-
-    if (isNaN(amount) || amount <= 0) {
-      showError('请输入有效的金额');
-      return;
-    }
-
-    if (type === 'pay' && amount > parseFloat(walletDisplay)) {
-      showError('余额不足');
-      return;
-    }
-
-    onConfirm({
-      takeawayType: type,
-      itemName: name,
-      amount: amount.toFixed(2),
-      status: type === 'pay' ? 'pending' : 'waiting'
-    });
-
-    closeModal();
-  };
-
-  btnRequest.addEventListener('click', () => handleSubmit('request'));
-  btnPay.addEventListener('click', () => handleSubmit('pay'));
+  
+  const nameInput = panel.querySelector('[data-role="msg-takeaway-title-input"]');
+  if (nameInput) {
+    setTimeout(() => nameInput.focus(), 50);
+  }
 }
 
 /* ==========================================================================
