@@ -315,10 +315,10 @@ export function initTakeawayBanner(container, state, messageIds = []) {
   const conversation = container.querySelector('.msg-conversation');
   if (!conversation) return;
 
-  // 寻找所有进行中的外卖消息 (status: pending)
+  // 寻找所有进行中的外卖消息 (takeawayStatus: pending)
   const pendingOrders = (state.currentMessages || []).filter(msg => 
     isTakeawayMessage(msg) && 
-    msg.status === 'pending' && 
+    msg.takeawayStatus === 'pending' && 
     (messageIds.length === 0 || messageIds.includes(msg.id))
   );
 
