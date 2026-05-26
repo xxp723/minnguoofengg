@@ -125,29 +125,44 @@
 }
 
 /* ==========================================================================
-   [区域标注·本次新增红包模块] 弹窗通用与特化样式
+   [区域标注·已更新·本次新增红包模块] 弹窗通用与特化样式
    ========================================================================== */
 
-/* 调整发送红包弹窗内部排版 */
+.msg-red-packet-modal__header span {
+  letter-spacing: 0.08em;
+}
+
+.msg-red-packet-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 4px;
+}
+
 .msg-red-packet-modal__balance-card {
   display: flex;
   align-items: center;
+  gap: 14px;
   padding: 16px;
-  background: var(--bg-tertiary, rgba(0, 0, 0, 0.03));
-  border-radius: 12px;
-  margin-bottom: 24px;
+  border: 1px solid rgba(174, 143, 117, 0.22);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 15% 8%, rgba(255, 255, 255, 0.9), transparent 38%),
+    linear-gradient(135deg, rgba(250, 244, 236, 0.96), rgba(232, 219, 204, 0.72));
+  box-shadow: 0 14px 34px rgba(101, 79, 58, 0.12);
 }
 
 .msg-red-packet-modal__balance-icon {
-  width: 40px;
-  height: 40px;
-  background: var(--theme-color, #c1a173);
-  color: #fff;
-  border-radius: 50%;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 12px;
+  width: 46px;
+  height: 46px;
+  border-radius: 18px;
+  color: #9f765c;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(159, 118, 92, 0.12);
+  flex: 0 0 auto;
 }
 
 .msg-red-packet-modal__balance-icon svg {
@@ -155,31 +170,62 @@
   height: 24px;
 }
 
+.msg-red-packet-modal__balance-card div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .msg-red-packet-modal__balance-card em {
-  display: block;
+  color: rgba(77, 58, 45, 0.66);
   font-size: 12px;
-  color: var(--text-tertiary, #999);
   font-style: normal;
-  margin-bottom: 4px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 .msg-red-packet-modal__balance-card strong {
-  display: block;
-  font-size: 20px;
-  color: var(--text-primary, #333);
-  font-family: monospace;
+  color: #3f2d25;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 25px;
+  line-height: 1.18;
+  letter-spacing: 0.02em;
+}
+
+.msg-red-packet-modal__balance-card small {
+  color: rgba(90, 69, 53, 0.52);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
 }
 
 .msg-red-packet-modal__field {
   display: flex;
   flex-direction: column;
-  margin-bottom: 16px;
+  gap: 8px;
 }
 
 .msg-red-packet-modal__field span {
-  font-size: 14px;
-  color: var(--text-secondary, #666);
-  margin-bottom: 8px;
+  color: rgba(63, 45, 37, 0.78);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.msg-red-packet-modal__input {
+  border-radius: 18px !important;
+  border: 1px solid rgba(174, 143, 117, 0.24) !important;
+  background: rgba(255, 252, 248, 0.86) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.msg-red-packet-modal__footer {
+  gap: 10px;
+}
+
+.msg-red-packet-modal__footer .chat-modal-btn {
+  border-radius: 999px;
+  letter-spacing: 0.04em;
 }
 
 /* 红包行为操作卡片 (领取/已领取) */

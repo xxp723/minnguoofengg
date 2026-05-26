@@ -266,7 +266,7 @@ export function showRedPacketActionModal(container, options = {}) {
 }
 
 /* ==========================================================================
-   [区域标注·本次新增红包模块] 发红包弹窗
+   [区域标注·已更新·本次新增红包模块] 发红包弹窗
    ========================================================================== */
 export function showMessageRedPacketModal(container, options = {}) {
   const mask = container.querySelector('[data-role="modal-mask"]');
@@ -274,6 +274,7 @@ export function showMessageRedPacketModal(container, options = {}) {
   if (!mask || !panel) return;
 
   const balanceLabel = String(options.balanceLabel || '¥0.00').trim();
+  const currencyCode = String(options.currencyCode || 'CNY').trim().toUpperCase();
   const maskName = String(options.maskName || '当前面具身份').trim();
 
   panel.innerHTML = `
@@ -287,6 +288,7 @@ export function showMessageRedPacketModal(container, options = {}) {
         <div>
           <em>${escapeHtml(maskName)}的钱包余额</em>
           <strong>${escapeHtml(balanceLabel)}</strong>
+          <small>${escapeHtml(currencyCode)}</small>
         </div>
       </section>
 
