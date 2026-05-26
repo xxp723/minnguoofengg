@@ -175,6 +175,15 @@ import {
 import { maybeRunAutoLongTermMemorySummary } from './chat-memory-settings.js';
 
 /* ==========================================================================
+   [区域标注·本次修改·分享链接解析功能] 导入独立链接解析模块
+   ========================================================================== */
+import {
+  detectSharedLink,
+  fetchLinkCardData,
+  formatLinkDataForAiRound
+} from './chat-link-card.js';
+
+/* ==========================================================================
    [区域标注·已完成·角色回复横幅点击跳转] 角色回复横幅进入聊天窗口
    说明：
    1. 横幅点击时按目标会话 targetChatId 动态打开对应角色聊天消息页。
@@ -690,8 +699,10 @@ export async function sendMessage(container, state, db, content, settingsManager
   /* [区域标注·本次需求] 用户消息入列并写入 IndexedDB */
   /* ===== 闲谈：发送消息去重 START ===== */
   let appendedUserMessage = null;
+  let sharedLinkUrl = null; // [区域标注·本次修改·分享链接]
   if (!options.skipAppendUser) {
     const pendingQuote = isCurrentChat && state.pendingQuote && state.pendingQuote.id ? { ...state.pendingQuote } : null;
+    sharedLinkUrl = detectSharedLink(userText); // [区域标注·本次修改·分享链接] 检测用户文本中是否包含小红书或微博链接
     appendedUserMessage = {
       id: `user_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       role: 'user',
@@ -728,6 +739,26 @@ export async function sendMessage(container, state, db, content, settingsManager
     appendCurrentMessageBubble(container, state, appendedUserMessage);
   }
   /* ===== 闲谈：发送消息去重 END ===== */
+
+  /* ==========================================================================
+     [区域标注·本次修改·分享链接] 异步抓取链接数据并更新消息
+     说明：
+     1. 如果检测到小红书或微博链接，异步调用 Jina API 抓取。
+     2. 抓取成功后，将 linkData 挂载到本条用户消息，并写入 IndexedDB，用于后续重新渲染卡片。
+     3. 强制重绘这条消息的气泡。
+     ========================================================================== */
+  if (sharedLinkUrl && appendedUserMessage) {
+    const fetchedData = await fetchLinkCardData(sharedLinkUrl);
+    if (fetchedData) {
+      appendedUserMessage.linkData = fetchedData;
+      
+      await dbPut(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + targetChatId, targetMessages);
+      
+      if (isCurrentChat) {
+        refreshMessageBubbleRows(container, state, [appendedUserMessage.id]);
+      }
+    }
+  }
 
   /* ===== 闲谈应用：回车只发送用户消息 START ===== */
   if (!triggerAi) return;

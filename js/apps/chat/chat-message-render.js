@@ -54,6 +54,14 @@ import { renderQuotePreview } from './chat-message-quote.js';
 import { renderChatMessageSearchPanelHtml } from './chat-message-search.js';
 import { isUserPatSystemMessage } from './chat-user-pat.js';
 import { getChatBackgroundListAreaAttrs } from './chat-beauty-settings.js';
+/* ==========================================================================
+   [区域标注·本次修改·分享链接] 导入链接卡片渲染
+   ========================================================================== */
+import {
+  isLinkCardMessage,
+  renderLinkCardBubble,
+  getLinkCardMessageDisplayText
+} from './chat-link-card.js';
 
 const CHAT_MESSAGE_INITIAL_VISIBLE_COUNT = 100;
 const CHAT_MESSAGE_LOAD_MORE_STEP = 100;
@@ -422,6 +430,7 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
   const isRedPacketBubbleMessage = isRedPacketMessage(msg);
   const isTakeawayBubbleMessage = isTakeawayMessage(msg);
   const isMomentShareMessage = String(msg?.type || '') === 'moment_share';
+  const isLinkCardBubbleMessage = isLinkCardMessage(msg); // [区域标注·本次修改·分享链接] 判断是否为带链接元数据的消息
   const isHtmlCardMessage = String(msg?.type || '') === 'card' && String(msg?.cardHtml || msg?.content || '').trim();
   const htmlCardSrcdoc = isHtmlCardMessage
     ? sanitizeHtmlCardDocumentForSrcdoc(String(msg?.cardHtml || msg?.content || ''))
@@ -493,6 +502,7 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
     if (isGiftBubbleMessage) return renderGiftBubble(msg);
     if (isTakeawayBubbleMessage) return renderTakeawayBubble(msg);
     if (isMomentShareMessage) return renderMomentShareBubble(msg);
+    if (isLinkCardBubbleMessage) return renderLinkCardBubble(msg); // [区域标注·本次修改·分享链接] 渲染链接卡片
 
     if (isHtmlCardMessage) {
       return `
@@ -562,7 +572,7 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
     ? 'msg-multi-toggle'
         : (isTransferMessage
         ? 'msg-transfer-open-actions'
-        : (isGiftBubbleMessage ? 'msg-gift-open-actions' : (isRedPacketBubbleMessage ? 'msg-red-packet-open-actions' : (isTakeawayBubbleMessage ? 'msg-takeaway-open-actions' : 'msg-bubble-select'))));
+        : (isGiftBubbleMessage ? 'msg-gift-open-actions' : (isRedPacketBubbleMessage ? 'msg-red-packet-open-actions' : (isTakeawayBubbleMessage ? 'msg-takeaway-open-actions' : (isLinkCardBubbleMessage ? 'msg-link-card-open-actions' : 'msg-bubble-select'))))); // [区域标注·本次修改·分享链接] 绑定点击打开事件
 
   return `
     <div class="msg-bubble-row ${isUser ? 'msg-bubble-row--right' : 'msg-bubble-row--left'} ${multiSelectMode ? 'is-multi-selecting' : ''} ${isSelected ? 'is-selected' : ''}"
@@ -622,7 +632,7 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
             </button>
           </div>
         ` : ''}
-        <div class="msg-bubble ${isUser ? 'msg-bubble--user' : 'msg-bubble--other'} ${isAssistant && msg?.pending ? 'is-pending' : ''} ${isStickerMessage ? 'msg-bubble--sticker' : ''} ${isTextImageBubbleMessage ? 'msg-bubble--text-image' : ''} ${isVoiceBubbleMessage ? 'msg-bubble--voice' : ''} ${isImageMessage ? 'msg-bubble--image' : ''} ${isTransferMessage ? 'msg-bubble--transfer' : ''} ${isGiftBubbleMessage ? 'msg-bubble--gift' : ''} ${isRedPacketBubbleMessage ? 'msg-bubble--red-packet' : ''} ${isMomentShareMessage ? 'msg-bubble--moment-share' : ''} ${isHtmlCardMessage ? 'msg-bubble--html-card' : ''} ${isTakeawayBubbleMessage ? 'msg-bubble--takeaway-wrap' : ''} ${quoteHtml ? 'msg-bubble--with-quote' : ''}">
+        <div class="msg-bubble ${isUser ? 'msg-bubble--user' : 'msg-bubble--other'} ${isAssistant && msg?.pending ? 'is-pending' : ''} ${isStickerMessage ? 'msg-bubble--sticker' : ''} ${isTextImageBubbleMessage ? 'msg-bubble--text-image' : ''} ${isVoiceBubbleMessage ? 'msg-bubble--voice' : ''} ${isImageMessage ? 'msg-bubble--image' : ''} ${isTransferMessage ? 'msg-bubble--transfer' : ''} ${isGiftBubbleMessage ? 'msg-bubble--gift' : ''} ${isRedPacketBubbleMessage ? 'msg-bubble--red-packet' : ''} ${isMomentShareMessage ? 'msg-bubble--moment-share' : ''} ${isLinkCardBubbleMessage ? 'msg-bubble--link-card' : ''} ${isHtmlCardMessage ? 'msg-bubble--html-card' : ''} ${isTakeawayBubbleMessage ? 'msg-bubble--takeaway-wrap' : ''} ${quoteHtml ? 'msg-bubble--with-quote' : ''}">
           ${quoteHtml}
           ${bubbleInnerHtml}
           ${renderTranslationBubbleHtml(msg, options.translationSettings, isUser)}
@@ -1185,6 +1195,8 @@ export function refreshCurrentSessionLastMessage(state) {
                         ? getGiftMessageDisplayText(latest)
                         : (latest?.type === 'red_packet'
                             ? getRedPacketMessageDisplayText(latest)
-                            : (latest?.content || '')))))));
+                            : (isLinkCardMessage(latest)
+                                ? getLinkCardMessageDisplayText(latest)
+                                : (latest?.content || ''))))))));
   session.lastTime = latest?.timestamp || Date.now();
 }

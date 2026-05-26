@@ -1,0 +1,104 @@
+/**
+ * 文件名: js/apps/chat/chat-link-card.css
+ * 用途: 分享链接(小红书、微博)的高级时尚杂志风卡片样式
+ */
+
+/* ==========================================================================
+   [区域标注·本次修改·分享链接卡片样式]
+   说明：
+   1. 高级时尚杂志风：大留白、纤细边框、高对比度黑白灰、优雅排版。
+   2. 图片自适应裁切，图文层次分明。
+   ========================================================================== */
+
+.msg-link-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 320px;
+  background: #ffffff;
+  border: 1px solid #eaeaea;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  text-decoration: none;
+  color: inherit;
+  margin-top: 6px;
+  margin-bottom: 4px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.msg-link-card:active {
+  transform: scale(0.98);
+}
+
+.msg-link-card__cover {
+  width: 100%;
+  height: 180px;
+  position: relative;
+  overflow: hidden;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #eaeaea;
+}
+
+.msg-link-card__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.msg-link-card__content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.msg-link-card__site {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #888888;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.msg-link-card__title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* 增加一点优雅的衬线字体感觉，如果系统支持 */
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+}
+
+.msg-link-card__snippet {
+  font-size: 13px;
+  color: #666666;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.msg-link-card--no-image .msg-link-card__content {
+  padding: 20px 16px;
+}
+
+.msg-link-card--no-image .msg-link-card__title {
+  font-size: 16px;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}

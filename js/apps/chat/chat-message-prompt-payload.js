@@ -11,6 +11,14 @@
  */
 
 /* ==========================================================================
+   [区域标注·本次修改·分享链接] 导入链接格式化工具
+   ========================================================================== */
+import {
+  formatLinkDataForAiRound,
+  formatLinkDataForAiHistory
+} from './chat-link-card.js';
+
+/* ==========================================================================
    [区域标注·已完成·本次拆分] 用户最新一轮消息 Prompt Payload 组装子模块
    说明：
    1. 原 chat-message.js 中的 buildPromptPayloadForLatestUserRound 已拆分到本文件。
@@ -125,7 +133,23 @@ export function buildPromptPayloadForLatestUserRound(messages = [], shortTermMem
       }
       return String(item?.giftAiPromptText || item?.content || '').trim();
     }
-    return String(item.content || '').trim();
+
+    /* ======================================================================
+       [区域标注·本次修改·分享链接]
+       说明：
+       1. 区分“当轮”与“历史”的 prompt 长度。
+       2. 当轮使用 formatLinkDataForAiRound (包含正文详情)。
+       3. 历史使用 formatLinkDataForAiHistory (仅保留标题摘要)。
+       ====================================================================== */
+    let baseContent = String(item.content || '').trim();
+    if (item.linkData) {
+      const isHistorySummary = Boolean(options.historySummary);
+      const linkAiText = isHistorySummary 
+        ? formatLinkDataForAiHistory(item.linkData)
+        : formatLinkDataForAiRound(item.linkData);
+      baseContent = baseContent ? `${baseContent}\n\n${linkAiText}` : linkAiText;
+    }
+    return baseContent;
   };
 
   const userInput = currentRoundMessages.map((item, index) => {

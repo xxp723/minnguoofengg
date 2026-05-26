@@ -13,6 +13,7 @@
    3. 本区域仅定义字体资源，不涉及任何持久化存储逻辑。
    ========================================================================== */
 @import url('./chat-red-packet.css');
+@import url('./chat-link-card.css');
 
 @font-face {
   font-family: "ZSFT-dt";
