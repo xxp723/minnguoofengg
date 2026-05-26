@@ -175,6 +175,29 @@ import {
 import { maybeRunAutoLongTermMemorySummary } from './chat-memory-settings.js';
 
 /* ==========================================================================
+   [区域标注·已完成·角色回复横幅点击跳转] 角色回复横幅进入聊天窗口
+   说明：
+   1. 横幅点击时按目标会话 targetChatId 动态打开对应角色聊天消息页。
+   2. 使用动态 import 避免 chat-navigation.js 与 chat-message.js 形成静态循环依赖。
+   3. 仅做运行时页面跳转，不新增持久化存储；聊天数据仍只通过 DB.js / IndexedDB 读写。
+   ========================================================================== */
+function openReplyNotificationTargetChat(container, state, db, targetChatId) {
+  const safeTargetChatId = String(targetChatId || '').trim();
+  if (!safeTargetChatId) return;
+
+  import('./chat-navigation.js')
+    .then(({ openChatMessage }) => {
+      if (typeof openChatMessage === 'function') {
+        return openChatMessage(container, state, db, safeTargetChatId);
+      }
+      return null;
+    })
+    .catch(error => {
+      console.error('角色回复横幅跳转聊天窗口失败:', error);
+    });
+}
+
+/* ==========================================================================
    [区域标注·已完成·本次拆分] 聊天消息页 HTML 卡片 iframe 全局桥接接线
    说明：
    1. 原 chat-message.js 内联的 postMessage 监听器已下沉到 chat-message-card-bridge.js。
@@ -1206,10 +1229,25 @@ export async function sendMessage(container, state, db, content, settingsManager
         );
       }
 
-      if (document.visibilityState !== 'hidden' && allSettings?.inAppNotificationEnabled !== false && typeof window.showInAppNotification === 'function') {
+      /* ======================================================================
+         [区域标注·已完成·角色回复横幅显示条件与点击跳转]
+         说明：
+         1. 只在网页前台、横幅开关开启、且当前不在任何聊天消息页时显示角色回复横幅。
+         2. 用户正在聊天消息页面内时不显示角色消息弹窗；在聊天列表等非消息页才显示。
+         3. 点击横幅会进入该角色对应的聊天窗口；不使用原生弹窗，不新增 localStorage/sessionStorage。
+         ====================================================================== */
+      const shouldShowReplyInAppNotification = (
+        !state.currentChatId
+        && document.visibilityState !== 'hidden'
+        && allSettings?.inAppNotificationEnabled !== false
+        && typeof window.showInAppNotification === 'function'
+      );
+
+      if (shouldShowReplyInAppNotification) {
         const { title, notificationBody, iconUrl } = buildReplyNotificationPayload(message);
-        /* [区域标注·已修改·逐条横幅通知] 每一条 AI 回复都单独触发一次网页内横幅，避免整轮只弹最后一条。 */
-        window.showInAppNotification(title, notificationBody, iconUrl);
+        window.showInAppNotification(title, notificationBody, iconUrl, {
+          onClick: () => openReplyNotificationTargetChat(container, state, db, targetChatId)
+        });
       }
 
       if (targetChatId === state.currentChatId) {

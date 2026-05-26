@@ -21,8 +21,13 @@ if (typeof window !== 'undefined' && !window.__keepaliveAudio) {
   window.__keepaliveAudio.volume = 0.01;
 }
 
-// [区域标注·已完成·逐条横幅通知队列] 应用内横幅通知策略
-// 说明：同一轮 AI 多条回复会多次调用 showInAppNotification；这里按队列逐条展示，避免只看到最后一条或多条横幅互相覆盖。
+/* ==========================================================================
+   [区域标注·已完成·角色回复横幅点击跳转] 应用内横幅通知策略
+   说明：
+   1. 同一轮 AI 多条回复会多次调用 showInAppNotification；这里按队列逐条展示，避免只看到最后一条或多条横幅互相覆盖。
+   2. 横幅支持可选 onClick 回调；闲谈应用会用它在用户点击角色回复横幅时跳转到对应角色聊天窗口。
+   3. 本区域只处理运行时 DOM 与点击回调，不使用 localStorage/sessionStorage，不使用浏览器原生弹窗。
+   ========================================================================== */
 if (typeof window !== 'undefined' && !window.__inAppNotificationQueueState) {
   window.__inAppNotificationQueueState = {
     items: [],
@@ -32,14 +37,17 @@ if (typeof window !== 'undefined' && !window.__inAppNotificationQueueState) {
 }
 
 if (typeof window !== 'undefined' && !window.showInAppNotification) {
-  window.showInAppNotification = (title, body, iconUrl) => {
+  window.showInAppNotification = (title, body, iconUrl, options = {}) => {
     const queueState = window.__inAppNotificationQueueState;
     if (!queueState) return;
+
+    const notificationOptions = options && typeof options === 'object' ? options : {};
 
     queueState.items.push({
       title: String(title || ''),
       body: String(body || ''),
-      iconUrl: String(iconUrl || '')
+      iconUrl: String(iconUrl || ''),
+      onClick: typeof notificationOptions.onClick === 'function' ? notificationOptions.onClick : null
     });
 
     const processQueue = () => {
@@ -110,9 +118,19 @@ if (typeof window !== 'undefined' && !window.showInAppNotification) {
 
       let timer = window.setTimeout(hide, 4000);
 
-      // 点击隐藏当前条，随后继续展示队列中的下一条。
+      /* ======================================================================
+         [区域标注·已完成·角色回复横幅点击跳转] 横幅点击处理
+         说明：点击角色回复横幅时先执行调用方传入的 onClick（闲谈中用于进入对应聊天窗口），再隐藏当前条并继续展示队列。
+         ====================================================================== */
       banner.addEventListener('click', () => {
         window.clearTimeout(timer);
+        if (typeof nextItem.onClick === 'function') {
+          try {
+            nextItem.onClick();
+          } catch (error) {
+            console.error('应用内横幅点击回调执行失败:', error);
+          }
+        }
         hide();
       });
 
