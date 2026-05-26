@@ -21,21 +21,21 @@ import {
   closeModal
 } from './chat-utils.js';
 /* ==========================================================================
-   [区域标注·已完成·本次闲谈启动失败修复] 修正 refreshCurrentSessionLastMessage 导入来源
+   [区域标注·已完成·本次闲谈启动失败修复] 修正 refreshCurrentSessionLastMessage 与 resetMessageSelectionState 导入来源
    说明：
-   1. refreshCurrentSessionLastMessage 与 resetMessageSelectionState 实际由 chat-message.js facade 导出，不由 chat-state.js 导出。
-   2. 之前错误地从 chat-state.js 导入，导致闲谈入口动态 import 在 ESM 实例化阶段失败。
-   3. 本区域只修复启动失败所需的导入来源，不改动其它业务逻辑与持久化链路。
+   1. 将 refreshCurrentSessionLastMessage 改为直接从 chat-message-render.js 导入。
+   2. 将 resetMessageSelectionState 改为直接从 chat-message-selection.js 导入。
+   3. 绕开 chat-message.js facade 导出，以彻底解决由于循环依赖导致的 ESM 实例化失败（即“启动失败”）。
    4. 持久化仍仅使用 DB.js / IndexedDB，不引入 localStorage/sessionStorage。
    ========================================================================== */
 import {
   persistCurrentMessages,
   renderCurrentChatMessage,
   sendImageMessage,
-  showChatAvatarCropModal,
-  refreshCurrentSessionLastMessage,
-  resetMessageSelectionState
+  showChatAvatarCropModal
 } from './chat-message.js';
+import { refreshCurrentSessionLastMessage } from './chat-message-render.js';
+import { resetMessageSelectionState } from './chat-message-selection.js';
 import {
   normalizeMomentsComposeDraft,
   ensureMomentsComposeDraft,

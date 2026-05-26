@@ -61,9 +61,7 @@ import {
   refreshMessageBubbleRows,
   refreshCurrentMessageListOnly,
   updateMultiSelectActionBar,
-  resetMessageSelectionState,
   getSelectedMessages,
-  refreshCurrentSessionLastMessage,
   retryLatestAiReply,
   syncMessageDockOpenState,
   syncChatConsoleDock,
@@ -89,6 +87,8 @@ import {
   syncChatMessageSearchPanel,
   scrollToChatSearchResult
 } from './chat-message.js';
+import { refreshCurrentSessionLastMessage } from './chat-message-render.js';
+import { resetMessageSelectionState } from './chat-message-selection.js';
 import {
   clearCurrentChatMessages,
   expireCurrentChatImages,
