@@ -56,9 +56,11 @@ function formatRedPacketAmountLabel(message = {}, fallbackCurrency = 'CNY') {
 }
 
 export function getRedPacketMessageDisplayText(message = {}) {
-  const note = String(message?.redPacketNote || message?.remark || '恭喜发财，大吉大利').trim();
+  const note = String(message?.redPacketNote || message?.remark || '').trim();
   const amountLabel = formatRedPacketAmountLabel(message);
-  return `[红包] ${note}${amountLabel ? ` · ${amountLabel}` : ''}`;
+  return note
+    ? `[红包] ${note}${amountLabel ? ` · ${amountLabel}` : ''}`
+    : `[红包] ${amountLabel || ''}`.trim();
 }
 
 export function isRedPacketSystemMessage(message = {}) {
@@ -77,6 +79,51 @@ function cleanAiProtocolValue(value = '') {
     .trim();
 }
 
+/* ==========================================================================
+   [区域标注·已完成·红包协议与金额解析修复]
+   说明：
+   1. 红包金额输入与 AI 红包协议都先做宽松清洗，再统一落到 packetAmount / redPacketAmount / redPacketBaseCny。
+   2. 解析函数继续只服务红包模块，不引入 localStorage/sessionStorage，也不增加双份兜底存储。
+   3. AI 红包备注保留模型原文，不再把缺省备注硬塞成“恭喜发财，大吉大利”；显示层会直接读取 redPacketNote / remark。
+   ========================================================================== */
+function parseRedPacketAmountInputValue(value = '') {
+  const normalized = String(value ?? '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/[\s,，]/g, '')
+    .replace(/[￥¥]/g, '')
+    .replace(/[。．｡．]/g, '.')
+    .trim();
+
+  if (!normalized) return NaN;
+
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : NaN;
+}
+
+function parseAiRedPacketBodyFields(body = '') {
+  const text = String(body || '').trim();
+  if (!text) return null;
+
+  const amountMatch = text.match(/(?:金额|金额数|数额|红包金额|金额￥)\s*[：:]\s*([0-9]+(?:\.[0-9]{1,2})?)/i)
+    || text.match(/\b([0-9]+(?:\.[0-9]{1,2})?)\b/);
+  if (!amountMatch) return null;
+
+  const noteMatch = text.match(/(?:备注|留言|文案|祝福|祝语|互动留言)\s*[：:]\s*([\s\S]*?)(?=\s*(?:金额|金额数|数额|红包金额|金额￥)\s*[：:]|$)/i);
+  const rawNote = cleanAiProtocolValue(noteMatch?.[1] || '');
+
+  return {
+    amount: Number(amountMatch[1]),
+    note: rawNote
+  };
+}
+
+function buildRedPacketDisplayAmount(amount = 0, currencyCode = 'CNY') {
+  const normalizedAmount = Number(Number(amount || 0).toFixed(2));
+  return currencyCode === 'CNY'
+    ? `¥${normalizedAmount.toFixed(2)}`
+    : `${String(currencyCode || 'CNY').toUpperCase()} ${normalizedAmount.toFixed(2)}`;
+}
+
 export function parseAiRedPacketSendProtocol(content = {}) {
   const normalized = cleanAiProtocolValue(content);
   if (!normalized) return null;
@@ -85,15 +132,28 @@ export function parseAiRedPacketSendProtocol(content = {}) {
   const body = bodyMatch ? String(bodyMatch[1] || '').trim() : normalized;
   if (!body) return null;
 
-  const amountMatch = body.match(/(?:金额)\s*[：:]\s*([0-9.]+)/i);
-  const noteMatch = body.match(/备注\s*[：:]\s*([^}]+)/i);
+  const parsed = parseAiRedPacketBodyFields(body);
+  if (!parsed) return null;
 
-  const amount = Number(amountMatch?.[1] || 0);
-  const note = cleanAiProtocolValue(noteMatch?.[1] || '恭喜发财，大吉大利');
+  const amount = Number(parsed.amount);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
 
-  if (!amount || isNaN(amount)) return null;
+  const normalizedAmount = Number(amount.toFixed(2));
+  const redPacketDisplayAmount = buildRedPacketDisplayAmount(normalizedAmount, 'CNY');
 
-  return { amount, note };
+  return {
+    amount: normalizedAmount,
+    note: String(parsed.note || '').trim(),
+    redPacketAmount: normalizedAmount,
+    redPacketBaseCny: normalizedAmount,
+    redPacketDisplayAmount,
+    redPacketCurrency: 'CNY',
+    redPacketNote: String(parsed.note || '').trim(),
+    redPacketPayer: '对方',
+    redPacketDirection: 'incoming',
+    redPacketStatus: 'pending',
+    content: `红包：${redPacketDisplayAmount}`
+  };
 }
 
 export function createAiRedPacketMessageFromProtocol(block = {}) {
@@ -101,16 +161,17 @@ export function createAiRedPacketMessageFromProtocol(block = {}) {
   if (!payload) return null;
 
   const roleName = String(block?.roleName || '').trim() || '对方';
-  const redPacketDisplayAmount = `¥${Number(payload.amount || 0).toFixed(2)}`;
+  const redPacketDisplayAmount = buildRedPacketDisplayAmount(payload.amount, payload.redPacketCurrency || 'CNY');
+  const redPacketNote = String(payload.redPacketNote || payload.note || '').trim();
   return {
     role: 'assistant',
     type: 'red_packet',
-    content: `[红包] ${payload.note}${redPacketDisplayAmount ? ` · ${redPacketDisplayAmount}` : ''}`,
+    content: `[红包] ${redPacketNote}${redPacketDisplayAmount ? ` · ${redPacketDisplayAmount}` : ''}`,
     redPacketAmount: Number(Number(payload.amount || 0).toFixed(2)),
     redPacketBaseCny: Number(Number(payload.amount || 0).toFixed(2)),
     redPacketDisplayAmount,
     redPacketCurrency: 'CNY',
-    redPacketNote: payload.note,
+    redPacketNote,
     redPacketPayer: roleName,
     redPacketSource: 'ai_protocol',
     redPacketDirection: 'incoming',
@@ -142,18 +203,20 @@ export function parseAiRedPacketReceiveProtocol(content = {}) {
    3. 本区域只负责渲染，不读写存储；持久化仍由上层 DB.js / IndexedDB 链路完成。
    ========================================================================== */
 export function renderRedPacketBubble(message = {}) {
-  const note = String(message?.redPacketNote || message?.remark || '恭喜发财，大吉大利').trim();
+  const note = String(message?.redPacketNote || message?.remark || '').trim();
   const amountLabel = formatRedPacketAmountLabel(message);
   const status = String(message?.redPacketStatus || 'pending').trim();
   const isAccepted = status === 'accepted';
   const statusLabel = isAccepted ? '已领取' : (status === 'returned' ? '已退回' : '');
+  const titleText = note || amountLabel || '红包';
+  const noteText = note || (amountLabel ? '红包' : '');
 
   return `
-    <article class="msg-red-packet-card msg-red-packet-card--${escapeHtml(status)}" title="${escapeHtml(note)}">
+    <article class="msg-red-packet-card msg-red-packet-card--${escapeHtml(status)}" title="${escapeHtml(titleText)}">
       <div class="msg-red-packet-card__content">
         <span class="msg-red-packet-card__icon">${RED_PACKET_ICONS.redPacket}</span>
         <div class="msg-red-packet-card__text">
-          <h3 class="msg-red-packet-card__note">${escapeHtml(note)}</h3>
+          <h3 class="msg-red-packet-card__note">${escapeHtml(noteText)}</h3>
           ${amountLabel ? `<strong class="msg-red-packet-card__amount">${escapeHtml(amountLabel)}</strong>` : ''}
           ${statusLabel ? `<span class="msg-red-packet-card__status">${escapeHtml(statusLabel)}</span>` : ''}
         </div>
@@ -174,7 +237,7 @@ export function showRedPacketActionModal(container, options = {}) {
   if (!mask || !panel) return;
 
   const messageId = String(options.messageId || '').trim();
-  const note = String(options.note || '恭喜发财，大吉大利').trim();
+  const note = String(options.note || '').trim();
   const payer = String(options.payer || '对方').trim();
   const amount = String(options.amount || options.amountLabel || '').trim();
   const isAccepted = options.status === 'accepted';
@@ -257,7 +320,7 @@ export function showMessageRedPacketModal(container, options = {}) {
 export function parseRedPacketDraftFromModal(container, walletDisplay = {}, walletData = {}) {
   const amountInput = container.querySelector('[data-role="msg-red-packet-amount-input"]');
   const noteInput = container.querySelector('[data-role="msg-red-packet-note-input"]');
-  const packetAmount = Number(String(amountInput?.value || '').trim());
+  const packetAmount = parseRedPacketAmountInputValue(amountInput?.value);
   const packetNote = String(noteInput?.value || '').trim() || '恭喜发财，大吉大利';
 
   const currency = walletDisplay.currency || { code: 'CNY', precision: 2 };

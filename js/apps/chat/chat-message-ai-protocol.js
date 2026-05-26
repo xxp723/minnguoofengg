@@ -980,6 +980,13 @@ export function parseAiTransferProtocolPayload(content) {
    1. 解析格式：{金额:xxx,备注:xxx}
    2. 成功后返回红包特定的有效载荷
    ======================================================================== */
+/* ========================================================================
+   [区域标注·已完成·红包协议字段对齐修复]
+   说明：
+   1. 统一把 AI 红包协议解析结果输出为 redPacket* 字段，供消息卡片、弹窗与会话摘要直接读取。
+   2. 保留 amount / remark 兼容字段，避免影响现有调用链。
+   3. 不使用 localStorage/sessionStorage，不增加任何双份兜底存储。
+   ======================================================================== */
 export function parseAiRedPacketProtocolPayload(content) {
   const normalized = cleanAiProtocolBlockContent(content);
   if (!normalized) return null;
@@ -995,12 +1002,22 @@ export function parseAiRedPacketProtocolPayload(content) {
   if (!Number.isFinite(amount) || amount <= 0) return null;
 
   const noteMatch = body.match(/备注\s*[：:]\s*([^}]*)/i);
-  const remark = String(noteMatch?.[1] || '').trim();
+  const note = String(noteMatch?.[1] || '').trim() || '恭喜发财，大吉大利';
+  const normalizedAmount = Number(amount.toFixed(2));
+  const redPacketDisplayAmount = `¥${normalizedAmount.toFixed(2)}`;
 
   return {
-    amount: Number(amount.toFixed(2)),
-    remark,
-    content: `红包：¥${amount.toFixed(2)}`
+    amount: normalizedAmount,
+    remark: note,
+    redPacketAmount: normalizedAmount,
+    redPacketBaseCny: normalizedAmount,
+    redPacketDisplayAmount,
+    redPacketCurrency: 'CNY',
+    redPacketNote: note,
+    redPacketPayer: '对方',
+    redPacketDirection: 'incoming',
+    redPacketStatus: 'pending',
+    content: `[红包] ${note}${redPacketDisplayAmount ? ` · ${redPacketDisplayAmount}` : ''}`
   };
 }
 
@@ -1027,12 +1044,23 @@ export function parseAiTakeawayProtocolPayload(content) {
   const name = nameMatch[1].trim();
 
   const noteMatch = body.match(/备注\s*[：:]\s*([^}]*)/i);
-  const remark = noteMatch ? noteMatch[1].trim() : '';
+  const takeawayNote = String(noteMatch?.[1] || '').trim();
+
+  const priceMatch = body.match(/价格\s*[：:]\s*([0-9]+(?:\.[0-9]{1,2})?)/i);
+  if (!priceMatch) return null;
+
+  const price = Number(priceMatch[1]);
+  if (!Number.isFinite(price) || price <= 0) return null;
 
   return {
-    takeawayName: name,
-    remark,
-    content: `[外卖] ${name}`
+    takeawayAction: 'order',
+    takeawayTitle: name,
+    takeawayPrice: Number(price.toFixed(2)),
+    takeawayBaseCny: Number(price.toFixed(2)),
+    takeawayCurrency: 'CNY',
+    takeawayDisplayPrice: `¥${price.toFixed(2)}`,
+    takeawayNote,
+    content: `¥${price.toFixed(2)}`
   };
 }
 
@@ -1399,6 +1427,7 @@ export function buildAiReplyMessages(rawText, state, options = {}) {
           type: 'red_packet',
           redPacketStatus: 'pending',
           ...redPacketPayload,
+          redPacketPayer: String(block.roleName || '').trim() || redPacketPayload.redPacketPayer || '对方',
           __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
           __protocolEndIndex: block.__protocolEndIndex
         });
