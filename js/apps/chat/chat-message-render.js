@@ -39,6 +39,12 @@ import {
   renderVoiceFeatureButton
 } from './chat-voice.js';
 import {
+  isTakeawayMessage,
+  renderTakeawayBubble,
+  renderTakeawayFeatureButton,
+  initTakeawayBanner
+} from './chat-takeaway.js';
+import {
   renderAsideBubbleHtml,
   renderAsideExitButtonHtml,
   isAsideModeActive
