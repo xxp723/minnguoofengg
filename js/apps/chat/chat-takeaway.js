@@ -39,10 +39,10 @@ export function renderTakeawayFeatureButton() {
    [区域标注·外卖模块] 气泡文字提取（用于消息列表预览）
    ========================================================================== */
 export function getTakeawayMessageDisplayText(msg) {
-  if (msg?.takeawayType === 'request') {
-    return `[外卖代付] 帮我点一份 ${msg?.itemName || '外卖'}`;
+  if (msg?.takeawayStatus === 'pending') {
+    return `[外卖代付] 帮我点一份 ${msg?.takeawayTitle || '外卖'}`;
   }
-  return `[外卖] 为你点了一份 ${msg?.itemName || '外卖'}`;
+  return `[外卖] 为你点了一份 ${msg?.takeawayTitle || '外卖'}`;
 }
 
 export function isTakeawayMessage(msg) {
@@ -60,10 +60,10 @@ export function isTakeawaySystemMessage(msg) {
    2. 不带发送按钮，点击后发送。
    ========================================================================== */
 export function renderTakeawayBubble(msg) {
-  const isRequest = msg?.takeawayType === 'request';
-  const itemName = String(msg?.itemName || '').trim();
-  const amountText = String(msg?.amount || '0').trim();
-  const status = msg?.status || 'pending';
+  const isRequest = msg?.takeawayStatus === 'pending';
+  const itemName = String(msg?.takeawayTitle || '').trim();
+  const amountText = String(msg?.takeawayDisplayPrice || '0').trim();
+  const status = msg?.takeawayStatus || 'pending';
   
   let statusText = '正在配送';
   let statusClass = '';
