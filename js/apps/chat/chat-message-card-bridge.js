@@ -17,9 +17,11 @@
    1. 原 chat-message.js 中的 HTML 卡片 postMessage 监听器已拆分到本文件。
    2. 本文件只负责一次性注册全局监听，不直接依赖聊天 state，也不触碰持久化逻辑。
    3. iframe 内部的高度上报、双击收藏桥接、互动事件桥接仍保持原有行为不变。
-   4. 全局只注册一次，避免重复绑定；持久化仍只走 DB.js / IndexedDB。
+   4. 仅在具备浏览器 DOM 环境时注册，避免模块初始化阶段因 window/document 不可用而导致闲谈应用启动失败。
+   5. 全局只注册一次，避免重复绑定；持久化仍只走 DB.js / IndexedDB。
    ========================================================================== */
 export function ensureChatHtmlCardMessageBridge() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
   if (window.__miniphone_card_message_bridge_listener__) return;
 
   window.__miniphone_card_message_bridge_listener__ = true;
