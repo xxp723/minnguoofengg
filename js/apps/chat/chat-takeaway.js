@@ -199,6 +199,151 @@ export function showTakeawayModal(container, walletData, onConfirm) {
 }
 
 /* ==========================================================================
+   [区域标注·已更新·本次启动失败修复·外卖模块导出补齐]
+   说明：
+   1. chat-event-click.js 依赖的外卖接口已在本模块统一补齐。
+   2. 仅补齐导出名，不改变闲谈其它模块的持久化链路。
+   3. 仍然只使用 DB.js / IndexedDB，不引入 localStorage/sessionStorage。
+   ========================================================================== */
+export const showMessageTakeawayModal = showTakeawayModal;
+
+export function parseTakeawayDraftFromModal(container, walletDisplay = {}, walletData = {}) {
+  const titleInput = container.querySelector('[data-role="msg-takeaway-title-input"]');
+  const priceInput = container.querySelector('[data-role="msg-takeaway-price-input"]');
+  const takeawayTitle = String(titleInput?.value || '').trim();
+  const takeawayPrice = Number(String(priceInput?.value || '').trim());
+
+  const currency = walletDisplay.currency || { code: 'CNY', precision: 2 };
+  const currencyCode = String(currency.code || 'CNY').toUpperCase();
+  const precision = Math.max(0, Number(currency.precision ?? 2) || 0);
+  const rates = walletData?.rates && typeof walletData.rates === 'object' ? walletData.rates : {};
+  const displayRate = currencyCode === 'CNY' ? 1 : Math.max(0, Number(rates[currencyCode] || 0) || 0);
+  const takeawayBaseCny = currencyCode === 'CNY' ? takeawayPrice : (takeawayPrice / displayRate);
+
+  return {
+    takeawayTitle,
+    takeawayPrice,
+    takeawayBaseCny,
+    currencyCode,
+    precision,
+    displayRate
+  };
+}
+
+export function showTakeawayActionModal(container, options = {}) {
+  const mask = container.querySelector('[data-role="modal-mask"]');
+  const panel = container.querySelector('[data-role="modal-panel"]');
+  if (!mask || !panel) return;
+
+  const messageId = String(options.messageId || '').trim();
+  const title = String(options.title || '外卖').trim();
+  const priceLabel = String(options.priceLabel || '').trim();
+  const note = String(options.note || '').trim();
+  const statusLabel = String(options.statusLabel || '').trim() || '待处理';
+  const actionHint = String(options.actionHint || '').trim() || '请选择处理方式';
+  const canAccept = Boolean(options.canAccept);
+
+  panel.innerHTML = `
+    <div class="chat-modal-header">
+      <span>外卖操作</span>
+      <button class="chat-modal-close" data-action="close-modal" type="button">${TAB_ICONS.close}</button>
+    </div>
+    <div class="chat-modal-body msg-transfer-action-modal-body">
+      <div class="msg-transfer-action-card">
+        <div class="msg-transfer-action-card__row">
+          <span class="msg-transfer-action-card__label">外卖</span>
+          <strong class="msg-transfer-action-card__amount">${escapeHtml(title)}</strong>
+        </div>
+        ${priceLabel ? `
+          <div class="msg-transfer-action-card__row">
+            <span class="msg-transfer-action-card__label">价格</span>
+            <span class="msg-transfer-action-card__status">${escapeHtml(priceLabel)}</span>
+          </div>
+        ` : ''}
+        <div class="msg-transfer-action-card__row">
+          <span class="msg-transfer-action-card__label">状态</span>
+          <span class="msg-transfer-action-card__status">${escapeHtml(statusLabel)}</span>
+        </div>
+        ${note ? `<div class="msg-transfer-action-card__note">${escapeHtml(note)}</div>` : ''}
+      </div>
+      <div class="chat-modal-notice">${escapeHtml(actionHint)}</div>
+    </div>
+    <div class="chat-modal-footer">
+      ${canAccept ? `<button class="chat-modal-btn chat-modal-btn--primary" data-action="msg-takeaway-accept" data-message-id="${escapeHtml(messageId)}" type="button">${GIFT_ICONS.check}<span>代付</span></button>` : ''}
+    </div>
+  `;
+
+  mask.classList.remove('is-hidden');
+}
+
+export async function sendTakeawayMessage(container, state, db, draft = {}, helpers = {}) {
+  if (!state.currentChatId) return false;
+  const session = state.sessions.find(item => String(item.id) === String(state.currentChatId));
+  if (!session) return false;
+
+  const now = Date.now();
+  const takeawayTitle = String(draft.takeawayTitle || '').trim();
+  const takeawayPrice = Number(draft.takeawayPrice || 0);
+  const takeawayBaseCny = Number(draft.takeawayBaseCny || 0);
+  const currencyCode = String(draft.currencyCode || 'CNY').toUpperCase();
+  const precision = Math.max(0, Number(draft.precision ?? 2) || 0);
+  const formatWalletMoney = typeof helpers.formatWalletMoney === 'function'
+    ? helpers.formatWalletMoney
+    : ((value, code) => `${code} ${Number(value || 0).toFixed(precision)}`);
+
+  const takeawayDisplayPrice = formatWalletMoney(takeawayPrice, currencyCode);
+  const nextBalanceBaseCny = Math.max(0, Number(state.walletData?.balanceBaseCny || 0) - takeawayBaseCny);
+
+  state.walletData = normalizeWalletData({
+    ...state.walletData,
+    balanceBaseCny: nextBalanceBaseCny,
+    ledger: [
+      {
+        id: `wallet_ledger_${now}_${Math.random().toString(16).slice(2)}`,
+        kind: 'takeaway',
+        direction: 'out',
+        title: `给 ${String(session.name || '对方').trim() || '对方'} 点外卖：${takeawayTitle}`,
+        amountBaseCny: Number(takeawayBaseCny.toFixed(2)),
+        timestamp: now
+      },
+      ...(Array.isArray(state.walletData?.ledger) ? state.walletData.ledger : [])
+    ],
+    updatedAt: now
+  });
+
+  const takeawayMessage = {
+    id: `user_takeaway_${now}_${Math.random().toString(16).slice(2)}`,
+    role: 'user',
+    type: 'takeaway',
+    content: `[外卖] ${takeawayTitle}`,
+    takeawayTitle,
+    takeawayDisplayPrice,
+    takeawayCurrency: currencyCode,
+    takeawayPrice: Number(takeawayPrice.toFixed(precision)),
+    takeawayBaseCny: Number(takeawayBaseCny.toFixed(2)),
+    takeawayNote: 'for you, with a warm meal and a quiet evening',
+    takeawayPayer: '我已购买',
+    takeawayDirection: 'outgoing',
+    takeawayStatus: 'accepted',
+    timestamp: now
+  };
+
+  state.currentMessages.push(takeawayMessage);
+  state.coffeeDockOpen = false;
+  state.stickerPanelOpen = false;
+  session.lastMessage = getTakeawayMessageDisplayText(takeawayMessage);
+  session.lastTime = now;
+
+  await Promise.all([
+    persistWalletData(state, db),
+    dbPut(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + state.currentChatId, state.currentMessages),
+    dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions)
+  ]);
+
+  return true;
+}
+
+/* ==========================================================================
    [区域标注·外卖模块] 顶部横幅更新（外卖距离）
    ========================================================================== */
 export function initTakeawayBanner(container, state, messageIds = []) {
