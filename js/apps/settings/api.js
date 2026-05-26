@@ -249,7 +249,7 @@ function renderModelOptions(profile) {
     .join('');
 }
 
-// ===== 设置：API 预设折叠选择器（已完成·本次预设名称显示与图标移除） START =====
+// ===== 设置：API 预设折叠选择器（已完成·本次将新建按钮改为仅图标并移至右侧） START =====
 // 说明：该区域只负责渲染主 API 预设入口；预设选择项已显示名称并去除图标，存储仍通过 settings.update -> SettingsStore/DB.js/IndexedDB，不使用 localStorage/sessionStorage。
 function renderSavedPrimaryConfigs(savedPrimaryConfigs) {
   const savedItems = savedPrimaryConfigs
@@ -275,10 +275,6 @@ function renderSavedPrimaryConfigs(savedPrimaryConfigs) {
   return `
     <div class="api-preset-panel">
       <div class="api-preset-new">
-        <button class="api-preset-new__button" type="button" data-action="new-primary-preset" aria-label="新建 API 预设">
-          <span class="api-preset-new__icon">${ICONS.add}</span>
-          <span class="api-preset-new__title">新建预设</span>
-        </button>
         <div class="api-preset-dropdown">
           <button
             class="api-preset-dropdown__trigger"
@@ -303,11 +299,14 @@ function renderSavedPrimaryConfigs(savedPrimaryConfigs) {
             }
           </div>
         </div>
+        <button class="api-preset-new__button" type="button" data-action="new-primary-preset" aria-label="新建 API 预设">
+          <span class="api-preset-new__icon">${ICONS.add}</span>
+        </button>
       </div>
     </div>
   `;
 }
-// ===== 设置：API 预设折叠选择器（已完成·本次预设名称显示与图标移除） END =====
+// ===== 设置：API 预设折叠选择器（已完成·本次将新建按钮改为仅图标并移至右侧） END =====
 
 function renderProviderTrigger(profileKey, profile) {
   const providerMeta = PROVIDER_META[profile.provider];
@@ -939,8 +938,8 @@ export function renderApiSection({ current }) {
               font-size: 12px;
             }
 
-            /* ===== 设置：API 预设折叠选择器样式（已完成·本次预设名称显示与图标移除） START =====
-               说明：仅作用于 API 设置页顶部预设区域和主 API“保存为预设”行；预设项已去除服务商图标，名称短时一行、长时最多两行显示。 */
+            /* ===== 设置：API 预设折叠选择器样式（已完成·本次将新建按钮改为仅图标并移至右侧） START =====
+               说明：仅作用于 API 设置页顶部预设区域和主 API“保存为预设”行；预设项已去除服务商图标，名称短时一行、长时最多两行显示。新建按钮仅保留图标。 */
             #settings-api .api-preset-panel {
               display: grid;
               gap: 10px;
@@ -948,7 +947,7 @@ export function renderApiSection({ current }) {
 
             #settings-api .api-preset-new {
               display: grid;
-              grid-template-columns: auto minmax(0, 1fr);
+              grid-template-columns: minmax(0, 1fr) auto;
               gap: 10px;
               align-items: center;
               width: 100%;
@@ -973,15 +972,13 @@ export function renderApiSection({ current }) {
             #settings-api .api-preset-new__button {
               display: inline-flex;
               align-items: center;
-              gap: 7px;
-              min-height: 32px;
-              padding: 0 10px 0 6px;
+              justify-content: center;
+              width: 34px;
+              height: 34px;
+              padding: 0;
               border: 0;
               border-radius: 999px;
               background: rgba(245, 241, 234, 0.72);
-              font-size: 13px;
-              font-weight: 700;
-              white-space: nowrap;
             }
 
             #settings-api .api-preset-new__button:active,
@@ -1139,7 +1136,7 @@ export function renderApiSection({ current }) {
             #settings-api .api-preset-name-input {
               min-height: 38px;
             }
-            /* ===== 设置：API 预设折叠选择器样式（已完成·本次预设名称显示与图标移除） END ===== */
+            /* ===== 设置：API 预设折叠选择器样式（已完成·本次将新建按钮改为仅图标并移至右侧） END ===== */
 
             #settings-api .api-provider-modal,
             #settings-api .api-model-modal {
@@ -1376,7 +1373,7 @@ export function renderApiSection({ current }) {
             }
           </style>
 
-          <!-- ===== 设置：API 预设折叠选择器（已完成·本次预设名称显示与图标移除） START =====
+          <!-- ===== 设置：API 预设折叠选择器（已完成·本次将新建按钮改为仅图标并移至右侧） START =====
                说明：已保存预设不再直接陈列；在“新建预设”同栏折叠选择，选择项已去除图标并显示预设名称，长名称最多两行。 -->
           <section class="ui-card api-section-card">
             <div class="api-section-head">
@@ -1389,7 +1386,7 @@ export function renderApiSection({ current }) {
               ${renderSavedPrimaryConfigs(api.savedPrimaryConfigs)}
             </div>
           </section>
-          <!-- ===== 设置：API 预设折叠选择器（已完成·本次预设名称显示与图标移除） END ===== -->
+          <!-- ===== 设置：API 预设折叠选择器（已完成·本次将新建按钮改为仅图标并移至右侧） END ===== -->
 
           ${renderProfileSection('primary', '主API设置', ICONS.main, api.primary, { isPrimary: true })}
 
@@ -1828,13 +1825,13 @@ function switchProviderProfile(container, profileKey, nextProvider) {
   );
 }
 
-// ===== 设置：API 预设折叠选择器刷新（已完成·本次预设名称显示与图标移除） START =====
+// ===== 设置：API 预设折叠选择器刷新（已完成·本次将新建按钮改为仅图标并移至右侧） START =====
 function renderSavedPrimaryConfigsInto(container, apiState) {
   const host = container.querySelector('#api-saved-primary-configs');
   if (!host) return;
   host.innerHTML = renderSavedPrimaryConfigs(apiState.savedPrimaryConfigs || []);
 }
-// ===== 设置：API 预设折叠选择器刷新（已完成·本次预设名称显示与图标移除） END =====
+// ===== 设置：API 预设折叠选择器刷新（已完成·本次将新建按钮改为仅图标并移至右侧） END =====
 
 function buildSavedPrimaryPreset(profileConfig, existingCount, presetName = '') {
   const normalized = normalizeProfileConfig(profileConfig, profileConfig?.provider || 'openai');
@@ -2130,7 +2127,7 @@ export function bindApiEvents(container, { settings }) {
     });
   });
 
-  // ===== 设置：API 预设按名称保存（已完成·本次按名称保存与折叠选择） START =====
+  // ===== 设置：API 预设按名称保存（已完成·本次将新建按钮改为仅图标并移至右侧） START =====
   // 说明：保存预设只写入 settings.update({ api })，即项目 IndexedDB 持久化链路；不使用浏览器 localStorage/sessionStorage。
   container.querySelector('[data-action="save-primary-preset"]')?.addEventListener('click', async () => {
     try {
@@ -2177,7 +2174,7 @@ export function bindApiEvents(container, { settings }) {
       setResultByProfile(container, 'primary', 'error', `保存失败：${error?.message || '未知错误'}`);
     }
   });
-  // ===== 设置：API 预设按名称保存（已完成·本次按名称保存与折叠选择） END =====
+  // ===== 设置：API 预设按名称保存（已完成·本次将新建按钮改为仅图标并移至右侧） END =====
 
   container.addEventListener('click', async (event) => {
     const target = event.target.closest([
@@ -2196,7 +2193,7 @@ export function bindApiEvents(container, { settings }) {
 
     const action = target.getAttribute('data-action');
 
-    // ===== 设置：API 预设折叠选择/新建/删除事件（已完成·本次按名称保存与折叠选择） START =====
+    // ===== 设置：API 预设折叠选择/新建/删除事件（已完成·本次将新建按钮改为仅图标并移至右侧） START =====
     if (action === 'new-primary-preset') {
       fillProfileForm(container, 'primary', getDefaultProfileConfig('openai'));
       const presetNameInput = container.querySelector('#api-primary-preset-name');
@@ -2213,7 +2210,7 @@ export function bindApiEvents(container, { settings }) {
       target.setAttribute('aria-expanded', String(!isOpen));
       return;
     }
-    // ===== 设置：API 预设折叠选择/新建/删除事件（已完成·本次按名称保存与折叠选择） END =====
+    // ===== 设置：API 预设折叠选择/新建/删除事件（已完成·本次将新建按钮改为仅图标并移至右侧） END =====
 
     if (action === 'open-provider-modal') {
       const profileKey = target.getAttribute('data-profile');
