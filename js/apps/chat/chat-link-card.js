@@ -7,9 +7,92 @@
    [区域标注·本次修改·分享链接解析功能]
    说明：
    1. 识别文本中的小红书、微博链接。
-   2. 调用 Jina Reader API 获取页面内容。
-   3. 返回清洗后的链接元数据，供前端渲染与 AI 上下文组装。
+   2. 优先尝试多个 Reader 代理地址，尽量绕过重定向和协议差异。
+   3. 提取页面标题、正文摘要和首图，供前端渲染与 AI 上下文组装。
+   4. 失败时仅返回明确兜底文案，不伪造正文。
    ========================================================================== */
+
+function normalizeSharedLinkUrl(url) {
+  const safeUrl = String(url || '').trim();
+  if (!safeUrl) return '';
+  if (/^https?:\/\//i.test(safeUrl)) return safeUrl;
+  return `https://${safeUrl.replace(/^\/+/, '')}`;
+}
+
+function buildReaderCandidateUrls(url) {
+  const normalizedUrl = normalizeSharedLinkUrl(url);
+  if (!normalizedUrl) return [];
+
+  const strippedUrl = normalizedUrl.replace(/^https?:\/\//i, '');
+  return Array.from(new Set([
+    `https://r.jina.ai/http://${strippedUrl}`,
+    `https://r.jina.ai/https://${strippedUrl}`,
+    `https://r.jina.ai/${normalizedUrl}`
+  ]));
+}
+
+function cleanMarkdownText(content) {
+  return String(content || '')
+    .replace(/!\[.*?\]\(.*?\)/g, '')
+    .replace(/\[.*?\]\(.*?\)/g, '')
+    .replace(/[#*`_>~]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractFirstImageFromMarkdown(content) {
+  const safeContent = String(content || '');
+  const imgRegex = /!\[.*?\]\((https?:\/\/[^\s\)]+)\)/g;
+  let match;
+  while ((match = imgRegex.exec(safeContent)) !== null) {
+    if (!/icon|captcha|avatar|logo/i.test(match[1])) {
+      return match[1];
+    }
+  }
+  return '';
+}
+
+function parseReaderResponse(textContent) {
+  const rawText = String(textContent || '').trim();
+  if (!rawText) {
+    return { title: '', snippet: '', imageUrl: '' };
+  }
+
+  let title = '';
+  const titleMatch = rawText.match(/^Title:\s*(.+)$/im);
+  if (titleMatch) {
+    title = titleMatch[1].trim();
+  }
+
+  if (!title) {
+    const headingMatch = rawText.match(/^#\s+(.+)$/m);
+    if (headingMatch) {
+      title = headingMatch[1].trim();
+    }
+  }
+
+  let content = '';
+  const markdownMatch = rawText.match(/^Markdown Content:\s*([\s\S]*)$/i);
+  if (markdownMatch) {
+    content = markdownMatch[1].trim();
+  } else {
+    const contentMatch = rawText.match(/^Content:\s*([\s\S]*)$/im);
+    content = contentMatch ? contentMatch[1].trim() : rawText;
+  }
+
+  const imageUrl = extractFirstImageFromMarkdown(content);
+  const snippet = cleanMarkdownText(content);
+
+  if (!title && snippet) {
+    title = snippet.slice(0, 20) + (snippet.length > 20 ? '...' : '');
+  }
+
+  return {
+    title,
+    snippet,
+    imageUrl
+  };
+}
 
 export function detectSharedLink(text) {
   const safeText = String(text || '');
@@ -29,81 +112,52 @@ export function detectSharedLink(text) {
 export async function fetchLinkCardData(url) {
   if (!url) return null;
   const siteName = /xiaohongshu\.com|xhslink\.com/i.test(url) ? '小红书' : '微博';
+  const candidateUrls = buildReaderCandidateUrls(url);
+  let lastError = null;
 
   try {
-    const targetUrl = `https://r.jina.ai/${url}`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+    for (const targetUrl of candidateUrls) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
 
-    const response = await fetch(targetUrl, {
-      method: 'GET',
-      headers: {
-        // 请求返回 Markdown 格式，以兼容重定向等复杂页面情况
-        'Accept': 'text/plain',
-        'X-No-Cache': 'true',
-        'X-Return-Format': 'markdown'
-      },
-      signal: controller.signal
-    });
+      try {
+        const response = await fetch(targetUrl, {
+          method: 'GET',
+          headers: {
+            // 请求返回 Markdown 格式，以兼容重定向等复杂页面情况
+            'Accept': 'text/plain',
+            'X-No-Cache': 'true',
+            'X-Return-Format': 'markdown'
+          },
+          signal: controller.signal
+        });
 
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`Jina API Error: ${response.status}`);
-    }
-
-    const textContent = await response.text();
-    
-    // 从纯文本中提取 Title, Source, Content
-    let titleMatch = textContent.match(/Title:\s*(.+)/i);
-    let title = titleMatch ? titleMatch[1].trim() : '';
-    
-    let contentMatch = textContent.match(/Markdown Content:\s*([\s\S]*)/i);
-    let content = contentMatch ? contentMatch[1].trim() : textContent.trim();
-    
-    let imageUrl = ''; // 稍后从正文匹配
-
-    // 从 Markdown 内容中提取第一张有效图片作为首图
-    if (content) {
-      // 过滤常见的小图标、验证码等图片
-      const imgRegex = /!\[.*?\]\((https?:\/\/[^\s\)]+)\)/g;
-      let match;
-      while ((match = imgRegex.exec(content)) !== null) {
-        if (!/icon|captcha|avatar|logo/i.test(match[1])) {
-          imageUrl = match[1];
-          break;
+        if (!response.ok) {
+          throw new Error(`Jina API Error: ${response.status}`);
         }
+
+        const textContent = await response.text();
+        const parsed = parseReaderResponse(textContent);
+
+        if (!parsed.title && !parsed.snippet) {
+          throw new Error('Reader 返回内容为空');
+        }
+
+        return {
+          url,
+          title: parsed.title || `${siteName}分享`,
+          snippet: parsed.snippet,
+          imageUrl: parsed.imageUrl || '',
+          site: siteName
+        };
+      } catch (error) {
+        lastError = error;
+      } finally {
+        clearTimeout(timeoutId);
       }
     }
 
-    // 清理正文：去除 markdown 图片语法，限制长度
-    let snippet = content
-      .replace(/!\[.*?\]\(.*?\)/g, '') // 去除图片链接
-      .replace(/\[.*?\]\(.*?\)/g, '') // 去除普通链接
-      .replace(/[#*`_>~]/g, '') // 去除基础 Markdown 符号
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    // 限制摘要长度
-    if (snippet.length > 300) {
-      snippet = snippet.slice(0, 300) + '...';
-    }
-
-    if (!title && snippet) {
-      title = snippet.slice(0, 20) + '...';
-    }
-
-    if (!title && !snippet) {
-      throw new Error('Jina API 提取到的内容为空');
-    }
-
-    return {
-      url,
-      title: title || `${siteName}分享`,
-      snippet,
-      imageUrl,
-      site: siteName
-    };
+    throw lastError || new Error('全部 Reader 路径均失败');
   } catch (error) {
     console.error('抓取分享链接失败, 启用兜底卡片:', error);
     // 启用兜底卡片数据，确保前端始终能渲染出链接卡片，同时告知 AI 页面无法访问
@@ -145,11 +199,11 @@ export function renderLinkCardBubble(message) {
 
   const escapeHtml = (str) => {
     return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+      .replace(/&/g, "\u0026amp;")
+      .replace(/</g, "\u0026lt;")
+      .replace(/>/g, "\u0026gt;")
+      .replace(/"/g, "\u0026quot;")
+      .replace(/'/g, "\u0026#039;");
   };
 
   const hasImage = !!linkData.imageUrl;
