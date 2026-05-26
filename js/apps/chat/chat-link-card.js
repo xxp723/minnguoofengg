@@ -94,7 +94,7 @@ export function formatLinkDataForAiRound(linkData) {
 `;
 }
 
-export function formatLinkDataForHistory(linkData) {
+export function formatLinkDataForAiHistory(linkData) {
   if (!linkData) return '';
   // 历史上下文中大幅精简，节省 token
   const shortSnippet = linkData.snippet.length > 50 ? linkData.snippet.slice(0, 50) + '...' : linkData.snippet;
