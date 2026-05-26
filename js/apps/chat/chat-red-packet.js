@@ -258,7 +258,7 @@ export function showRedPacketActionModal(container, options = {}) {
       </div>
     </div>
     <div class="chat-modal-footer msg-red-packet-modal__footer">
-      ${!isAccepted ? `<button class="chat-modal-btn chat-modal-btn--primary" data-action="msg-red-packet-accept" data-message-id="${escapeHtml(messageId)}" type="button">${RED_PACKET_ICONS.check}<span>领取红包</span></button>` : ''}
+      ${!isAccepted ? `<button class="chat-modal-btn chat-modal-btn--primary" data-action="msg-red-packet-accept" data-message-id="${escapeHtml(messageId)}" type="button"><span>领取红包</span></button>` : ''}
     </div>
   `;
 
