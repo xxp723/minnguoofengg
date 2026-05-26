@@ -502,7 +502,15 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
     if (isGiftBubbleMessage) return renderGiftBubble(msg);
     if (isTakeawayBubbleMessage) return renderTakeawayBubble(msg);
     if (isMomentShareMessage) return renderMomentShareBubble(msg);
-    if (isLinkCardBubbleMessage) return renderLinkCardBubble(msg); // [区域标注·本次修改·分享链接] 渲染链接卡片
+    if (isLinkCardBubbleMessage) {
+      const linkUrl = String(msg?.linkData?.url || '');
+      let userText = String(msg?.content || '').trim();
+      if (linkUrl) {
+        userText = userText.split(linkUrl).join('').trim();
+      }
+      const textHtml = userText ? `<div style="margin-bottom: 6px; word-break: break-word;">${escapeHtml(userText)}</div>` : '';
+      return `${textHtml}${renderLinkCardBubble(msg)}`;
+    } // [区域标注·本次修改·分享链接] 渲染链接卡片并保留用户原始文本
 
     if (isHtmlCardMessage) {
       return `

@@ -13,7 +13,8 @@
 
 export function detectSharedLink(text) {
   const safeText = String(text || '');
-  const urlRegex = /(https?:\/\/[^\s]+)/i;
+  // 优化正则，排除中文与全角标点，遇到即停止匹配
+  const urlRegex = /(https?:\/\/[a-zA-Z0-9-._~:/?#[\]@!$&'()*+,;=%]+)/i;
   const match = safeText.match(urlRegex);
   if (!match) return null;
 
@@ -30,12 +31,20 @@ export async function fetchLinkCardData(url) {
 
   try {
     const targetUrl = `https://r.jina.ai/${url}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+
     const response = await fetch(targetUrl, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json'
-      }
+        'Accept': 'application/json',
+        'X-No-Cache': 'true', // 要求 Jina 返回新鲜数据
+        'X-Return-Format': 'markdown'
+      },
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`Jina API Error: ${response.status}`);
@@ -64,6 +73,11 @@ export async function fetchLinkCardData(url) {
       .replace(/[#*`_>~]/g, '') // 去除基础 Markdown 符号
       .replace(/\s+/g, ' ')
       .trim();
+
+    // 限制摘要长度
+    if (snippet.length > 300) {
+      snippet = snippet.slice(0, 300) + '...';
+    }
 
     if (!title && snippet) {
       title = snippet.slice(0, 20) + '...';
@@ -109,9 +123,8 @@ export function renderLinkCardBubble(message) {
   const linkData = message.linkData;
   if (!linkData) return '';
   
-  const siteIcon = linkData.site === '小红书' 
-    ? `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>` 
-    : `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M22.46,6C21.69,6.35 20.86,6.58 20,6.69C20.88,6.16 21.56,5.32 21.88,4.31C21.05,4.81 20.13,5.16 19.16,5.36C18.37,4.5 17.26,4 16,4C13.65,4 11.73,5.92 11.73,8.29C11.73,8.63 11.77,8.96 11.84,9.27C8.28,9.09 5.11,7.38 3,4.79C2.63,5.42 2.42,6.16 2.42,6.94C2.42,8.43 3.17,9.75 4.33,10.5C3.62,10.5 2.96,10.3 2.38,10C2.38,10 2.38,10 2.38,10.03C2.38,12.11 3.86,13.85 5.82,14.24C5.46,14.34 5.08,14.39 4.69,14.39C4.42,14.39 4.15,14.36 3.89,14.31C4.43,16.03 6.02,17.28 7.91,17.31C6.44,18.46 4.59,19.15 2.58,19.15C2.22,19.15 1.88,19.13 1.54,19.09C3.44,20.31 5.68,21 8.12,21C16.02,21 20.33,14.46 20.33,8.79C20.33,8.6 20.33,8.42 20.32,8.23C21.16,7.63 21.88,6.87 22.46,6Z"/></svg>`;
+  // 统一使用 IconPark 的 link 图标
+  const siteIcon = `<svg viewBox="0 0 48 48" fill="none" aria-hidden="true" width="14" height="14" style="flex-shrink:0;"><path d="M14 25C14 25 15.0514 29.5332 19 30.9999C22.9486 32.4666 31 32 34 26C37 20 33 16 33 16" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M34 23C34 23 32.9486 18.4668 29 17.0001C25.0514 15.5334 17 16 14 22C11 28 15 32 15 32" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
   const escapeHtml = (str) => {
     return String(str)
