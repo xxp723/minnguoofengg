@@ -184,7 +184,7 @@ export function repairAiMessageFormatIfPossible(message, state) {
 /* ======================================================================== */
 /* 协议清理与排序 */
 /* ======================================================================== */
-const AI_PROTOCOL_CLOSING_TAG_REGEX = /(?:\[\s*\/\s*(?:回复|表情|转账|礼物|引用|撤回|拍一拍|语音|文字图|图片|卡片|旁白|心声)\s*\]|【\s*\/\s*(?:语音|文字图)\s*】)/gi;
+const AI_PROTOCOL_CLOSING_TAG_REGEX = /(?:\[\s*\/\s*(?:回复|表情|转账|礼物|红包|引用|撤回|拍一拍|语音|文字图|图片|卡片|旁白|心声)\s*\]|【\s*\/\s*(?:语音|文字图)\s*】)/gi;
 
 function stripAiProtocolClosingTags(value = '') {
   return String(value || '').replace(AI_PROTOCOL_CLOSING_TAG_REGEX, ' ');
@@ -245,7 +245,7 @@ export function cleanAiVisibleBubbleText(text) {
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
     .replace(/<\/?think>/gi, '')
     .replace(/^\s*(?:以下是)?(?:修正后内容|最终输出|回复格式|检查结果|修正结果|正确格式)\s*[：:]\s*/i, '')
-    .replace(/^\s*(?:\*\*)?\s*`?\s*\[\s*(?:回复|表情|引用|礼物|转账|撤回|拍一拍|语音|文字图|图片)\s*\]\s*(?:[^：:\n`*]{1,40}\s*[：:]\s*)?/i, '')
+    .replace(/^\s*(?:\*\*)?\s*`?\s*\[\s*(?:回复|表情|引用|礼物|红包|转账|撤回|拍一拍|语音|文字图|图片)\s*\]\s*(?:[^：:\n`*]{1,40}\s*[：:]\s*)?/i, '')
     .replace(/^\s*\{(?:user|assistant|role|character|mask)_[^}\n]{3,120}\}\s*/i, '')
     .replace(/(?:`|\*\*)+/g, '')
     .replace(/\[\s*消息发送时间\s*[：:][\s\S]*?\]/gi, ' ')
@@ -511,6 +511,9 @@ export function enforceAiReplyMessageCount(messages, chatSettings = {}) {
           if (String(message.type || '') === 'gift') {
             return message;
           }
+          if (String(message.type || '') === 'red_packet') {
+            return message;
+          }
           if (String(message.type || '') === 'card' && String(message.cardHtml || message.content || '').trim()) {
             return message;
           }
@@ -529,7 +532,7 @@ export function enforceAiReplyMessageCount(messages, chatSettings = {}) {
     let bestLength = 0;
 
     normalizedMessages.forEach((message, index) => {
-      if (String(message.type || '') === 'sticker' || String(message.type || '') === 'ai_withdraw_system' || String(message.type || '') === 'ai_pat_system' || isTextImageMessage(message) || isVoiceMessage(message) || String(message.type || '') === 'card' || String(message.type || '') === 'transfer' || String(message.type || '') === 'gift') return;
+      if (String(message.type || '') === 'sticker' || String(message.type || '') === 'ai_withdraw_system' || String(message.type || '') === 'ai_pat_system' || isTextImageMessage(message) || isVoiceMessage(message) || String(message.type || '') === 'card' || String(message.type || '') === 'transfer' || String(message.type || '') === 'gift' || String(message.type || '') === 'red_packet') return;
       const parts = splitSingleBubbleForCount(message.content);
       if (parts.length <= 1) return;
       const currentLength = String(message.content || '').length;
@@ -708,7 +711,7 @@ export function resolveAiQuotePayloadById(state, quoteId = '') {
 /* ======================================================================== */
 export function repairAiTextMessageFormatIfPossible(message) {
   if (!message || message.role !== 'assistant') return null;
-  if (['sticker', 'image', 'transfer', 'gift'].includes(String(message.type || ''))) return null;
+  if (['sticker', 'image', 'transfer', 'gift', 'red_packet'].includes(String(message.type || ''))) return null;
 
   const before = String(message.content || '');
   const protocolBlocks = extractAiProtocolBlocks(before).filter(block => block.type === '回复');
@@ -735,7 +738,7 @@ export function repairAiTextMessageFormatIfPossible(message) {
 
 export function repairAiQuoteMessageFormatIfPossible(message, state) {
   if (!message || message.role !== 'assistant') return null;
-  if (['sticker', 'image', 'transfer', 'gift'].includes(String(message.type || ''))) return null;
+  if (['sticker', 'image', 'transfer', 'gift', 'red_packet'].includes(String(message.type || ''))) return null;
 
   const raw = String(message.content || '').trim();
   const quoteMatch = raw.match(/(?:\[\s*引用\s*\]\s*[^：:\n`*]+?\s*[：:]\s*)?\{\s*引用\s*ID\s*[：:]\s*([^}；;，,\s]+)\s*\}\s*([\s\S]*)$/i);
@@ -759,7 +762,7 @@ export function repairAiQuoteMessageFormatIfPossible(message, state) {
 export function repairAiVoiceMessageFormatIfPossible(message) {
   if (!message || message.role !== 'assistant') return null;
   if (isVoiceMessage(message)) return null;
-  if (['sticker', 'image', 'transfer', 'gift', 'card'].includes(String(message.type || ''))) return null;
+  if (['sticker', 'image', 'transfer', 'gift', 'card', 'red_packet'].includes(String(message.type || ''))) return null;
 
   const raw = String(message.content || message.voiceText || '').trim();
   if (!/(?:\[\s*语音\s*\]|【\s*语音\s*】)/i.test(raw)) return null;
@@ -783,7 +786,7 @@ export function repairAiVoiceMessageFormatIfPossible(message) {
 
 export function repairAiAsideMessageFormatIfPossible(message) {
   if (!message || message.role !== 'assistant') return null;
-  if (['sticker', 'image', 'transfer', 'gift', 'card'].includes(String(message.type || ''))) return null;
+  if (['sticker', 'image', 'transfer', 'gift', 'card', 'red_packet'].includes(String(message.type || ''))) return null;
 
   const raw = String(message.content || '').trim();
   if (!/旁白/i.test(raw)) return null;
@@ -968,6 +971,36 @@ export function parseAiTransferProtocolPayload(content) {
   };
 }
 
+/* ========================================================================
+   [区域标注·本次修改] 解析 AI 发送红包协议
+   说明：
+   1. 解析格式：{金额:xxx,备注:xxx}
+   2. 成功后返回红包特定的有效载荷
+   ======================================================================== */
+export function parseAiRedPacketProtocolPayload(content) {
+  const normalized = cleanAiProtocolBlockContent(content);
+  if (!normalized) return null;
+
+  const bodyMatch = normalized.match(/\{\s*([\s\S]*?)\s*\}/);
+  const body = bodyMatch ? String(bodyMatch[1] || '').trim() : normalized;
+  if (!body) return null;
+
+  const amountMatch = body.match(/金额\s*[：:]\s*([0-9]+(?:\.[0-9]{1,2})?)/i);
+  if (!amountMatch) return null;
+
+  const amount = Number(amountMatch[1]);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+
+  const noteMatch = body.match(/备注\s*[：:]\s*([^}]*)/i);
+  const remark = String(noteMatch?.[1] || '').trim();
+
+  return {
+    amount: Number(amount.toFixed(2)),
+    remark,
+    content: `红包：¥${amount.toFixed(2)}`
+  };
+}
+
 function parseProtocolRoleAndContent(raw = '', type = '') {
   const text = cleanAiProtocolBlockContent(raw);
   if (!text) return { roleName: '', content: '' };
@@ -1056,7 +1089,7 @@ export function extractAiProtocolBlocks(rawText) {
     .trim();
   if (!visibleText) return [];
 
-  const markerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情|转账|礼物|引用|撤回|拍一拍|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
+  const markerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情|转账|礼物|红包|引用|撤回|拍一拍|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
   const matches = [...visibleText.matchAll(markerRegex)];
   if (!matches.length) return [];
 
@@ -1316,6 +1349,21 @@ export function buildAiReplyMessages(rawText, state, options = {}) {
       if (giftMessage) {
         builtMessages.push({
           ...giftMessage,
+          __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
+          __protocolEndIndex: block.__protocolEndIndex
+        });
+      }
+      return;
+    }
+
+    if (block.type === '红包') {
+      const redPacketPayload = parseAiRedPacketProtocolPayload(block.content);
+      if (redPacketPayload) {
+        builtMessages.push({
+          role: 'assistant',
+          type: 'red_packet',
+          redPacketStatus: 'pending',
+          ...redPacketPayload,
           __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
           __protocolEndIndex: block.__protocolEndIndex
         });

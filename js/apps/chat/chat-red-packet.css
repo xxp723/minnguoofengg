@@ -1,0 +1,249 @@
+/**
+ * 文件名: js/apps/chat/chat-red-packet.css
+ * 用途: 闲谈应用 — 咖啡功能区“红包”独立模块样式
+ * 说明: 防闪屏，统一微信红包主题风格。
+ */
+
+/* ==========================================================================
+   [区域标注·本次新增红包模块] 聊天气泡内红包样式
+   ========================================================================== */
+
+/* 让带有 .msg-bubble--red-packet 的气泡本身去掉多余边距，由内部卡片撑开 */
+.msg-bubble--red-packet {
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  overflow: hidden;
+  max-width: 260px;
+  width: 240px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.msg-red-packet-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  cursor: pointer;
+  user-select: none;
+  background: #fff;
+  transition: opacity 0.2s;
+}
+
+.msg-red-packet-card:active {
+  opacity: 0.85;
+}
+
+.msg-red-packet-card__content {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  background: #f45448; /* 微信红包底色 */
+  color: #fff;
+  min-height: 72px;
+  box-sizing: border-box;
+}
+
+/* 已领取/已退回状态，气泡颜色变浅 */
+.msg-red-packet-card--accepted .msg-red-packet-card__content,
+.msg-red-packet-card--returned .msg-red-packet-card__content {
+  background: #f8b4a9;
+}
+
+.msg-red-packet-card__icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  margin-right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.msg-red-packet-card__icon svg {
+  width: 32px;
+  height: 32px;
+  color: #f7d58f; /* 微信红包icon黄色 */
+}
+
+.msg-red-packet-card--accepted .msg-red-packet-card__icon svg,
+.msg-red-packet-card--returned .msg-red-packet-card__icon svg {
+  color: #fff; /* 已领取的icon一般偏白或淡色 */
+  opacity: 0.8;
+}
+
+.msg-red-packet-card__text {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.msg-red-packet-card__note {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #fff;
+}
+
+.msg-red-packet-card__status {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: 4px;
+}
+
+.msg-red-packet-card__footer {
+  padding: 6px 16px;
+  font-size: 12px;
+  color: #999;
+  background: #fff;
+  text-align: left;
+}
+
+/* ==========================================================================
+   [区域标注·本次新增红包模块] 系统提示小字 (类似撤回、拍一拍)
+   ========================================================================== */
+.msg-red-packet-system-row {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0;
+  position: relative;
+}
+
+.msg-red-packet-system-row__text {
+  display: inline-block;
+  padding: 4px 12px;
+  background: var(--bg-tertiary, rgba(0, 0, 0, 0.05));
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--text-tertiary, #999);
+  user-select: none;
+}
+
+/* ==========================================================================
+   [区域标注·本次新增红包模块] 弹窗通用与特化样式
+   ========================================================================== */
+
+/* 调整发送红包弹窗内部排版 */
+.msg-red-packet-modal__balance-card {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  background: var(--bg-tertiary, rgba(0, 0, 0, 0.03));
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+
+.msg-red-packet-modal__balance-icon {
+  width: 40px;
+  height: 40px;
+  background: var(--theme-color, #c1a173);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+}
+
+.msg-red-packet-modal__balance-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.msg-red-packet-modal__balance-card em {
+  display: block;
+  font-size: 12px;
+  color: var(--text-tertiary, #999);
+  font-style: normal;
+  margin-bottom: 4px;
+}
+
+.msg-red-packet-modal__balance-card strong {
+  display: block;
+  font-size: 20px;
+  color: var(--text-primary, #333);
+  font-family: monospace;
+}
+
+.msg-red-packet-modal__field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+
+.msg-red-packet-modal__field span {
+  font-size: 14px;
+  color: var(--text-secondary, #666);
+  margin-bottom: 8px;
+}
+
+/* 红包行为操作卡片 (领取/已领取) */
+.msg-red-packet-action-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px;
+}
+
+.msg-red-packet-action-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.msg-red-packet-action-avatar {
+  width: 64px;
+  height: 64px;
+  background: #f45448;
+  color: #f7d58f;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(244, 84, 72, 0.2);
+}
+
+.msg-red-packet-action-avatar svg {
+  width: 36px;
+  height: 36px;
+}
+
+.msg-red-packet-action-payer {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-primary, #333);
+  margin: 0 0 8px 0;
+}
+
+.msg-red-packet-action-note {
+  font-size: 14px;
+  color: var(--text-secondary, #666);
+  margin: 0 0 24px 0;
+}
+
+.msg-red-packet-action-amount {
+  color: #f45448;
+  margin-bottom: 8px;
+}
+
+.msg-red-packet-action-amount strong {
+  font-size: 40px;
+  font-family: monospace;
+  margin-right: 4px;
+}
+
+.msg-red-packet-action-amount small {
+  font-size: 16px;
+}
+
+.msg-red-packet-action-status {
+  font-size: 14px;
+  color: var(--text-tertiary, #999);
+}

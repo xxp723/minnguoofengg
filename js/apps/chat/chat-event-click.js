@@ -171,6 +171,12 @@ import {
   showMessageGiftModal
 } from './chat-gift.js';
 import {
+  parseRedPacketDraftFromModal,
+  sendRedPacketMessage,
+  showRedPacketActionModal,
+  showMessageRedPacketModal
+} from './chat-red-packet.js';
+import {
   createTextImageMessage,
   openTextImagePreview,
   parseTextImageDraftFromModal,
@@ -1193,6 +1199,61 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
       break;
     }
 
+    case 'open-msg-red-packet-modal': {
+      const walletDisplay = getWalletDisplayAmount(state.walletData || {});
+      const activeMask = (state.archiveMasks || []).find(mask => String(mask?.id || '') === String(state.activeMaskId)) || {};
+      showMessageRedPacketModal(container, {
+        balanceLabel: formatWalletMoney(walletDisplay.value, walletDisplay.currency.code),
+        currencyCode: walletDisplay.currency.code,
+        maskName: String(activeMask?.name || state.profile?.nickname || '当前面具身份')
+      });
+      break;
+    }
+
+    case 'confirm-msg-red-packet-send': {
+      if (!state.currentChatId) break;
+
+      const walletDisplay = getWalletDisplayAmount(state.walletData || {});
+      const draft = parseRedPacketDraftFromModal(container, walletDisplay, state.walletData || {});
+      const packetAmount = Number(draft.packetAmount || 0);
+      const packetBaseCny = Number(draft.packetBaseCny || 0);
+      const currentBaseCny = Math.max(0, Number(state.walletData?.balanceBaseCny || 0) || 0);
+
+      if (!Number.isFinite(packetAmount) || packetAmount <= 0) {
+        renderModalNotice(container, '请输入大于 0 的红包金额');
+        break;
+      }
+
+      if (!Number.isFinite(Number(draft.displayRate || 0)) || Number(draft.displayRate || 0) <= 0 || !Number.isFinite(packetBaseCny)) {
+        renderModalNotice(container, '当前钱包币种汇率不可用，请先切换币种后重试');
+        break;
+      }
+
+      if (packetBaseCny > currentBaseCny + 1e-8) {
+        renderModalNotice(container, '红包金额不能超过当前钱包余额');
+        break;
+      }
+
+      const packetDisplayAmount = formatWalletMoney(packetAmount, draft.currencyCode);
+      const normalizedDraft = {
+        ...draft,
+        packetDisplayAmount
+      };
+
+      const sent = await sendRedPacketMessage(container, state, db, normalizedDraft, { formatWalletMoney });
+      if (!sent) {
+        renderModalNotice(container, '当前聊天不存在，无法发送红包');
+        break;
+      }
+
+      const latestPacketMessage = state.currentMessages[state.currentMessages.length - 1];
+      closeModal(container);
+      appendCurrentMessageBubble(container, state, latestPacketMessage);
+      syncMessageDockOpenState(container, state);
+      refreshPanel(container, state, 'chatList');
+      break;
+    }
+
     case 'confirm-msg-gift-buy':
     case 'request-msg-gift-pay': {
       if (!state.currentChatId) break;
@@ -1525,6 +1586,101 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
       await Promise.all([
         persistCurrentMessages(state, db),
         dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions)
+      ]);
+
+      closeModal(container);
+      renderCurrentChatMessage(container, state);
+      break;
+    }
+
+    case 'msg-red-packet-open-actions': {
+      const messageId = String(target.dataset.messageId || '').trim();
+      const packetMessage = (state.currentMessages || []).find(item => String(item.id) === messageId);
+      if (!packetMessage || String(packetMessage.type || '') !== 'red_packet') break;
+
+      const packetStatus = String(packetMessage.packetStatus || 'pending').trim();
+      const packetDirection = String(packetMessage.packetDirection || '').trim() || (packetMessage.role === 'assistant' ? 'incoming' : 'outgoing');
+      const statusLabel = packetStatus === 'accepted' ? '已领取' : '等待操作';
+      const canOperate = packetStatus === 'pending' && packetDirection === 'incoming';
+
+      showRedPacketActionModal(container, {
+        messageId,
+        note: String(packetMessage.packetNote || '恭喜发财，大吉大利'),
+        statusLabel,
+        actionHint: canOperate ? '请选择领取' : `当前红包状态：${statusLabel}`,
+        canAccept: canOperate
+      });
+      break;
+    }
+
+    case 'msg-red-packet-accept': {
+      const messageId = String(target.dataset.messageId || '').trim();
+      if (!messageId) break;
+
+      const messageIndex = (state.currentMessages || []).findIndex(item => String(item.id) === messageId);
+      if (messageIndex < 0) break;
+
+      const packetMessage = state.currentMessages[messageIndex];
+      if (String(packetMessage.type || '') !== 'red_packet') break;
+      if (String(packetMessage.packetStatus || 'pending') !== 'pending') {
+        closeModal(container);
+        break;
+      }
+
+      const packetDirection = String(packetMessage.packetDirection || '').trim() || (packetMessage.role === 'assistant' ? 'incoming' : 'outgoing');
+      if (packetDirection !== 'incoming') {
+        closeModal(container);
+        break;
+      }
+
+      const now = Date.now();
+      const packetBaseCny = Math.max(0, Number(packetMessage.packetBaseCny || 0) || 0);
+
+      state.currentMessages[messageIndex] = {
+        ...packetMessage,
+        packetDirection,
+        packetStatus: 'accepted',
+        packetHandledAt: now
+      };
+
+      if (packetBaseCny > 0) {
+        const session = state.sessions.find(s => s.id === state.currentChatId);
+        state.walletData = normalizeWalletData({
+          ...state.walletData,
+          balanceBaseCny: Number(state.walletData?.balanceBaseCny || 0) + packetBaseCny,
+          ledger: [
+            {
+              id: `wallet_ledger_${now}_${Math.random().toString(16).slice(2)}`,
+              kind: 'transfer',
+              direction: 'in',
+              title: `领取 ${String(session?.name || '对方').trim() || '对方'} 红包`,
+              amountBaseCny: Number(packetBaseCny.toFixed(2)),
+              timestamp: now
+            },
+            ...(Array.isArray(state.walletData?.ledger) ? state.walletData.ledger : [])
+          ],
+          updatedAt: now
+        });
+      }
+
+      state.currentMessages.push({
+        id: `red_packet_system_${now}_${Math.random().toString(16).slice(2)}`,
+        role: 'user',
+        type: 'transfer_system',
+        content: '你已领取',
+        timestamp: now + 1
+      });
+
+      const session = state.sessions.find(s => s.id === state.currentChatId);
+      if (session) {
+        session.lastMessage = '[红包]';
+        session.lastTime = now;
+      }
+
+      await Promise.all([
+        persistCurrentMessages(state, db),
+        dbPut(db, DATA_KEY_SESSIONS(state.activeMaskId), state.sessions),
+        persistWalletData(state, db)
       ]);
 
       closeModal(container);

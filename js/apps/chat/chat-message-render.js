@@ -21,6 +21,13 @@ import {
   renderGiftFeatureButton
 } from './chat-gift.js';
 import {
+  getRedPacketMessageDisplayText,
+  isRedPacketMessage,
+  isRedPacketSystemMessage,
+  renderRedPacketBubble,
+  renderRedPacketFeatureButton
+} from './chat-red-packet.js';
+import {
   isTextImageMessage,
   renderTextImageBubble,
   renderTextImageFeatureButton
@@ -406,6 +413,7 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
   const isZoomableImage = Boolean(hasImageUrl && !isExpiredImageMessage);
   const isTransferMessage = String(msg?.type || '') === 'transfer';
   const isGiftBubbleMessage = isGiftMessage(msg);
+  const isRedPacketBubbleMessage = isRedPacketMessage(msg);
   const isMomentShareMessage = String(msg?.type || '') === 'moment_share';
   const isHtmlCardMessage = String(msg?.type || '') === 'card' && String(msg?.cardHtml || msg?.content || '').trim();
   const htmlCardSrcdoc = isHtmlCardMessage
@@ -424,7 +432,8 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
   const isUserPatSystem = isUserPatSystemMessage(msg);
   const isUserWithdrawSystemMessage = String(msg?.type || '') === 'user_withdraw_system';
   const isHtmlCardInteractionSystemMessage = String(msg?.type || '') === 'html_card_interaction_system';
-  const isTransferSystemMessage = String(msg?.type || '') === 'transfer_system' || isAiWithdrawSystemMessage || isAiPatSystemMessage || isUserPatSystem || isUserWithdrawSystemMessage || isHtmlCardInteractionSystemMessage;
+  const isRedPacketSystem = isRedPacketSystemMessage(msg);
+  const isTransferSystemMessage = String(msg?.type || '') === 'transfer_system' || isAiWithdrawSystemMessage || isAiPatSystemMessage || isUserPatSystem || isUserWithdrawSystemMessage || isHtmlCardInteractionSystemMessage || isRedPacketSystem;
   const transferStatus = String(msg?.transferStatus || '').trim() || 'pending';
   const isTransferAccepted = transferStatus === 'accepted';
   const quoteHtml = renderQuotePreview(msg?.quote);
@@ -455,6 +464,8 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
           </div>
         `;
     }
+
+    if (isRedPacketBubbleMessage) return renderRedPacketBubble(msg);
 
     if (isTransferMessage) {
       return `
@@ -541,9 +552,9 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
      ====================================================================== */
   const bubbleRowAction = multiSelectMode
     ? 'msg-multi-toggle'
-    : (isTransferMessage
+        : (isTransferMessage
         ? 'msg-transfer-open-actions'
-        : (isGiftBubbleMessage ? 'msg-gift-open-actions' : 'msg-bubble-select'));
+        : (isGiftBubbleMessage ? 'msg-gift-open-actions' : (isRedPacketBubbleMessage ? 'msg-red-packet-open-actions' : 'msg-bubble-select')));
 
   return `
     <div class="msg-bubble-row ${isUser ? 'msg-bubble-row--right' : 'msg-bubble-row--left'} ${multiSelectMode ? 'is-multi-selecting' : ''} ${isSelected ? 'is-selected' : ''}"
@@ -603,7 +614,7 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
             </button>
           </div>
         ` : ''}
-        <div class="msg-bubble ${isUser ? 'msg-bubble--user' : 'msg-bubble--other'} ${isAssistant && msg?.pending ? 'is-pending' : ''} ${isStickerMessage ? 'msg-bubble--sticker' : ''} ${isTextImageBubbleMessage ? 'msg-bubble--text-image' : ''} ${isVoiceBubbleMessage ? 'msg-bubble--voice' : ''} ${isImageMessage ? 'msg-bubble--image' : ''} ${isTransferMessage ? 'msg-bubble--transfer' : ''} ${isGiftBubbleMessage ? 'msg-bubble--gift' : ''} ${isMomentShareMessage ? 'msg-bubble--moment-share' : ''} ${isHtmlCardMessage ? 'msg-bubble--html-card' : ''} ${quoteHtml ? 'msg-bubble--with-quote' : ''}">
+        <div class="msg-bubble ${isUser ? 'msg-bubble--user' : 'msg-bubble--other'} ${isAssistant && msg?.pending ? 'is-pending' : ''} ${isStickerMessage ? 'msg-bubble--sticker' : ''} ${isTextImageBubbleMessage ? 'msg-bubble--text-image' : ''} ${isVoiceBubbleMessage ? 'msg-bubble--voice' : ''} ${isImageMessage ? 'msg-bubble--image' : ''} ${isTransferMessage ? 'msg-bubble--transfer' : ''} ${isGiftBubbleMessage ? 'msg-bubble--gift' : ''} ${isRedPacketBubbleMessage ? 'msg-bubble--red-packet' : ''} ${isMomentShareMessage ? 'msg-bubble--moment-share' : ''} ${isHtmlCardMessage ? 'msg-bubble--html-card' : ''} ${quoteHtml ? 'msg-bubble--with-quote' : ''}">
           ${quoteHtml}
           ${bubbleInnerHtml}
           ${renderTranslationBubbleHtml(msg, options.translationSettings, isUser)}
@@ -769,6 +780,7 @@ export function renderChatMessage(chatSession, messages, options = {}) {
       </div>
       <div class="msg-feature-dock__row">
         ${renderGiftFeatureButton()}
+        ${renderRedPacketFeatureButton()}
         <button class="msg-feature-dock__item msg-feature-dock__item--aside" type="button" data-action="open-msg-aside-modal" data-feature="aside">
           ${MSG_ICONS.aside}<span>旁白</span>
         </button>
@@ -1158,6 +1170,8 @@ export function refreshCurrentSessionLastMessage(state) {
                     ? `[转账] ${latest?.transferDisplayAmount || latest?.content || '¥0.00'}`
                     : (latest?.type === 'gift'
                         ? getGiftMessageDisplayText(latest)
-                        : (latest?.content || ''))))));
+                        : (latest?.type === 'red_packet'
+                            ? getRedPacketMessageDisplayText(latest)
+                            : (latest?.content || '')))))));
   session.lastTime = latest?.timestamp || Date.now();
 }

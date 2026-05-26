@@ -12,6 +12,8 @@
    2. 中文仍保留 PingFang SC / Microsoft YaHei 作为 fallback，避免中文缺字。
    3. 本区域仅定义字体资源，不涉及任何持久化存储逻辑。
    ========================================================================== */
+@import url('./chat-red-packet.css');
+
 @font-face {
   font-family: "ZSFT-dt";
   src: url("https://fontsapi.zeoseven.com/dt/main.woff2") format("woff2");
