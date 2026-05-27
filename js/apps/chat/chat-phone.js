@@ -101,26 +101,38 @@ function bindPhoneEvents() {
   const btnReset = phoneOverlayElement.querySelector('#phone-btn-reset');
   const btnHangup = phoneOverlayElement.querySelector('#phone-btn-hangup');
 
-  // 发送逻辑
-  const handleSend = async () => {
+  /* ========================================================================
+     [区域标注·本次修改·电话功能] 按键分流：回车只入列、纸飞机才触发 AI
+     说明：
+     1. 回车键只把消息写入 currentMessages 并刷新电话页，不再自动请求 AI。
+     2. 点击纸飞机按钮时才允许 triggerAi=true，进入角色回复流程。
+     3. 这样可以避免通话页面误把键盘发送当作 AI 触发入口。
+     ======================================================================== */
+  const sendPhoneMessage = async (triggerAi = false) => {
     const text = input.value.trim();
     if (!text) return;
-    
+
     input.value = '';
-    // 发送消息，这会自动推入 state.currentMessages，并触发 UI 更新
-    await sendMessage(_container, state, _db, text, _settingsManager, { triggerAi: true });
+    await sendMessage(_container, state, _db, text, _settingsManager, { triggerAi });
+    updatePhoneUI();
     scrollToBottom();
   };
 
-  btnSend.addEventListener('click', handleSend);
+  btnSend.addEventListener('click', () => {
+    void sendPhoneMessage(true);
+  });
+
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleSend();
+      void sendPhoneMessage(false);
     }
   });
 
-  // 重回逻辑：找到最后一条 AI 消息并删除，然后重新请求
+  /* ========================================================================
+     [区域标注·本次修改·电话功能] 重新生成当前通话最后一条 AI 回复
+     说明：仅在电话页中删掉最后一条 AI 消息并重新请求，刷新后同步更新电话页。
+     ======================================================================== */
   btnReset.addEventListener('click', async () => {
     const messages = state.currentMessages;
     let lastAiIndex = -1;
@@ -130,9 +142,8 @@ function bindPhoneEvents() {
         break;
       }
     }
-    
+
     if (lastAiIndex !== -1) {
-      // 删除最后一条 AI 消息
       messages.splice(lastAiIndex, 1);
       /* ========================================================================
          [区域标注·已完成·电话功能持久化修复] 重新生成持久化
@@ -141,14 +152,15 @@ function bindPhoneEvents() {
       if (state.currentChatId) {
         await dbPut(_db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + state.currentChatId, state.currentMessages);
       }
-      // 重新渲染当前 UI
       updatePhoneUI();
-      // 调用请求重新生成，通过触发空消息实现（等价于重回）
       await sendMessage(_container, state, _db, '', _settingsManager, { skipAppendUser: true, triggerAi: true });
     }
   });
 
-  // 挂断逻辑
+  /* ========================================================================
+     [区域标注·本次修改·电话功能] 挂断按钮接线
+     说明：点击挂断时直接进入 endPhoneCall，避免把结束流程留到下一次通话才回写。
+     ======================================================================== */
   btnHangup.addEventListener('click', async () => {
     await endPhoneCall();
   });
@@ -348,8 +360,14 @@ export async function endPhoneCall(skipSystemMessage = false) {
   const durationMs = Date.now() - phoneStartTime;
   const durationStr = formatDuration(durationMs);
 
+  /* ========================================================================
+     [区域标注·本次修改·电话功能] 通话结束即时回写
+     说明：
+     1. 挂断时立刻把结束系统消息写入 currentMessages 和 IndexedDB。
+     2. 先刷新主聊天页，让通话结束气泡与系统提示马上落到聊天页，而不是等到下一次电话再补显示。
+     3. 隐藏电话覆盖层仍保留收尾动画，但不再把结束状态延后到下一轮通话。
+     ======================================================================== */
   if (!skipSystemMessage) {
-    // 写入结束提示
     const endMsg = {
       id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       role: 'system',
@@ -365,15 +383,13 @@ export async function endPhoneCall(skipSystemMessage = false) {
     if (state.currentChatId) {
       await dbPut(_db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + state.currentChatId, state.currentMessages);
     }
+    renderChatMessage(_container, state);
   }
 
-  // 隐藏全屏
   if (phoneOverlayElement) {
     phoneOverlayElement.classList.remove('is-visible');
     setTimeout(() => {
       phoneOverlayElement.classList.add('is-hidden');
-      // 返回主界面时，重新渲染主聊天列表以显示系统消息等
-      renderChatMessage(_container, state);
-    }, 300); // 等待动画完成
+    }, 300);
   }
 }
