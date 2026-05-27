@@ -263,23 +263,25 @@ function scrollToBottom() {
    2. 初始化全屏覆盖层，进入通话状态。
    3. 写入系统提示以记录开始。
    ========================================================================== */
-export async function openPhoneModal(container) {
+export async function openPhoneModal(container, skipSystemMessage = false) {
   // 如果之前是在普通聊天状态，现在进入电话状态
   phoneStartTime = Date.now();
 
-  // 1. 写入开始通话的系统消息，用以让 prompt-payload 识别当前是通话中
-  const startMsg = {
-    id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-    role: 'system',
-    type: 'phone_start_system',
-    content: '[电话通话开始]',
-    timestamp: Date.now()
-  };
-  state.currentMessages.push(startMsg);
-  await DB.put('chat_sessions', {
-    id: state.currentSessionId,
-    messages: state.currentMessages
-  });
+  if (!skipSystemMessage) {
+    // 1. 写入开始通话的系统消息，用以让 prompt-payload 识别当前是通话中
+    const startMsg = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      role: 'system',
+      type: 'phone_start_system',
+      content: '[电话通话开始]',
+      timestamp: Date.now()
+    };
+    state.currentMessages.push(startMsg);
+    await DB.put('chat_sessions', {
+      id: state.currentSessionId,
+      messages: state.currentMessages
+    });
+  }
 
   // 2. 初始化/显示 DOM
   const overlay = initPhoneOverlay(container);
@@ -309,23 +311,26 @@ export async function openPhoneModal(container) {
    [区域标注·本次修改·电话功能] 结束通话
    说明：计算时长，写入系统消息，恢复主界面。
    ========================================================================== */
-async function endPhoneCall() {
+export async function endPhoneCall(skipSystemMessage = false) {
+  if (!phoneOverlayElement || phoneOverlayElement.classList.contains('is-hidden')) return;
   const durationMs = Date.now() - phoneStartTime;
   const durationStr = formatDuration(durationMs);
 
-  // 写入结束提示
-  const endMsg = {
-    id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-    role: 'system',
-    type: 'phone_end_system',
-    content: `[电话通话结束，时长: ${durationStr}]`,
-    timestamp: Date.now()
-  };
-  state.currentMessages.push(endMsg);
-  await DB.put('chat_sessions', {
-    id: state.currentSessionId,
-    messages: state.currentMessages
-  });
+  if (!skipSystemMessage) {
+    // 写入结束提示
+    const endMsg = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      role: 'system',
+      type: 'phone_end_system',
+      content: `[电话通话结束，时长: ${durationStr}]`,
+      timestamp: Date.now()
+    };
+    state.currentMessages.push(endMsg);
+    await DB.put('chat_sessions', {
+      id: state.currentSessionId,
+      messages: state.currentMessages
+    });
+  }
 
   // 隐藏全屏
   if (phoneOverlayElement) {

@@ -190,8 +190,15 @@ function stripAiProtocolClosingTags(value = '') {
   return String(value || '').replace(AI_PROTOCOL_CLOSING_TAG_REGEX, ' ');
 }
 
+/* ========================================================================
+   [区域标注·本次修改·电话功能] 丢弃系统补全的单独引用残片
+   说明：如果在最下方单独出现“[/电话]”等闭合标签，说明是残片。
+   ======================================================================== */
+const AI_PHONE_PROTOCOL_CLOSING_TAG_REGEX = /(?:\[\s*\/\s*(?:拨打电话|挂断电话|电话)\s*\]|【\s*\/\s*(?:拨打电话|挂断电话|电话)\s*】)/gi;
+
 export function cleanAiProtocolBlockContent(content) {
   return stripAiProtocolClosingTags(String(content || ''))
+    .replace(AI_PHONE_PROTOCOL_CLOSING_TAG_REGEX, ' ')
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
     .replace(/^\s*(?:`|\*\*)+/g, '')
     .replace(/(?:`|\*\*)+\s*$/g, '')
@@ -242,6 +249,7 @@ function normalizeAiEllipsisText(text = '') {
 
 export function cleanAiVisibleBubbleText(text) {
   return normalizeAiEllipsisText(stripAiProtocolClosingTags(String(text || '')))
+    .replace(AI_PHONE_PROTOCOL_CLOSING_TAG_REGEX, ' ')
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
     .replace(/<\/?think>/gi, '')
     .replace(/^\s*(?:以下是)?(?:修正后内容|最终输出|回复格式|检查结果|修正结果|正确格式)\s*[：:]\s*/i, '')
@@ -359,6 +367,7 @@ function softenShortToneParticleEnding(text = '') {
 
 export function splitStrictSentenceBubbles(text) {
   const normalized = normalizeAiEllipsisText(stripAiProtocolClosingTags(String(text || '')))
+    .replace(AI_PHONE_PROTOCOL_CLOSING_TAG_REGEX, ' ')
     .replace(/\*\*`?\s*\[回复\]\s*[^：:\n`]+?\s*[：:]\s*/g, '')
     .replace(/`?\*\*/g, '')
     .replace(/\r\n/g, '\n')
@@ -1152,7 +1161,7 @@ export function extractAiProtocolBlocks(rawText) {
     .trim();
   if (!visibleText) return [];
 
-  const markerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情包|表情|转账|礼物|红包|外卖|引用|撤回|拍一拍|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
+  const markerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情包|表情|转账|礼物|红包|外卖|引用|撤回|拍一拍|拨打电话|挂断电话|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
   const matches = [...visibleText.matchAll(markerRegex)];
   if (!matches.length) return [];
 
@@ -1213,7 +1222,7 @@ export function bindAsideSegmentsToAiMessages(aiMessages = [], asideSegments = [
   }
 
   const source = String(rawTextWithAside || '');
-  const protocolMarkerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情包|表情|转账|礼物|红包|外卖|引用|撤回|拍一拍|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
+  const protocolMarkerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情包|表情|转账|礼物|红包|外卖|引用|撤回|拍一拍|拨打电话|挂断电话|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
   const protocolMarkers = [...source.matchAll(protocolMarkerRegex)]
     .map(match => Number(match.index || 0))
     .sort((a, b) => a - b);
@@ -1350,6 +1359,28 @@ export function buildAiReplyMessages(rawText, state, options = {}) {
     if (block.type === '拍一拍') {
       const patMessage = createAiPatSystemMessageFromProtocol(block);
       if (patMessage) builtMessages.push(patMessage);
+      return;
+    }
+
+    if (block.type === '拨打电话') {
+      builtMessages.push({
+        role: 'system',
+        type: 'phone_start_system',
+        content: '[电话通话开始]',
+        __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
+        __protocolEndIndex: block.__protocolEndIndex
+      });
+      return;
+    }
+
+    if (block.type === '挂断电话') {
+      builtMessages.push({
+        role: 'system',
+        type: 'phone_end_system',
+        content: '[电话通话结束]',
+        __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
+        __protocolEndIndex: block.__protocolEndIndex
+      });
       return;
     }
 

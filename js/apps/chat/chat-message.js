@@ -1206,6 +1206,21 @@ export async function sendMessage(container, state, db, content, settingsManager
       );
       if (shouldDelayVisibleAiBubble) await sleep(getAiBubbleDelayMs(visibleText, index));
       targetMessages.push(message);
+
+      /* ======================================================================
+         [区域标注·本次修改·电话功能] 监听 AI 电话协议并触发相应行为
+         ====================================================================== */
+      if (message.type === 'phone_start_system' && targetChatId === state.currentChatId) {
+        import('./chat-phone.js').then(({ openPhoneModal }) => {
+          openPhoneModal(container, state, db, true);
+        });
+      }
+      if (message.type === 'phone_end_system' && targetChatId === state.currentChatId) {
+        import('./chat-phone.js').then(({ endPhoneCall }) => {
+          endPhoneCall(container, state, db, true);
+        });
+      }
+
       appendTargetChatConsoleLog(
         'info',
         message.type === 'sticker'
