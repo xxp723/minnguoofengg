@@ -108,14 +108,29 @@ function bindPhoneEvents() {
      2. 点击纸飞机按钮时才允许 triggerAi=true，进入角色回复流程。
      3. 这样可以避免通话页面误把键盘发送当作 AI 触发入口。
      ======================================================================== */
+  /* ========================================================================
+     [区域标注·本次修改·电话消息发送优化] 
+     说明：修复发送后电话页没马上显示消息的问题。
+           无论是否 triggerAi，都先 skipAppendUser=false 把消息入列并立刻 updatePhoneUI()；
+           如果是点击纸飞机(triggerAi=true)，再另外用 skipAppendUser=true 去请求AI。
+     ======================================================================== */
   const sendPhoneMessage = async (triggerAi = false) => {
     const text = input.value.trim();
     if (!text) return;
 
     input.value = '';
-    await sendMessage(_container, state, _db, text, _settingsManager, { triggerAi });
+    
+    // 1. 先只把用户消息写进 currentMessages 并立即刷新界面
+    await sendMessage(_container, state, _db, text, _settingsManager, { triggerAi: false });
     updatePhoneUI();
     scrollToBottom();
+
+    // 2. 如果是点纸飞机，则请求 AI 回复
+    if (triggerAi) {
+      await sendMessage(_container, state, _db, '', _settingsManager, { skipAppendUser: true, triggerAi: true });
+      updatePhoneUI();
+      scrollToBottom();
+    }
   };
 
   btnSend.addEventListener('click', () => {
@@ -215,18 +230,12 @@ export function renderPhoneChatArea() {
  */
 function rebuildPhoneMessagesHTML(messages) {
   let html = '';
-  
-  // 获取当前会话，以正确取得头像
-  const currentSession = (state.sessions || []).find(session => String(session.id) === String(state.currentChatId)) || {};
-  const contactAvatar = String(currentSession.avatar || '');
-  const userAvatar = String(currentSession.userAvatar || state.profile?.avatar || '');
 
   for (const msg of messages) {
     if (msg.type === 'system' || msg.type === 'phone_start_system' || msg.type === 'phone_end_system') continue;
     
     const isUser = msg.role === 'user';
     const alignClass = isUser ? 'is-right' : 'is-left';
-    const avatar = isUser ? userAvatar : contactAvatar;
     
     // 如果是语音消息显示语音样式，其他文本显示文本样式
     let contentHtml = '';
@@ -236,10 +245,14 @@ function rebuildPhoneMessagesHTML(messages) {
       contentHtml = escapeHtml(msg.content);
     }
 
+    /* ========================================================================
+       [区域标注·本次修改·移除下方消息头像]
+       说明：为了避免在电话界面下方显示巨大的头像，直接去掉下方每条消息的 img.chat-message-avatar 标签，
+             仅保留气泡内容，上方已经展示了当前联系人头像。
+       ======================================================================== */
     html += `
-      <div class="chat-message-item ${alignClass}" data-id="${escapeHtml(msg.id)}" data-role="${escapeHtml(msg.role)}">
-        <img class="chat-message-avatar" src="${escapeHtml(avatar)}" alt="头像" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 48 48\\' fill=\\'%23ccc\\'><circle cx=\\'24\\' cy=\\'24\\' r=\\'20\\' fill=\\'%23eee\\'/><path d=\\'M24 24c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm0 4c7.7 0 14 5.3 14 12H10c0-6.7 6.3-12 14-12z\\' fill=\\'%23ccc\\'/></svg>'"/>
-        <div class="chat-message-content">
+      <div class="chat-message-item ${alignClass} msg-phone-bubble-item" data-id="${escapeHtml(msg.id)}" data-role="${escapeHtml(msg.role)}">
+        <div class="chat-message-content" style="margin-left: 0; margin-right: 0;">
           <div class="chat-message-bubble-wrapper">
             <div class="chat-message-bubble">
               <div class="chat-message-text">${contentHtml}</div>
@@ -322,8 +335,14 @@ export async function openPhoneModal(container, chatState, db, settingsManager, 
   const overlay = initPhoneOverlay(container);
   
   // 3. 更新对方头像和名字
+  /* ========================================================================
+     [区域标注·本次修改·电话顶部头像获取]
+     说明：如果在会话(session)中没有专门设置头像，回退读取通讯录(contact)中的头像，
+           保证电话独立页面的顶部头像和普通聊天列表中的一致。
+     ======================================================================== */
   const currentSession = (state.sessions || []).find(session => String(session.id) === String(state.currentChatId)) || {};
-  const contactAvatar = String(currentSession.avatar || '');
+  const contact = (state.contacts || []).find(c => String(c.id) === String(currentSession.id) || String(c.roleId) === String(currentSession.roleId)) || {};
+  const contactAvatar = String(currentSession.avatar || contact.avatar || '');
   const contactName = String(currentSession.remark || currentSession.name || '未知联系人');
 
   const avatarEl = overlay.querySelector('#phone-avatar');
