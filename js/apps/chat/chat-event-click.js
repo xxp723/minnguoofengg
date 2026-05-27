@@ -182,6 +182,7 @@ import {
   showTakeawayActionModal,
   showMessageTakeawayModal
 } from './chat-takeaway.js';
+import { openPhoneModal } from './chat-phone.js';
 import {
   createTextImageMessage,
   openTextImagePreview,
@@ -1226,6 +1227,10 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
       });
       break;
     }
+
+    case 'open-msg-phone-modal':
+      openPhoneModal();
+      break;
 
     /* ========================================================================
        [区域标注·已完成·本次红包发送金额校验修复]

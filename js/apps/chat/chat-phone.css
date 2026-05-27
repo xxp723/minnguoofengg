@@ -1,0 +1,43 @@
+/**
+ * 文件名: js/apps/chat/chat-phone.css
+ * 用途: 闲谈应用 — 电话功能样式
+ * 架构层: 应用层 CSS
+ */
+
+/* ==========================================================================
+   [区域标注·本次修改·电话功能] 电话应用内弹窗样式
+   说明：
+   1. 仅作用于聊天消息页“电话”应用内弹窗。
+   2. 样式风格保持与闲谈应用其它弹窗一致。
+   ========================================================================== */
+.msg-phone-modal-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 10px 0;
+}
+
+.msg-phone-modal-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(74, 52, 42, 0.08);
+  color: #4A342A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.msg-phone-modal-icon svg {
+  width: 32px;
+  height: 32px;
+}
+
+.msg-phone-modal-text {
+  font-size: 14px;
+  color: rgba(74, 52, 42, 0.6);
+  text-align: center;
+  line-height: 1.5;
+}

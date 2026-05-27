@@ -40,6 +40,12 @@ export const MSG_ICONS = {
      ======================================================================== */
   aside: `<svg viewBox="0 0 48 48" fill="none"><path d="M10 8h28a2 2 0 0 1 2 2v20a2 2 0 0 1-2 2H26l-8 8v-8h-8a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M18 17h12M18 23h8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
 
+  /* ========================================================================
+     [区域标注·本次修改·电话功能] IconPark — 电话按钮图标
+     说明：用于聊天消息页咖啡功能区第三行"电话"板块，图标来源保持 IconPark 风格。
+     ======================================================================== */
+  phone: `<svg viewBox="0 0 48 48" fill="none"><path d="M8 30H4V14h4a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M40 30h4V14h-4a4 4 0 0 0-4 4v8a4 4 0 0 0 4 4Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M24 16v16" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="12" y="6" width="24" height="36" rx="4" stroke="currentColor" stroke-width="3"/><path d="M22 36h4" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+
   /* ==========================================================================
      [区域标注·本次修改3] 消息气泡功能栏 IconPark 图标
      说明：单击消息气泡后显示，含修正、删除和多选；“修正”用于 AI 表情包格式补全。

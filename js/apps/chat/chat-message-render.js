@@ -812,6 +812,14 @@ export function renderChatMessage(chatSession, messages, options = {}) {
           ${MSG_ICONS.aside}<span>旁白</span>
         </button>
       </div>
+      <div class="msg-feature-dock__row">
+        <button class="msg-feature-dock__item" type="button" data-action="open-msg-phone-modal" data-feature="phone">
+          ${MSG_ICONS.phone}<span>电话</span>
+        </button>
+        <div class="msg-feature-dock__item" style="visibility: hidden;"></div>
+        <div class="msg-feature-dock__item" style="visibility: hidden;"></div>
+        <div class="msg-feature-dock__item" style="visibility: hidden;"></div>
+      </div>
     </div>
   `;
 
