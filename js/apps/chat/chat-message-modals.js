@@ -168,10 +168,11 @@ export function showMessageTransferModal(container, options = {}) {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·本次转账需求] 转账消息操作弹窗（接收 / 退回）
+   [区域标注·已完成·本次转账弹窗去图标] 转账消息操作弹窗（接收 / 退回）
    说明：
    1. 用户点击转账消息后使用应用内弹窗处理，不使用原生浏览器弹窗。
    2. 这里只负责 UI；余额变更和消息状态持久化统一由 index.js 写入 DB.js / IndexedDB。
+   3. 按照要求，去除了“接收”和“退回”按钮的图标，只留下文字。
    ========================================================================== */
 export function showTransferActionModal(container, options = {}) {
   const mask = container.querySelector('[data-role="modal-mask"]');
@@ -206,8 +207,8 @@ export function showTransferActionModal(container, options = {}) {
       <div class="chat-modal-notice">${escapeHtml(actionHint)}</div>
     </div>
     <div class="chat-modal-footer">
-      ${canReturn ? `<button class="chat-modal-btn chat-modal-btn--secondary" data-action="msg-transfer-return" data-message-id="${escapeHtml(messageId)}" type="button">${MSG_ICONS.undo}<span>退回</span></button>` : ''}
-      ${canAccept ? `<button class="chat-modal-btn chat-modal-btn--primary" data-action="msg-transfer-accept" data-message-id="${escapeHtml(messageId)}" type="button">${MSG_ICONS.check}<span>接收</span></button>` : ''}
+      ${canReturn ? `<button class="chat-modal-btn chat-modal-btn--secondary" data-action="msg-transfer-return" data-message-id="${escapeHtml(messageId)}" type="button"><span>退回</span></button>` : ''}
+      ${canAccept ? `<button class="chat-modal-btn chat-modal-btn--primary" data-action="msg-transfer-accept" data-message-id="${escapeHtml(messageId)}" type="button"><span>接收</span></button>` : ''}
     </div>
   `;
 
