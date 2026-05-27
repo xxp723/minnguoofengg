@@ -13,7 +13,7 @@
 
 import { MSG_ICONS } from './chat-message-icons.js';
 import { sendMessage } from './chat-message.js';
-import { renderChatMessage } from './chat-message-render.js';
+import { renderChatMessage, renderMessageBubble } from './chat-message-render.js';
 import { dbPut, DATA_KEY_MESSAGES_PREFIX, escapeHtml } from './chat-utils.js';
 
 let phoneStartTime = 0;
@@ -224,43 +224,25 @@ export function renderPhoneChatArea() {
 
 /* 
  * 修正：为了完美复用聊天气泡渲染和长按事件，
- * 直接使用 chat-message-render.js 暴露的 updateChatMessageList(messages, container) 或自行渲染。
- * 观察到原始实现中大多是更新 `.chat-message-list`。
- * 我们在这里手动构建标准气泡结构，让全局事件代理生效。
+ * 我们直接使用 chat-message-render.js 提供的 renderMessageBubble 渲染标准气泡。
+ * 并且传入 hideAvatars 隐藏联系人与用户头像。
  */
 function rebuildPhoneMessagesHTML(messages) {
   let html = '';
+  const currentSession = (state.sessions || []).find(session => String(session.id) === String(state.currentChatId)) || {};
 
   for (const msg of messages) {
     if (msg.type === 'system' || msg.type === 'phone_start_system' || msg.type === 'phone_end_system') continue;
     
-    const isUser = msg.role === 'user';
-    const alignClass = isUser ? 'is-right' : 'is-left';
-    
-    // 如果是语音消息显示语音样式，其他文本显示文本样式
-    let contentHtml = '';
-    if (msg.type === 'text' || !msg.type) {
-      contentHtml = escapeHtml(msg.content);
-    } else {
-      contentHtml = escapeHtml(msg.content);
-    }
-
     /* ========================================================================
-       [区域标注·本次修改·移除下方消息头像]
-       说明：为了避免在电话界面下方显示巨大的头像，直接去掉下方每条消息的 img.chat-message-avatar 标签，
-             仅保留气泡内容，上方已经展示了当前联系人头像。
+       [区域标注·本次修改·移除下方消息头像与正常显示气泡]
+       说明：复用主界面的 renderMessageBubble，传入 chatSettings: { hideAvatars: true }，
+             使得气泡拥有和主聊天页面一样的格式，包括靠左靠右和底色，从而解决“不显示发送的消息”和“有巨大头像”的问题。
        ======================================================================== */
-    html += `
-      <div class="chat-message-item ${alignClass} msg-phone-bubble-item" data-id="${escapeHtml(msg.id)}" data-role="${escapeHtml(msg.role)}">
-        <div class="chat-message-content" style="margin-left: 0; margin-right: 0;">
-          <div class="chat-message-bubble-wrapper">
-            <div class="chat-message-bubble">
-              <div class="chat-message-text">${contentHtml}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
+    html += renderMessageBubble(msg, currentSession, { 
+      chatSettings: { hideAvatars: true }, 
+      userProfile: state.profile 
+    });
   }
   return html;
 }

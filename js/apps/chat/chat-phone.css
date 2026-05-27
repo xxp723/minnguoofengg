@@ -217,14 +217,24 @@
 }
 
 /* 适配气泡在暗色背景下的显示 */
-.msg-phone-fullscreen-overlay .chat-message-item {
+.msg-phone-fullscreen-overlay .msg-bubble-row {
   margin-bottom: 16px;
+  width: 100%;
 }
 
-.msg-phone-fullscreen-overlay .chat-message-bubble {
+.msg-phone-fullscreen-overlay .msg-bubble {
   max-width: 85%;
+  background-color: rgba(255, 255, 255, 0.15); /* 角色气泡底色 */
+  color: #fff; /* 角色气泡文字颜色 */
+  border-radius: 12px;
 }
 
-.msg-phone-fullscreen-overlay .chat-message-text {
-  color: #000;
+.msg-phone-fullscreen-overlay .msg-bubble--user {
+  background-color: #07c160; /* 用户气泡底色 */
+  color: #fff;
+}
+
+/* 隐藏时间等可能在暗色背景下看不清的干扰元素 */
+.msg-phone-fullscreen-overlay .msg-bubble__time {
+  display: none;
 }
