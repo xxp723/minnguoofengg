@@ -27,9 +27,11 @@ import {
   DATA_KEY_MOMENTS,
   DATA_KEY_WALLET,
   DATA_KEY_FAVORITES,
+  DATA_KEY_MESSAGES_PREFIX,
   loadCSS,
   removeCSS,
   dbGet,
+  dbPut,
   dbGetArchiveData,
   loadStickerDataFromDb
 } from './chat-utils.js';
@@ -333,6 +335,49 @@ export async function mount(container, context) {
   eventBus.on('archive:data-changed', onArchiveDataChanged);
 
   /* ========================================================================
+     [区域标注·本次修改·外卖配送完成事件接线]
+     说明：
+     1. 监听 document 上派发的 takeaway-delivery-complete 事件。
+     2. 更新对应消息的外卖状态并写入 DB.js / IndexedDB。
+     3. 局部更新气泡状态避免重排闪屏。
+     ======================================================================== */
+  const onTakeawayDeliveryComplete = async (e) => {
+    if (state.destroyed) return;
+    const { messageId, status } = e.detail || {};
+    if (!messageId) return;
+
+    let updated = false;
+    state.currentMessages = (state.currentMessages || []).map(msg => {
+      if (String(msg.id) === String(messageId) && String(msg.type) === 'takeaway') {
+        updated = true;
+        return { ...msg, takeawayStatus: status };
+      }
+      return msg;
+    });
+
+    if (!updated) return;
+
+    if (state.currentChatId) {
+      await dbPut(db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + state.currentChatId, state.currentMessages);
+    }
+
+    const row = container.querySelector(`.msg-bubble-row[data-message-id="${CSS.escape(messageId)}"]`);
+    if (row) {
+      const statusSpan = row.querySelector('.msg-takeaway-bubble__status');
+      if (statusSpan) {
+        if (status === 'completed') {
+          statusSpan.textContent = '已送达';
+          statusSpan.className = 'msg-takeaway-bubble__status msg-takeaway-bubble__status--completed';
+        } else if (status === 'timeout') {
+          statusSpan.textContent = '已超时';
+          statusSpan.className = 'msg-takeaway-bubble__status msg-takeaway-bubble__status--timeout';
+        }
+      }
+    }
+  };
+  document.addEventListener('takeaway-delivery-complete', onTakeawayDeliveryComplete);
+
+  /* ========================================================================
      [区域标注·已完成·自主活动主动发朋友圈后台接线]
      说明：
      1. 仅接入“自主活动/主动发朋友圈”后台调度，具体提示词、副 API 调用与朋友圈 IndexedDB 写入均在 chat-autonomous-activity-settings.js。
@@ -384,6 +429,7 @@ export async function mount(container, context) {
       container.removeEventListener('contextmenu', chatListLongPressHandlers.contextmenu);
       eventBus.off('archive:active-mask-changed', onMaskChanged);
       eventBus.off('archive:data-changed', onArchiveDataChanged);
+      document.removeEventListener('takeaway-delivery-complete', onTakeawayDeliveryComplete);
       autonomousMomentPublisher.destroy();
       removeCSS('chat-app-css');
       removeCSS('chat-moments-css');

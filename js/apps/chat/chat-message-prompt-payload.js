@@ -135,6 +135,36 @@ export function buildPromptPayloadForLatestUserRound(messages = [], shortTermMem
     }
 
     /* ======================================================================
+       [区域标注·本次修改·外卖配送完成静默通知AI]
+       说明：
+       1. 当外卖消息传入 prompt 时，提取其真实状态和点餐方。
+       2. 如果已送达或超时，自动计算送达时间（下单时间 + 30 分钟）并追加到上下文中。
+       3. 让 AI 静默知晓外卖进度，无需浏览器前台额外弹窗或主动提示。
+       ====================================================================== */
+    if (String(item?.type || '') === 'takeaway') {
+      const isHistorySummary = Boolean(options.historySummary);
+      const title = String(item?.takeawayTitle || '外卖').trim();
+      const status = String(item?.takeawayStatus || 'pending').trim();
+      const payer = String(item?.takeawayPayer || '对方').trim();
+
+      let statusText = '正在配送';
+      if (status === 'completed') statusText = '已送达';
+      if (status === 'timeout') statusText = '已超时';
+
+      let timeText = '';
+      if (status === 'completed' || status === 'timeout') {
+         const deliveryTime = new Date(Number(item.timestamp || 0) + 30 * 60 * 1000);
+         const pad = n => String(n).padStart(2, '0');
+         timeText = ` (送达时间：${deliveryTime.getFullYear()}/${pad(deliveryTime.getMonth() + 1)}/${pad(deliveryTime.getDate())} ${pad(deliveryTime.getHours())}:${pad(deliveryTime.getMinutes())})`;
+      }
+
+      if (isHistorySummary) {
+        return `[外卖订单] ${title} (点餐方：${payer}) - ${statusText}${timeText}`;
+      }
+      return `[外卖订单] ${title}\n点餐方：${payer}\n当前状态：${statusText}${timeText}`;
+    }
+
+    /* ======================================================================
        [区域标注·本次修改·分享链接]
        说明：
        1. 区分“当轮”与“历史”的 prompt 长度。
