@@ -450,6 +450,7 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
   const isHtmlCardInteractionSystemMessage = String(msg?.type || '') === 'html_card_interaction_system';
   const isRedPacketSystem = isRedPacketSystemMessage(msg);
   const isPhoneSystemMessage = String(msg?.type || '') === 'phone_end_system';
+  const isPhoneSystemMessage = String(msg?.type || '') === 'phone_end_system' || String(msg?.type || '') === 'phone_start_system';
   const isTransferSystemMessage = String(msg?.type || '') === 'transfer_system' || isAiWithdrawSystemMessage || isAiPatSystemMessage || isUserPatSystem || isUserWithdrawSystemMessage || isHtmlCardInteractionSystemMessage || isRedPacketSystem || isPhoneSystemMessage;
   const transferStatus = String(msg?.transferStatus || '').trim() || 'pending';
   const isTransferAccepted = transferStatus === 'accepted';
@@ -1218,8 +1219,8 @@ export function refreshCurrentSessionLastMessage(state) {
                             ? getRedPacketMessageDisplayText(latest)
                             : (isLinkCardMessage(latest)
                                 ? getLinkCardMessageDisplayText(latest)
-                                : (latest?.type === 'phone_end_system'
-                                    ? String(latest?.content || '[电话通话记录]')
+                                : (latest?.type === 'phone_end_system' || latest?.type === 'phone_start_system'
+                                    ? String(latest?.content || '[电话记录]')
                                     : (latest?.content || '')))))))));
   session.lastTime = latest?.timestamp || Date.now();
 }
