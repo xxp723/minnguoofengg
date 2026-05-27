@@ -309,119 +309,140 @@ export async function sendTakeawayMessage(container, state, db, draft = {}, help
 }
 
 /* ==========================================================================
-   [区域标注·外卖模块] 顶部横幅更新（外卖距离）
+   [区域标注·已更新·外卖模块] 顶部横幅更新（外卖距离）
    ========================================================================== */
 export function initTakeawayBanner(container, state, messageIds = []) {
   const conversation = container.querySelector('.msg-conversation');
   if (!conversation) return;
 
-  // 寻找所有进行中的外卖消息 (takeawayStatus: pending)
+  // 寻找所有进行中的外卖消息 (takeawayStatus: accepted)
   const pendingOrders = (state.currentMessages || []).filter(msg => 
     isTakeawayMessage(msg) && 
-    msg.takeawayStatus === 'pending' && 
-    (messageIds.length === 0 || messageIds.includes(msg.id))
+    msg.takeawayStatus === 'accepted'
   );
 
   if (pendingOrders.length === 0) return;
 
-  pendingOrders.forEach(order => {
-    if (activeTakeawayTimers.has(order.id)) return; // 已经在跑了
+  // 按照时间降序排序
+  pendingOrders.sort((a, b) => b.timestamp - a.timestamp);
+  
+  // 30分钟配送 (1800秒)
+  const TOTAL_DELIVERY_TIME_SEC = 1800; 
+  const now = Date.now();
 
-    // 模拟配送流程
-    // 30分钟配送，分为几个阶段，这里为了演示，时间压缩（比如总共5分钟，即300秒）
-    const TOTAL_DELIVERY_TIME_SEC = 300; 
-    let remainingSec = TOTAL_DELIVERY_TIME_SEC;
-    
-    // 初始化或获取已存储的配送进度
-    if (order.deliveryRemainingSec !== undefined) {
-      remainingSec = order.deliveryRemainingSec;
+  let hasActiveBanner = false;
+
+  pendingOrders.forEach((order, index) => {
+    const elapsedSec = Math.floor((now - order.timestamp) / 1000);
+    const remainingSec = TOTAL_DELIVERY_TIME_SEC - elapsedSec;
+
+    if (remainingSec <= 0) {
+      // 已经超过30分钟，直接派发完成事件，不显示横幅
+      if (activeTakeawayTimers.has(order.id)) {
+        clearInterval(activeTakeawayTimers.get(order.id));
+        activeTakeawayTimers.delete(order.id);
+      }
+      const isTimeout = Math.random() > 0.8;
+      const event = new CustomEvent('takeaway-delivery-complete', {
+        detail: { 
+          messageId: order.id, 
+          status: isTimeout ? 'timeout' : 'completed' 
+        }
+      });
+      document.dispatchEvent(event);
+      return;
     }
-    
-    const bannerId = `msg-takeaway-banner-${order.id}`;
-    let bannerWrapper = document.getElementById('msg-takeaway-banner-wrapper');
-    if (!bannerWrapper) {
-      bannerWrapper = document.createElement('div');
-      bannerWrapper.id = 'msg-takeaway-banner-wrapper';
-      bannerWrapper.className = 'msg-takeaway-banner-wrapper';
-      conversation.appendChild(bannerWrapper);
-    }
-    
-    const updateBannerUI = (distance, timeText, statusDesc) => {
-      let banner = document.getElementById(bannerId);
-      if (!banner) {
-        banner = document.createElement('div');
-        banner.id = bannerId;
-        banner.className = 'msg-takeaway-banner';
-        bannerWrapper.appendChild(banner);
+
+    // 只为最新的一条有效订单显示横幅
+    if (index === 0 && !hasActiveBanner) {
+      hasActiveBanner = true;
+      if (activeTakeawayTimers.has(order.id)) return; // 已经在跑了
+
+      let currentRemainingSec = remainingSec;
+      
+      const bannerId = `msg-takeaway-banner-${order.id}`;
+      // 确保包装器存在且唯一
+      let bannerWrapper = document.getElementById('msg-takeaway-banner-wrapper');
+      if (!bannerWrapper) {
+        bannerWrapper = document.createElement('div');
+        bannerWrapper.id = 'msg-takeaway-banner-wrapper';
+        bannerWrapper.className = 'msg-takeaway-banner-wrapper';
+        conversation.appendChild(bannerWrapper);
       }
       
-      banner.innerHTML = `
-        <div class="msg-takeaway-banner__icon">
-          ${MSG_ICONS.takeaway}
-        </div>
-        <div class="msg-takeaway-banner__info">
-          <span class="msg-takeaway-banner__title">${escapeHtml(order.itemName)} · ${statusDesc}</span>
-          <span class="msg-takeaway-banner__desc">距离 <strong>${distance}</strong>，预计 <strong>${timeText}</strong> 送达</span>
-        </div>
-      `;
-    };
-
-    const timer = setInterval(() => {
-      remainingSec -= 1;
-      order.deliveryRemainingSec = remainingSec;
-
-      // 根据剩余时间计算距离和状态
-      let distance = '';
-      let timeText = '';
-      let statusDesc = '';
-
-      if (remainingSec > 240) {
-        distance = '2.5km';
-        timeText = '30分钟';
-        statusDesc = '商家备餐中';
-      } else if (remainingSec > 180) {
-        distance = '2km';
-        timeText = '20分钟';
-        statusDesc = '骑手已取餐';
-      } else if (remainingSec > 60) {
-        distance = '1km';
-        timeText = '10分钟';
-        statusDesc = '骑手配送中';
-      } else if (remainingSec > 0) {
-        distance = '200m';
-        timeText = '即将';
-        statusDesc = '即将送达';
-      }
-
-      if (remainingSec <= 0) {
-        clearInterval(timer);
-        activeTakeawayTimers.delete(order.id);
-        
-        // 随机决定是送达还是超时
-        const isTimeout = Math.random() > 0.8; // 20% 概率超时
-        
-        // 触发一个自定义事件去更新消息状态和持久化
-        const event = new CustomEvent('takeaway-delivery-complete', {
-          detail: { 
-            messageId: order.id, 
-            status: isTimeout ? 'timeout' : 'completed' 
-          }
-        });
-        document.dispatchEvent(event);
-
-        // 移除 banner
-        const banner = document.getElementById(bannerId);
-        if (banner) {
-          banner.classList.add('is-closing');
-          setTimeout(() => banner.remove(), 300);
+      const updateBannerUI = (distance, timeText, statusDesc) => {
+        let banner = document.getElementById(bannerId);
+        if (!banner) {
+          // 清理旧横幅，确保只有一个横幅
+          bannerWrapper.innerHTML = ''; 
+          banner = document.createElement('div');
+          banner.id = bannerId;
+          banner.className = 'msg-takeaway-banner';
+          bannerWrapper.appendChild(banner);
         }
-      } else {
-        updateBannerUI(distance, timeText, statusDesc);
-      }
+        
+        banner.innerHTML = `
+          <div class="msg-takeaway-banner__icon">
+            ${MSG_ICONS.takeaway}
+          </div>
+          <div class="msg-takeaway-banner__info">
+            <span class="msg-takeaway-banner__title">${escapeHtml(order.takeawayTitle || '外卖')} · ${statusDesc}</span>
+            <span class="msg-takeaway-banner__desc">距离 <strong>${distance}</strong>，预计 <strong>${timeText}</strong> 送达</span>
+          </div>
+        `;
+      };
 
-    }, 1000); // 每秒更新一次测试，实际可能用真实时间对比
+      const timer = setInterval(() => {
+        currentRemainingSec -= 1;
 
-    activeTakeawayTimers.set(order.id, timer);
+        let distance = '';
+        let timeText = '';
+        let statusDesc = '';
+
+        if (currentRemainingSec > 1440) { // > 24分钟
+          distance = '2.5km';
+          timeText = Math.ceil(currentRemainingSec / 60) + '分钟';
+          statusDesc = '商家备餐中';
+        } else if (currentRemainingSec > 900) { // > 15分钟
+          distance = '2km';
+          timeText = Math.ceil(currentRemainingSec / 60) + '分钟';
+          statusDesc = '骑手已取餐';
+        } else if (currentRemainingSec > 180) { // > 3分钟
+          distance = '1km';
+          timeText = Math.ceil(currentRemainingSec / 60) + '分钟';
+          statusDesc = '骑手配送中';
+        } else if (currentRemainingSec > 0) {
+          distance = '200m';
+          timeText = '即将';
+          statusDesc = '即将送达';
+        }
+
+        if (currentRemainingSec <= 0) {
+          clearInterval(timer);
+          activeTakeawayTimers.delete(order.id);
+          
+          const isTimeout = Math.random() > 0.8;
+          const event = new CustomEvent('takeaway-delivery-complete', {
+            detail: { 
+              messageId: order.id, 
+              status: isTimeout ? 'timeout' : 'completed' 
+            }
+          });
+          document.dispatchEvent(event);
+
+          const banner = document.getElementById(bannerId);
+          if (banner) {
+            banner.classList.add('is-closing');
+            setTimeout(() => banner.remove(), 300);
+          }
+        } else {
+          updateBannerUI(distance, timeText, statusDesc);
+        }
+
+      }, 1000);
+
+      activeTakeawayTimers.set(order.id, timer);
+    }
   });
 }
 
