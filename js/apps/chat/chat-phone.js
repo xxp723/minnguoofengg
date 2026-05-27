@@ -15,7 +15,7 @@ import { MSG_ICONS } from './chat-message-icons.js';
 import { state } from './chat-state.js';
 import { sendMessage, callAiApiForCurrentRound } from './chat-message.js';
 import { renderChatList } from './chat-message-render.js';
-import DB from '../../core/data/DB.js';
+import { dbPut, DATA_KEY_MESSAGES_PREFIX } from './chat-utils.js';
 
 let phoneStartTime = 0;
 let phoneOverlayElement = null;
@@ -128,10 +128,13 @@ function bindPhoneEvents() {
     if (lastAiIndex !== -1) {
       // 删除最后一条 AI 消息
       messages.splice(lastAiIndex, 1);
-      await DB.put('chat_sessions', {
-        id: state.currentSessionId,
-        messages: state.currentMessages
-      });
+      /* ========================================================================
+         [区域标注·已完成·电话功能持久化修复] 重新生成持久化
+         说明：使用 dbPut 替换错误的 DB.put，采用规范的 keys
+         ======================================================================== */
+      if (state.currentChatId) {
+        await dbPut(state._db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + state.currentChatId, state.currentMessages);
+      }
       // 重新渲染当前 UI（复用主 render 逻辑，但指向电话容器）
       renderPhoneChatArea();
       // 调用请求重新生成
@@ -277,10 +280,13 @@ export async function openPhoneModal(container, skipSystemMessage = false) {
       timestamp: Date.now()
     };
     state.currentMessages.push(startMsg);
-    await DB.put('chat_sessions', {
-      id: state.currentSessionId,
-      messages: state.currentMessages
-    });
+    /* ========================================================================
+       [区域标注·已完成·电话功能持久化修复] 通话开始提示持久化
+       说明：使用 dbPut 替换错误的 DB.put，采用规范的 keys
+       ======================================================================== */
+    if (state.currentChatId) {
+      await dbPut(state._db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + state.currentChatId, state.currentMessages);
+    }
   }
 
   // 2. 初始化/显示 DOM
@@ -326,10 +332,13 @@ export async function endPhoneCall(skipSystemMessage = false) {
       timestamp: Date.now()
     };
     state.currentMessages.push(endMsg);
-    await DB.put('chat_sessions', {
-      id: state.currentSessionId,
-      messages: state.currentMessages
-    });
+    /* ========================================================================
+       [区域标注·已完成·电话功能持久化修复] 通话结束提示持久化
+       说明：使用 dbPut 替换错误的 DB.put，采用规范的 keys
+       ======================================================================== */
+    if (state.currentChatId) {
+      await dbPut(state._db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + state.currentChatId, state.currentMessages);
+    }
   }
 
   // 隐藏全屏
