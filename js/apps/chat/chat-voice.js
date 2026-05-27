@@ -17,8 +17,7 @@ import { TAB_ICONS, escapeHtml } from './chat-utils.js';
    ========================================================================== */
 const VOICE_ICONS = {
   voice: `<svg viewBox="0 0 48 48" fill="none"><rect x="17" y="5" width="14" height="24" rx="7" stroke="currentColor" stroke-width="3"/><path d="M10 22c0 8 6 14 14 14s14-6 14-14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M24 36v7M17 43h14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
-  wave: `<svg viewBox="0 0 48 48" fill="none"><path d="M18 16c3 3 4.5 5.7 4.5 8S21 29 18 32" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M25 10c5.5 5 8 9.5 8 14s-2.5 9-8 14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M32 5c8 7 12 13.5 12 19S40 36 32 43" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
-  play: `<svg viewBox="0 0 48 48" fill="none"><path d="M17 12v24l20-12L17 12Z" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round"/></svg>`,
+  speaker: `<svg viewBox="0 0 48 48" fill="none"><path d="M11 24C11 24 11 24 11 24.01" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 17C23.3333 17 26.3333 19.3333 27 24C26.3333 28.6667 23.3333 31 20 31" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M28 9C34.6667 9 40.6667 14.6667 42 24C40.6667 33.3333 34.6667 39 28 39" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   download: `<svg viewBox="0 0 48 48" fill="none"><path d="M24 6v24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="m14 21 10 10 10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 38h28" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
   sparkle: `<svg viewBox="0 0 48 48" fill="none"><path d="M23 4c1.8 9.1 5.9 13.2 15 15-9.1 1.8-13.2 5.9-15 15-1.8-9.1-5.9-13.2-15-15 9.1-1.8 13.2-5.9 15-15Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M38 30c.8 4.2 2.8 6.2 7 7-4.2.8-6.2 2.8-7 7-.8-4.2-2.8-6.2-7-7 4.2-.8 6.2-2.8 7-7Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>`
 };
@@ -162,41 +161,35 @@ export function renderVoiceFeatureButton() {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·本次语音气泡向下展开]
+   [区域标注·已完成·仿微信语音气泡动态宽度向下展开]
    说明：
-   1. 用户模拟语音与 AI 主动语音共用本气泡：播放键 + 波长条 + 0:xx 秒数，默认不直接露出文字。
-   2. 双击后在原语音条下方直接展开“语音转文字”区域，不覆盖主语音条，布局参考 QQ / 微信 的分层展示。
-   3. 气泡宽度保持固定，不再随转文字长度变化，避免展开时气泡横向抖动或误以为大小被改动。
+   1. 用户模拟语音与 AI 主动语音共用本气泡：引入微信风格声波图标，随字数动态计算气泡宽度，时长格式改为 x"。
+   2. 双击后在原语音条下方直接展开“语音转文字”区域，不覆盖主语音条，采用极简分割线与纯净文本排版。
+   3. 气泡宽度不再是固定死，而是根据真实秒数按比例缩放，还原微信视觉体验。
    4. 渲染只读取消息对象字段；持久化由 index.js 调用 DB.js / IndexedDB 完成，不使用 localStorage/sessionStorage。
    ========================================================================== */
-function formatVoiceBubbleDuration(seconds = 1) {
-  const safeSeconds = Math.max(1, Math.min(60, Math.floor(Number(seconds) || 1)));
-  return `0:${String(safeSeconds).padStart(2, '0')}`;
-}
-
 export function renderVoiceBubble(message = {}) {
   const text = sanitizeVoiceTranscriptText(message?.voiceText || message?.content || '');
   const duration = Math.max(1, Math.min(60, Number(message?.voiceDuration || Math.ceil(text.length / 3) || 1)));
   const expanded = Boolean(message?.voiceExpanded);
-  const waveBars = [18, 24, 30, 22, 34, 40, 28, 36, 44, 30, 38, 24];
+
+  // 计算动态宽度：基础宽度 + 时长 × 增长系数 (限制最大宽度)
+  const baseWidth = 60;
+  const maxWidth = 220;
+  const dynamicWidth = Math.min(maxWidth, baseWidth + duration * 3.5);
 
   return `
     <div class="msg-voice-bubble ${expanded ? 'is-expanded' : ''}"
          data-action="toggle-msg-voice-transcript"
          data-message-id="${escapeHtml(message?.id || '')}"
-         style="--msg-voice-bubble-width:220px"
+         style="--msg-voice-bubble-width:${dynamicWidth}px"
          title="双击展开/收起语音转文字">
       <div class="msg-voice-bubble__main">
-        <span class="msg-voice-bubble__play" aria-hidden="true">${VOICE_ICONS.play}</span>
-        <span class="msg-voice-bubble__wave" aria-hidden="true">
-          ${waveBars.map((height) => `<i style="--bar-height:${height}%"></i>`).join('')}
-        </span>
-        <span class="msg-voice-bubble__duration">${escapeHtml(formatVoiceBubbleDuration(duration))}</span>
-        <span class="msg-voice-bubble__download" aria-hidden="true">${VOICE_ICONS.download}</span>
+        <span class="msg-voice-bubble__speaker" aria-hidden="true">${VOICE_ICONS.speaker}</span>
+        <span class="msg-voice-bubble__duration">${duration}"</span>
       </div>
       ${expanded ? `
         <div class="msg-voice-bubble__expand">
-          <div class="msg-voice-bubble__expand-label">语音转文字</div>
           <div class="msg-voice-bubble__expand-text">${escapeHtml(text)}</div>
         </div>
       ` : ''}

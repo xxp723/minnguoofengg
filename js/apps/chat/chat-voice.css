@@ -23,16 +23,16 @@
 }
 
 /* ==========================================================================
-   [区域标注·已完成·语音气泡固定宽度向下展开样式]
+   [区域标注·已完成·仿微信语音气泡动态宽度向下展开样式]
    说明：
-   1. 语音消息气泡已锁定为原有主条宽度，展开后不会向左/向右拓宽/变大。
-   2. 双击后仅在主语音条下方展开“语音转文字”区域，正文在固定宽度内换行向下延展。
-   3. 展开区只向下增加内容，不改变主语音条本身的显示方式。
+   1. 语音气泡宽度采用动态伸缩 (--msg-voice-bubble-width)，支持类似微信的长短变化。
+   2. 采用极简 Flex 布局：AI（左）喇叭在左，用户（右）喇叭在右并翻转。
+   3. 双击展开转文字后，采用极细的 0.5px 分割线，纯净展示转文字内容，不再有多余的标题和复杂边框。
    4. 本区域只做语音气泡视觉展示，不涉及持久化存储逻辑，不使用 localStorage/sessionStorage。
    ========================================================================== */
 .msg-bubble--voice {
-  min-width: 0;
-  width: var(--msg-voice-bubble-width, 168px);
+  min-width: 60px;
+  width: var(--msg-voice-bubble-width, 60px);
   max-width: min(280px, 78vw);
   padding: 10px 14px;
   border: none;
@@ -43,9 +43,9 @@
   width: 100%;
   max-width: 100%;
   padding: 0;
-  color: #765b63;
+  color: #1a1a1a;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.5;
   background: transparent;
   border: none;
@@ -56,79 +56,59 @@
   overflow: visible;
 }
 
+.msg-bubble--user .msg-voice-bubble {
+  color: #fff;
+}
+
 .msg-voice-bubble__main {
-  display: grid;
-  grid-template-columns: 18px minmax(38px, 1fr) auto;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   min-height: 22px;
 }
 
-.msg-voice-bubble__play,
-.msg-voice-bubble__download,
-.msg-voice-bubble__sparkle {
+/* AI(左侧)：喇叭在左，时长在右 */
+.msg-voice-bubble__speaker {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: currentColor;
   flex-shrink: 0;
-}
-
-.msg-voice-bubble__play {
   width: 18px;
   height: 18px;
 }
 
-.msg-voice-bubble__download {
-  display: none;
-}
-
-.msg-voice-bubble__play svg,
-.msg-voice-bubble__download svg,
-.msg-voice-bubble__sparkle svg {
+.msg-voice-bubble__speaker svg {
   width: 100%;
   height: 100%;
 }
 
-.msg-voice-bubble__wave {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  height: 20px;
-  min-width: 0;
-  color: rgba(118, 91, 99, .22);
-  overflow: hidden;
-}
-
-.msg-voice-bubble__wave i {
-  display: block;
-  width: 4px;
-  height: var(--bar-height);
-  min-height: 8px;
-  max-height: 20px;
-  background: currentColor;
-  border-radius: 999px;
-}
-
 .msg-voice-bubble__duration {
-  min-width: 34px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1;
-  font-weight: 700;
-  letter-spacing: .01em;
+  font-weight: 500;
   color: currentColor;
-  text-align: right;
   white-space: nowrap;
 }
 
+/* 用户(右侧)：反转布局，时长在左，喇叭在右，且喇叭镜像翻转 */
+.msg-bubble--user .msg-voice-bubble__main {
+  flex-direction: row-reverse;
+}
+
+.msg-bubble--user .msg-voice-bubble__speaker svg {
+  transform: scaleX(-1);
+}
+
+/* 微信风格极简转文字展开 */
 .msg-voice-bubble__expand {
   width: 100%;
   box-sizing: border-box;
   padding-top: 8px;
   margin-top: 8px;
-  border-top: 1px solid rgba(149, 115, 88, .18);
+  border-top: 0.5px solid rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -136,33 +116,7 @@
 }
 
 .msg-bubble--user .msg-voice-bubble__expand {
-  border-top-color: rgba(120, 170, 95, .18);
-}
-
-.msg-voice-bubble__expand-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: inherit;
-  font-size: 11px;
-  line-height: 1.2;
-  font-weight: 800;
-  letter-spacing: .14em;
-  color: rgba(118, 91, 99, .68);
-  white-space: nowrap;
-}
-
-.msg-voice-bubble__expand-label::before {
-  content: '';
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
-  background: currentColor;
-  flex: 0 0 auto;
-}
-
-.msg-bubble--user .msg-voice-bubble__expand-label {
-  color: rgba(111, 147, 86, .92);
+  border-top-color: rgba(255, 255, 255, 0.25);
 }
 
 .msg-voice-bubble__expand-text {
@@ -170,31 +124,19 @@
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
-  color: rgba(90, 67, 74, .9);
+  color: #333;
   font-family: inherit;
-  font-size: 12px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
 }
 
 .msg-bubble--user .msg-voice-bubble__expand-text {
-  color: rgba(79, 105, 64, .95);
+  color: #e5f4d8;
 }
 
 .msg-voice-bubble.is-expanded {
   gap: 0;
-}
-
-.msg-voice-bubble.is-expanded .msg-voice-bubble__main {
-  padding-bottom: 1px;
-}
-
-.msg-voice-bubble.is-expanded .msg-voice-bubble__download {
-  color: #7b4f38;
-}
-
-.msg-bubble--user .msg-voice-bubble.is-expanded .msg-voice-bubble__download {
-  color: #5f8750;
 }
