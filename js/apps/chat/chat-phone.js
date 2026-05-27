@@ -10,38 +10,43 @@
  * 3. 严禁使用 localStorage/sessionStorage 和浏览器原生弹窗。
  */
 
-import { escapeHtml } from './chat-utils.js';
 import { MSG_ICONS } from './chat-message-icons.js';
-import { createApiErrorModal } from '../../core/ui/components/ApiErrorModal.js';
 
 /* ==========================================================================
-   [区域标注·本次修改·电话功能] 电话应用内弹窗渲染
+   [区域标注·已完成·电话弹窗启动失败修复] 电话应用内弹窗渲染
    说明：
    1. 拦截“电话”入口点击事件后触发此弹窗。
-   2. 占位用功能，只显示开发中提示。
+   2. 占位用功能，只显示开发中提示，符合 UI 主题。
+   3. 移除不存在的 createApiErrorModal 导致启动失败的导入。
    ========================================================================== */
-export function openPhoneModal() {
-  const modal = createApiErrorModal({
-    title: '电话',
-    message: `
-      <div class="msg-phone-modal-body">
-        <div class="msg-phone-modal-icon">
+export function openPhoneModal(container) {
+  const mask = container.querySelector('[data-role="modal-mask"]');
+  const panel = container.querySelector('[data-role="modal-panel"]');
+  if (!mask || !panel) return;
+
+  panel.innerHTML = `
+    <div class="chat-modal-card">
+      <div class="chat-modal-header">
+        <h3 class="chat-modal-title">电话</h3>
+        <button class="chat-modal-close-btn" data-action="close-modal" aria-label="关闭">
+          <svg viewBox="0 0 48 48" fill="none"><path d="M14 14l20 20M34 14L14 34" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <div class="chat-modal-body" style="text-align: center; padding: 40px 20px;">
+        <div style="color: #b15f34; margin-bottom: 16px;">
           ${MSG_ICONS.phone}
         </div>
-        <div class="msg-phone-modal-text">
+        <div style="font-size: 15px; color: #5c422d; line-height: 1.6;">
           电话功能还在开发中<br>敬请期待
         </div>
       </div>
-    `,
-    onRetry: () => {
-      // 占位关闭逻辑，组件自带关闭按钮
-    }
-  });
+      <div class="chat-modal-footer">
+        <button class="chat-modal-btn chat-modal-btn--primary" data-action="close-modal" type="button" style="width: 100%;">
+          我知道了
+        </button>
+      </div>
+    </div>
+  `;
 
-  const retryBtn = modal.element.querySelector('.api-error-modal-btn--retry');
-  if (retryBtn) {
-    retryBtn.textContent = '我知道了';
-  }
-
-  document.body.appendChild(modal.element);
+  mask.classList.remove('is-hidden');
 }
