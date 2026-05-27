@@ -1229,7 +1229,7 @@ export async function handleClick(e, state, container, db, eventBus, windowManag
     }
 
     case 'open-msg-phone-modal':
-      openPhoneModal(container, state);
+      openPhoneModal(container, state, db, settingsManager);
       break;
 
     /* ========================================================================

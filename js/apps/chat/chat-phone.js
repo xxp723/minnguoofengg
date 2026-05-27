@@ -14,7 +14,7 @@
 import { MSG_ICONS } from './chat-message-icons.js';
 import { sendMessage } from './chat-message.js';
 import { renderChatMessage } from './chat-message-render.js';
-import { dbPut, DATA_KEY_MESSAGES_PREFIX } from './chat-utils.js';
+import { dbPut, DATA_KEY_MESSAGES_PREFIX, escapeHtml } from './chat-utils.js';
 
 let phoneStartTime = 0;
 let phoneOverlayElement = null;
@@ -23,6 +23,9 @@ let phoneChatArea = null;
 // 从 index.js 中获取全局状态。由于架构限制，我们在调用时动态获取。
 // 我们可以通过参数传递 state
 let state = null;
+let _db = null;
+let _settingsManager = null;
+let _container = null;
 
 // 在普通聊天列表中隐藏 phone 系统的记录，由 render 处理即可，或者我们利用 type 进行特殊渲染
 
@@ -105,7 +108,7 @@ function bindPhoneEvents() {
     
     input.value = '';
     // 发送消息，这会自动推入 state.currentMessages，并触发 UI 更新
-    await sendMessage(text, 'text');
+    await sendMessage(_container, state, _db, text, _settingsManager, { triggerAi: true });
     scrollToBottom();
   };
 
@@ -122,7 +125,7 @@ function bindPhoneEvents() {
     const messages = state.currentMessages;
     let lastAiIndex = -1;
     for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'ai') {
+      if (messages[i].role === 'ai' || messages[i].role === 'assistant') {
         lastAiIndex = i;
         break;
       }
@@ -136,12 +139,12 @@ function bindPhoneEvents() {
          说明：使用 dbPut 替换错误的 DB.put，采用规范的 keys
          ======================================================================== */
       if (state.currentChatId) {
-        await dbPut(state._db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + state.currentChatId, state.currentMessages);
+        await dbPut(_db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + state.currentChatId, state.currentMessages);
       }
-      // 重新渲染当前 UI（复用主 render 逻辑，但指向电话容器）
-      renderPhoneChatArea();
+      // 重新渲染当前 UI
+      updatePhoneUI();
       // 调用请求重新生成，通过触发空消息实现（等价于重回）
-      sendMessage('', 'text', { skipAppendUser: true, triggerAi: true });
+      await sendMessage(_container, state, _db, '', _settingsManager, { skipAppendUser: true, triggerAi: true });
     }
   });
 
@@ -200,24 +203,30 @@ export function renderPhoneChatArea() {
  */
 function rebuildPhoneMessagesHTML(messages) {
   let html = '';
+  
+  // 获取当前会话，以正确取得头像
+  const currentSession = (state.sessions || []).find(session => String(session.id) === String(state.currentChatId)) || {};
+  const contactAvatar = String(currentSession.avatar || '');
+  const userAvatar = String(currentSession.userAvatar || state.profile?.avatar || '');
+
   for (const msg of messages) {
     if (msg.type === 'system' || msg.type === 'phone_start_system' || msg.type === 'phone_end_system') continue;
     
     const isUser = msg.role === 'user';
     const alignClass = isUser ? 'is-right' : 'is-left';
-    const avatar = isUser ? state.userAvatar : state.contactAvatar;
+    const avatar = isUser ? userAvatar : contactAvatar;
     
     // 如果是语音消息显示语音样式，其他文本显示文本样式
     let contentHtml = '';
-    if (msg.type === 'text') {
-      contentHtml = msg.content; // 这里可以加入 formatTextToHtml
+    if (msg.type === 'text' || !msg.type) {
+      contentHtml = escapeHtml(msg.content);
     } else {
-      contentHtml = msg.content;
+      contentHtml = escapeHtml(msg.content);
     }
 
     html += `
-      <div class="chat-message-item ${alignClass}" data-id="${msg.id}" data-role="${msg.role}">
-        <img class="chat-message-avatar" src="${avatar}" alt="头像" />
+      <div class="chat-message-item ${alignClass}" data-id="${escapeHtml(msg.id)}" data-role="${escapeHtml(msg.role)}">
+        <img class="chat-message-avatar" src="${escapeHtml(avatar)}" alt="头像" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 48 48\\' fill=\\'%23ccc\\'><circle cx=\\'24\\' cy=\\'24\\' r=\\'20\\' fill=\\'%23eee\\'/><path d=\\'M24 24c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm0 4c7.7 0 14 5.3 14 12H10c0-6.7 6.3-12 14-12z\\' fill=\\'%23ccc\\'/></svg>'"/>
         <div class="chat-message-content">
           <div class="chat-message-bubble-wrapper">
             <div class="chat-message-bubble">
@@ -269,8 +278,12 @@ function scrollToBottom() {
    2. 初始化全屏覆盖层，进入通话状态。
    3. 写入系统提示以记录开始。
    ========================================================================== */
-export async function openPhoneModal(container, chatState, skipSystemMessage = false) {
+export async function openPhoneModal(container, chatState, db, settingsManager, skipSystemMessage = false) {
   state = chatState;
+  _db = db;
+  _settingsManager = settingsManager;
+  _container = container;
+  
   // 如果之前是在普通聊天状态，现在进入电话状态
   phoneStartTime = Date.now();
 
@@ -289,7 +302,7 @@ export async function openPhoneModal(container, chatState, skipSystemMessage = f
        说明：使用 dbPut 替换错误的 DB.put，采用规范的 keys
        ======================================================================== */
     if (state.currentChatId) {
-      await dbPut(state._db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + state.currentChatId, state.currentMessages);
+      await dbPut(_db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + state.currentChatId, state.currentMessages);
     }
   }
 
@@ -297,10 +310,19 @@ export async function openPhoneModal(container, chatState, skipSystemMessage = f
   const overlay = initPhoneOverlay(container);
   
   // 3. 更新对方头像和名字
+  const currentSession = (state.sessions || []).find(session => String(session.id) === String(state.currentChatId)) || {};
+  const contactAvatar = String(currentSession.avatar || '');
+  const contactName = String(currentSession.remark || currentSession.name || '未知联系人');
+
   const avatarEl = overlay.querySelector('#phone-avatar');
   const nameEl = overlay.querySelector('#phone-name');
-  if (avatarEl) avatarEl.src = state.contactAvatar;
-  if (nameEl) nameEl.textContent = state.contactName;
+  if (avatarEl) {
+    avatarEl.src = contactAvatar;
+    avatarEl.onerror = () => {
+      avatarEl.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="%23ccc"><circle cx="24" cy="24" r="20" fill="%23eee"/><path d="M24 24c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm0 4c7.7 0 14 5.3 14 12H10c0-6.7 6.3-12 14-12z" fill="%23ccc"/></svg>';
+    };
+  }
+  if (nameEl) nameEl.textContent = contactName;
   
   // 4. 显示
   overlay.classList.remove('is-hidden');
@@ -341,7 +363,7 @@ export async function endPhoneCall(skipSystemMessage = false) {
        说明：使用 dbPut 替换错误的 DB.put，采用规范的 keys
        ======================================================================== */
     if (state.currentChatId) {
-      await dbPut(state._db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + state.currentChatId, state.currentMessages);
+      await dbPut(_db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + state.currentChatId, state.currentMessages);
     }
   }
 
@@ -351,7 +373,7 @@ export async function endPhoneCall(skipSystemMessage = false) {
     setTimeout(() => {
       phoneOverlayElement.classList.add('is-hidden');
       // 返回主界面时，重新渲染主聊天列表以显示系统消息等
-      renderChatMessage(state.currentSession, state.currentMessages);
+      renderChatMessage(_container, state);
     }, 300); // 等待动画完成
   }
 }
