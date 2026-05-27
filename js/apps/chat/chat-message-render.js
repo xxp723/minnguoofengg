@@ -812,8 +812,12 @@ export function renderChatMessage(chatSession, messages, options = {}) {
           ${MSG_ICONS.aside}<span>旁白</span>
         </button>
       </div>
+      <!-- ======================================================================
+           [区域标注·本次修改·电话功能] 第三行"电话"板块
+           说明：增加电话功能板块占位
+           ====================================================================== -->
       <div class="msg-feature-dock__row">
-        <button class="msg-feature-dock__item" type="button" data-action="open-msg-phone-modal" data-feature="phone">
+        <button class="msg-feature-dock__item msg-feature-dock__item--phone" type="button" data-action="open-msg-phone-modal" data-feature="phone">
           ${MSG_ICONS.phone}<span>电话</span>
         </button>
         <div class="msg-feature-dock__item" style="visibility: hidden;"></div>

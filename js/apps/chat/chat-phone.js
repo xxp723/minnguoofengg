@@ -38,7 +38,6 @@ export function openPhoneModal() {
     }
   });
 
-  // 如果需要修改按钮文本或行为，可以直接操作 DOM，这里保持默认的“确认”按钮
   const retryBtn = modal.element.querySelector('.api-error-modal-btn--retry');
   if (retryBtn) {
     retryBtn.textContent = '我知道了';
