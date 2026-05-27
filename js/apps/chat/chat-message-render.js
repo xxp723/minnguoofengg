@@ -1127,6 +1127,32 @@ export function appendCurrentMessageBubble(container, state, message) {
   const emptyEl = listArea.querySelector('.msg-empty');
   if (emptyEl) emptyEl.remove();
 
+  /* ========================================================================
+     [区域标注·本次修改·主界面电话消息过滤修复] 
+     说明：修复在电话期间发送的消息依然会追加到主页面列表的 bug。
+           追加前，如果发现当前会话中已经有未闭合的 'phone_start_system'，
+           说明还处于电话状态，此时不应该将这条消息追加到主聊天界面里去，
+           而是依靠 chat-phone.js 去渲染到全屏的电话页面。
+           注意：这里不处理 'phone_start_system' 本身，因为它需要显示；
+           也不处理 'phone_end_system'，因为它需要显示。
+     ======================================================================== */
+  let isCurrentlyInPhoneCall = false;
+  const msgs = state.currentMessages || [];
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].type === 'phone_end_system') {
+      break; // 从后往前找，先遇到结束标志，说明没在通话中
+    }
+    if (msgs[i].type === 'phone_start_system') {
+      isCurrentlyInPhoneCall = true;
+      break; // 先遇到开始标志，说明在通话中
+    }
+  }
+
+  // 如果当前在通话中，且追加的不是系统开始/结束提示，直接跳过在主界面的渲染
+  if (isCurrentlyInPhoneCall && message.type !== 'phone_start_system' && message.type !== 'phone_end_system') {
+    return;
+  }
+
   listArea.insertAdjacentHTML('beforeend', renderMessageWithAsideHtml(message, session, {
     userProfile: state.profile,
     contacts: state.contacts,

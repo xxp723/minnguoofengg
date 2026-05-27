@@ -111,25 +111,30 @@ function bindPhoneEvents() {
   /* ========================================================================
      [区域标注·本次修改·电话消息发送优化] 
      说明：修复发送后电话页没马上显示消息的问题。
-           无论是否 triggerAi，都先 skipAppendUser=false 把消息入列并立刻 updatePhoneUI()；
-           如果是点击纸飞机(triggerAi=true)，则在 sendMessage 中将 triggerAi 设置为 true。
+           无论是发送文本还是触发 AI，都先通过 sendMessage 入列（此时可能还没开始 fetch），
+           随后立即调用 updatePhoneUI 刷新界面；由于 sendMessage 是异步的，
+           对于 triggerAi，我们在它内部调用结束后会由外部状态或者 render 刷新，
+           但我们在本页面需要主动再刷新一次或者订阅变化。
      ======================================================================== */
   const sendPhoneMessage = async (triggerAi = false) => {
     const text = input.value.trim();
-    if (!text) return;
+    if (!text && !triggerAi) return;
 
-    input.value = '';
-    
-    // 如果 triggerAi 为 true，则直接发送内容并触发 AI
-    // 否则只发送内容入列，不触发 AI
-    if (triggerAi) {
-      await sendMessage(_container, state, _db, text, _settingsManager, { triggerAi: true });
-    } else {
+    // 当有文字时，首先作为用户消息发送，且不触发 AI（只是入库入列）
+    if (text) {
+      input.value = '';
       await sendMessage(_container, state, _db, text, _settingsManager, { triggerAi: false });
+      updatePhoneUI();
+      scrollToBottom();
     }
-    
-    updatePhoneUI();
-    scrollToBottom();
+
+    // 如果是点击了纸飞机且 triggerAi=true，即使没有文字，我们也要去请求 AI 回复最近的对话
+    if (triggerAi) {
+      // 传递空字符串并 skipAppendUser=true 可以让底层 chat-message.js 直接调用 AI 生成
+      await sendMessage(_container, state, _db, '', _settingsManager, { skipAppendUser: true, triggerAi: true });
+      updatePhoneUI();
+      scrollToBottom();
+    }
   };
 
   btnSend.addEventListener('click', () => {
@@ -383,8 +388,10 @@ export async function endPhoneCall(skipSystemMessage = false) {
     if (state.currentChatId) {
       await dbPut(_db, DATA_KEY_MESSAGES_PREFIX(state.activeMaskId) + state.currentChatId, state.currentMessages);
     }
-    renderChatMessage(_container, state);
   }
+
+  // 无论是否写入系统消息，挂断时都应该重新渲染底层消息列表，让过滤逻辑生效
+  renderChatMessage(_container, state);
 
   if (phoneOverlayElement) {
     phoneOverlayElement.classList.remove('is-visible');

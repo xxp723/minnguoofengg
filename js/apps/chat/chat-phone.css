@@ -220,6 +220,15 @@
 .msg-phone-fullscreen-overlay .msg-bubble-row {
   margin-bottom: 16px;
   width: 100%;
+  display: flex; /* 确保气泡支持 flex 对齐 */
+}
+
+.msg-phone-fullscreen-overlay .msg-bubble-row--left {
+  justify-content: flex-start;
+}
+
+.msg-phone-fullscreen-overlay .msg-bubble-row--right {
+  justify-content: flex-end;
 }
 
 .msg-phone-fullscreen-overlay .msg-bubble {
