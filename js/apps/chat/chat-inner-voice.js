@@ -442,30 +442,30 @@ function parseInnerVoiceLoose(raw) {
 }
 
 /* ==========================================================================
-   [区域标注·已完成·本次修正：心声面板标准化数据对象]
+   [区域标注·已修改·心声面板标准化数据对象]
    说明：
-   1. 确保所有字段存在且类型正确，限定字数范围。
-   2. 本次已新增“性幻想”(≤100字) 和 “性欲值”(0-100)。
+   1. 确保所有字段存在且类型正确，取消文本字段的字数截断限制以防内容丢失。
+   2. 包含“性幻想”和“性欲值”(0-100)。
    ========================================================================== */
 export function normalizeInnerVoiceData(raw) {
   if (!raw || typeof raw !== 'object') return null;
 
-  const clampStr = (v, max) => cleanInnerVoiceFieldValue(v).slice(0, max);
+  const clampStr = (v) => cleanInnerVoiceFieldValue(v);
   const clampNum = (v, min, max) => {
     const n = Number(v);
     return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.round(n))) : min;
   };
 
   return {
-    status: clampStr(raw.status || raw.状态, 30),
-    action: clampStr(raw.action || raw.动作, 50),
-    mood: clampStr(raw.mood || raw.心情, 30),
+    status: clampStr(raw.status || raw.状态),
+    action: clampStr(raw.action || raw.动作),
+    mood: clampStr(raw.mood || raw.心情),
     heartbeat: clampNum(raw.heartbeat || raw.心跳频率 || raw.心调频率 || raw.心跳, 60, 180),
     jealousy: clampNum(raw.jealousy || raw.醋意指数 || raw.醋意, 0, 100),
     affection: clampNum(raw.affection || raw.好感度 || raw.好感, 0, 100),
     desire: clampNum(raw.desire || raw.性欲值 || raw.性欲, 0, 100),
-    voice: clampStr(raw.voice || raw.心声 || raw.真实想法, 150),
-    fantasy: clampStr(raw.fantasy || raw.性幻想, 100)
+    voice: clampStr(raw.voice || raw.心声 || raw.真实想法),
+    fantasy: clampStr(raw.fantasy || raw.性幻想)
   };
 }
 
