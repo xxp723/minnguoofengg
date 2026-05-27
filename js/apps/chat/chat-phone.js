@@ -12,14 +12,17 @@
  */
 
 import { MSG_ICONS } from './chat-message-icons.js';
-import { state } from './chat-state.js';
-import { sendMessage, callAiApiForCurrentRound } from './chat-message.js';
-import { renderChatList } from './chat-message-render.js';
+import { sendMessage } from './chat-message.js';
+import { renderChatMessage } from './chat-message-render.js';
 import { dbPut, DATA_KEY_MESSAGES_PREFIX } from './chat-utils.js';
 
 let phoneStartTime = 0;
 let phoneOverlayElement = null;
 let phoneChatArea = null;
+
+// 从 index.js 中获取全局状态。由于架构限制，我们在调用时动态获取。
+// 我们可以通过参数传递 state
+let state = null;
 
 // 在普通聊天列表中隐藏 phone 系统的记录，由 render 处理即可，或者我们利用 type 进行特殊渲染
 
@@ -137,8 +140,8 @@ function bindPhoneEvents() {
       }
       // 重新渲染当前 UI（复用主 render 逻辑，但指向电话容器）
       renderPhoneChatArea();
-      // 调用请求重新生成
-      callAiApiForCurrentRound();
+      // 调用请求重新生成，通过触发空消息实现（等价于重回）
+      sendMessage('', 'text', { skipAppendUser: true, triggerAi: true });
     }
   });
 
@@ -266,7 +269,8 @@ function scrollToBottom() {
    2. 初始化全屏覆盖层，进入通话状态。
    3. 写入系统提示以记录开始。
    ========================================================================== */
-export async function openPhoneModal(container, skipSystemMessage = false) {
+export async function openPhoneModal(container, chatState, skipSystemMessage = false) {
+  state = chatState;
   // 如果之前是在普通聊天状态，现在进入电话状态
   phoneStartTime = Date.now();
 
@@ -347,7 +351,7 @@ export async function endPhoneCall(skipSystemMessage = false) {
     setTimeout(() => {
       phoneOverlayElement.classList.add('is-hidden');
       // 返回主界面时，重新渲染主聊天列表以显示系统消息等
-      renderChatList(state.currentMessages);
+      renderChatMessage(state.currentSession, state.currentMessages);
     }, 300); // 等待动画完成
   }
 }

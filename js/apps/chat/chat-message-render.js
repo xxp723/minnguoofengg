@@ -449,7 +449,6 @@ export function renderMessageBubble(msg, chatSession, options = {}) {
   const isUserWithdrawSystemMessage = String(msg?.type || '') === 'user_withdraw_system';
   const isHtmlCardInteractionSystemMessage = String(msg?.type || '') === 'html_card_interaction_system';
   const isRedPacketSystem = isRedPacketSystemMessage(msg);
-  const isPhoneSystemMessage = String(msg?.type || '') === 'phone_end_system';
   const isPhoneSystemMessage = String(msg?.type || '') === 'phone_end_system' || String(msg?.type || '') === 'phone_start_system';
   const isTransferSystemMessage = String(msg?.type || '') === 'transfer_system' || isAiWithdrawSystemMessage || isAiPatSystemMessage || isUserPatSystem || isUserWithdrawSystemMessage || isHtmlCardInteractionSystemMessage || isRedPacketSystem || isPhoneSystemMessage;
   const transferStatus = String(msg?.transferStatus || '').trim() || 'pending';
