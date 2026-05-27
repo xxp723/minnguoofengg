@@ -41,10 +41,10 @@ export const MSG_ICONS = {
   aside: `<svg viewBox="0 0 48 48" fill="none"><path d="M10 8h28a2 2 0 0 1 2 2v20a2 2 0 0 1-2 2H26l-8 8v-8h-8a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M18 17h12M18 23h8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
 
   /* ========================================================================
-     [区域标注·本次修改·电话功能] IconPark — 电话按钮图标
-     说明：用于聊天消息页咖啡功能区第三行"电话"板块，图标改为座机电话筒样式。
+     [区域标注·已完成·电话功能] IconPark — 电话按钮图标
+     说明：用于聊天消息页咖啡功能区第三行"电话"板块，图标已改为电话筒（听筒）样式。
      ======================================================================== */
-  phone: `<svg viewBox="0 0 48 48" fill="none"><path d="M9 16c-3 0-5 2.5-5 5.5v11C4 35.5 6 38 9 38h30c3 0 5-2.5 5-5.5v-11c0-3-2-5.5-5-5.5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 16v-6c0-3.3 2.7-6 6-6h12c3.3 0 6 2.7 6 6v6" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="27" r="2" fill="currentColor"/><circle cx="24" cy="27" r="2" fill="currentColor"/><circle cx="32" cy="27" r="2" fill="currentColor"/></svg>`,
+  phone: `<svg viewBox="0 0 48 48" fill="none"><path d="M8 30H14C15.1046 30 16 29.1046 16 28V22C16 20.8954 15.1046 20 14 20H8C6.89543 20 6 20.8954 6 22V28C6 29.1046 6.89543 30 8 30Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M40 30H34C32.8954 30 32 29.1046 32 28V22C32 20.8954 32.8954 20 34 20H40C41.1046 20 42 20.8954 42 22V28C42 29.1046 41.1046 30 40 30Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M24 6C14.0589 6 6 14.0589 6 24" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 24C42 14.0589 33.9411 6 24 6" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 
   /* ==========================================================================
      [区域标注·本次修改3] 消息气泡功能栏 IconPark 图标
