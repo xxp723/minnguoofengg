@@ -118,7 +118,7 @@ export function normalizeHtmlCardProtocolContent(raw = '') {
 export function getHtmlCardFeaturePrompt() {
   return [
     '【深度交互HTML卡片生成规范】',
-    '当上下文需要时输出 [卡片] 协议。它应是一个深层交互界面、迷你可玩装置或伪应用。不能频繁生成。',
+    '你必须经常且主动地使用 [卡片] 协议，通过互动装置、小游戏、拟真设备等形式为聊天不断制造惊喜和趣味。不要只在用户要求时才发，把它作为你日常表达的常规形态。',
     '严格格式：**`[卡片] 角色名：HTML文档`**。必须输出完整的<!DOCTYPE html>文档结构。',
     '代码必须全部左对齐，严禁任何缩进！严禁包含Markdown围栏、解释文字或附加聊天协议。',
     '【内容设定】',
@@ -542,7 +542,6 @@ const HTML_CARD_INTERACTION_BRIDGE_SCRIPT = `
   function shouldSkipDuplicate(el, eventType){
     var now = Date.now();
     var key = [
-      eventType,
       String(el && el.tagName || '').toLowerCase(),
       getText(el),
       String(el && el.getAttribute && el.getAttribute('role') || '').toLowerCase()
