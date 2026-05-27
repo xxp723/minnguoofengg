@@ -13,7 +13,7 @@
 
 import { MSG_ICONS } from './chat-message-icons.js';
 import { sendMessage } from './chat-message.js';
-import { renderChatMessage, renderMessageBubble } from './chat-message-render.js';
+import { renderCurrentChatMessage, renderMessageBubble } from './chat-message-render.js';
 import { dbPut, DATA_KEY_MESSAGES_PREFIX, escapeHtml } from './chat-utils.js';
 
 let phoneStartTime = 0;
@@ -268,7 +268,26 @@ export function updatePhoneUI() {
 
   const phoneMsgs = state.currentMessages.slice(startIndex);
   if (phoneChatArea) {
-    phoneChatArea.innerHTML = rebuildPhoneMessagesHTML(phoneMsgs);
+    let html = rebuildPhoneMessagesHTML(phoneMsgs);
+    
+    /* ========================================================================
+       [区域标注·本次修改·电话思考提示]
+       说明：如果 AI 正在回复，追加一个处于左侧的“……”思考气泡。
+             当 state.isAiSending 为 false 时，UI 更新会自动移除。
+       ======================================================================== */
+    if (state.isAiSending) {
+      html += `
+        <div class="msg-bubble-row msg-bubble-row--left">
+          <div class="msg-bubble-content">
+            <div class="msg-bubble msg-bubble--other msg-bubble--thinking">
+              <span class="msg-thinking-dots">……</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    
+    phoneChatArea.innerHTML = html;
     scrollToBottom();
   }
 }
@@ -391,7 +410,11 @@ export async function endPhoneCall(skipSystemMessage = false) {
   }
 
   // 无论是否写入系统消息，挂断时都应该重新渲染底层消息列表，让过滤逻辑生效
-  renderChatMessage(_container, state);
+  /* ========================================================================
+     [区域标注·本次修改·电话功能] 修正挂断后底层刷新调用
+     说明：修复调用了错误的渲染函数 renderChatMessage 的问题，改为调用 renderCurrentChatMessage 以触发整页刷新。
+     ======================================================================== */
+  renderCurrentChatMessage(_container, state);
 
   if (phoneOverlayElement) {
     phoneOverlayElement.classList.remove('is-visible');

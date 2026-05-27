@@ -247,3 +247,27 @@
 .msg-phone-fullscreen-overlay .msg-bubble__time {
   display: none;
 }
+
+/* ========================================================================
+   [区域标注·本次修改·电话思考提示] 正在思考动画
+   说明：为“……”提供跳动动画
+   ======================================================================== */
+.msg-phone-fullscreen-overlay .msg-bubble--thinking {
+  background-color: transparent !important;
+  color: #fff !important;
+  font-size: 20px;
+  letter-spacing: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+}
+
+.msg-phone-fullscreen-overlay .msg-thinking-dots {
+  animation: msg-phone-thinking 1.5s infinite alternate;
+}
+
+@keyframes msg-phone-thinking {
+  0% { opacity: 0.3; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1); }
+}

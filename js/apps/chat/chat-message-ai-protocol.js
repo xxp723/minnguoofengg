@@ -1254,8 +1254,26 @@ export function buildAiReplyMessages(rawText, state, options = {}) {
   const protocolBlocks = extractAiProtocolBlocks(rawText);
   const detectedHtmlCardBlocks = extractHtmlCardProtocolBlocks(rawText);
   const htmlCardBlocks = htmlCardFeatureEnabled ? detectedHtmlCardBlocks : [];
+  
+  /* ========================================================================
+     [区域标注·本次修改·电话功能] 检测当前是否在通话中
+     说明：遍历当前 currentMessages 确认最后一条 phone_start/end system，
+           从而判断出当前是否在通话页面。
+     ======================================================================== */
+  let inPhoneCall = false;
+  if (state && Array.isArray(state.currentMessages)) {
+    for (let i = state.currentMessages.length - 1; i >= 0; i--) {
+      const msg = state.currentMessages[i];
+      if (msg.type === 'phone_end_system') break;
+      if (msg.type === 'phone_start_system') {
+        inPhoneCall = true;
+        break;
+      }
+    }
+  }
+
   if (!protocolBlocks.length && !htmlCardBlocks.length) {
-    if (/(?:\[\s*语音\s*\]|【\s*语音\s*】)/i.test(String(rawText || ''))) {
+    if (!inPhoneCall && /(?:\[\s*语音\s*\]|【\s*语音\s*】)/i.test(String(rawText || ''))) {
       const voicePayload = parseAiVoiceProtocolPayload(rawText);
       if (voicePayload) {
         return enforceAiReplyMessageCount([{
@@ -1267,34 +1285,36 @@ export function buildAiReplyMessages(rawText, state, options = {}) {
       }
     }
 
-    if (textImageProtocolEnabled && /(?:\[\s*文字图\s*\]|【\s*文字图\s*】)/i.test(String(rawText || ''))) {
+    if (!inPhoneCall && textImageProtocolEnabled && /(?:\[\s*文字图\s*\]|【\s*文字图\s*】)/i.test(String(rawText || ''))) {
       const textImageMessage = createAiTextImageMessageFromProtocol(rawText);
       if (textImageMessage) {
         return enforceAiReplyMessageCount([textImageMessage], state.chatPromptSettings);
       }
     }
 
-    const repairedSticker = findLooseStickerTargetFromText(rawText, state);
-    if (repairedSticker) {
-      return enforceAiReplyMessageCount([{
-        role: 'assistant',
-        type: 'sticker',
-        content: `[表情包] ${repairedSticker.name}`,
-        stickerId: repairedSticker.id,
-        stickerName: repairedSticker.name,
-        stickerUrl: repairedSticker.url
-      }], state.chatPromptSettings);
-    } else if (/(?:\[\s*(?:表情包|表情)\s*\]|【\s*(?:表情包|表情)\s*】)/i.test(String(rawText || ''))) {
-      /* [区域标注·本次修改] 单独一条未能命中正则匹配的情况下，如果明显是表情包意图也做兜底 */
-      const textContent = String(rawText || '').replace(/(?:\[\s*(?:表情包|表情)\s*\]|【\s*(?:表情包|表情)\s*】)/i, '').trim() || '未识别表情';
-      return enforceAiReplyMessageCount([{
-        role: 'assistant',
-        type: 'sticker',
-        content: `[表情包] ${textContent}`,
-        stickerId: '',
-        stickerName: textContent,
-        stickerUrl: ''
-      }], state.chatPromptSettings);
+    if (!inPhoneCall) {
+      const repairedSticker = findLooseStickerTargetFromText(rawText, state);
+      if (repairedSticker) {
+        return enforceAiReplyMessageCount([{
+          role: 'assistant',
+          type: 'sticker',
+          content: `[表情包] ${repairedSticker.name}`,
+          stickerId: repairedSticker.id,
+          stickerName: repairedSticker.name,
+          stickerUrl: repairedSticker.url
+        }], state.chatPromptSettings);
+      } else if (/(?:\[\s*(?:表情包|表情)\s*\]|【\s*(?:表情包|表情)\s*】)/i.test(String(rawText || ''))) {
+        /* [区域标注·本次修改] 单独一条未能命中正则匹配的情况下，如果明显是表情包意图也做兜底 */
+        const textContent = String(rawText || '').replace(/(?:\[\s*(?:表情包|表情)\s*\]|【\s*(?:表情包|表情)\s*】)/i, '').trim() || '未识别表情';
+        return enforceAiReplyMessageCount([{
+          role: 'assistant',
+          type: 'sticker',
+          content: `[表情包] ${textContent}`,
+          stickerId: '',
+          stickerName: textContent,
+          stickerUrl: ''
+        }], state.chatPromptSettings);
+      }
     }
 
     return enforceAiReplyMessageCount(
@@ -1386,49 +1406,57 @@ export function buildAiReplyMessages(rawText, state, options = {}) {
 
     /* [区域标注·本次修改] 增加表情包协议兜底处理与 `[表情包]` 标签支持 */
     if (block.type === '表情' || block.type === '表情包') {
-      const sticker = resolveStickerProtocolTarget(block.content, state) || findLooseStickerTargetFromText(block.content, state);
-      if (sticker) {
-        builtMessages.push({
-          role: 'assistant',
-          type: 'sticker',
-          content: `[表情包] ${sticker.name}`,
-          stickerId: sticker.id,
-          stickerName: sticker.name,
-          stickerUrl: sticker.url,
-          __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
-          __protocolEndIndex: block.__protocolEndIndex
-        });
-      } else {
-        // 当无法匹配本地表情包资源时，兜底生成不带 url 的占位表情包，防止格式退化
-        const fallbackName = cleanAiVisibleBubbleText(block.content).trim() || '未识别表情';
-        builtMessages.push({
-          role: 'assistant',
-          type: 'sticker',
-          content: `[表情包] ${fallbackName}`,
-          stickerId: '',
-          stickerName: fallbackName,
-          stickerUrl: '',
-          __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
-          __protocolEndIndex: block.__protocolEndIndex
-        });
+      /* ========================================================================
+         [区域标注·本次修改·电话功能] 拦截表情包
+         说明：通话中禁用所有表情包，跳过处理，不渲染为气泡。
+         ======================================================================== */
+      if (!inPhoneCall) {
+        const sticker = resolveStickerProtocolTarget(block.content, state) || findLooseStickerTargetFromText(block.content, state);
+        if (sticker) {
+          builtMessages.push({
+            role: 'assistant',
+            type: 'sticker',
+            content: `[表情包] ${sticker.name}`,
+            stickerId: sticker.id,
+            stickerName: sticker.name,
+            stickerUrl: sticker.url,
+            __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
+            __protocolEndIndex: block.__protocolEndIndex
+          });
+        } else {
+          // 当无法匹配本地表情包资源时，兜底生成不带 url 的占位表情包，防止格式退化
+          const fallbackName = cleanAiVisibleBubbleText(block.content).trim() || '未识别表情';
+          builtMessages.push({
+            role: 'assistant',
+            type: 'sticker',
+            content: `[表情包] ${fallbackName}`,
+            stickerId: '',
+            stickerName: fallbackName,
+            stickerUrl: '',
+            __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
+            __protocolEndIndex: block.__protocolEndIndex
+          });
+        }
       }
       return;
     }
 
     if (block.type === '语音') {
-      const voiceMessage = createAiVoiceMessageFromProtocol(block);
-      if (voiceMessage) {
-        builtMessages.push({
-          ...voiceMessage,
-          __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
-          __protocolEndIndex: block.__protocolEndIndex
-        });
+      if (!inPhoneCall) {
+        const voiceMessage = createAiVoiceMessageFromProtocol(block);
+        if (voiceMessage) {
+          builtMessages.push({
+            ...voiceMessage,
+            __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
+            __protocolEndIndex: block.__protocolEndIndex
+          });
+        }
       }
       return;
     }
 
     if (block.type === '文字图') {
-      if (textImageProtocolEnabled) {
+      if (!inPhoneCall && textImageProtocolEnabled) {
         const textImageMessage = createAiTextImageMessageFromProtocol(block.content);
         if (textImageMessage) {
           builtMessages.push({
@@ -1442,66 +1470,80 @@ export function buildAiReplyMessages(rawText, state, options = {}) {
     }
 
     if (block.type === '图片') {
-      hasImageGenerationProtocol = true;
+      if (!inPhoneCall) {
+        hasImageGenerationProtocol = true;
+      }
       return;
     }
 
     if (block.type === '转账') {
-      const transferPayload = parseAiTransferProtocolPayload(block.content);
-      if (transferPayload) {
-        builtMessages.push({
-          role: 'assistant',
-          type: 'transfer',
-          transferDirection: 'incoming',
-          transferStatus: 'pending',
-          transferCounterpartyName: String(block.roleName || '').trim(),
-          ...transferPayload,
-          __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
-          __protocolEndIndex: block.__protocolEndIndex
-        });
+      if (!inPhoneCall) {
+        const transferPayload = parseAiTransferProtocolPayload(block.content);
+        if (transferPayload) {
+          builtMessages.push({
+            role: 'assistant',
+            type: 'transfer',
+            transferDirection: 'incoming',
+            transferStatus: 'pending',
+            transferCounterpartyName: String(block.roleName || '').trim(),
+            ...transferPayload,
+            __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
+            __protocolEndIndex: block.__protocolEndIndex
+          });
+        }
       }
       return;
     }
 
     if (block.type === '礼物') {
-      const giftMessage = createAiGiftMessageFromProtocol(block);
-      if (giftMessage) {
-        builtMessages.push({
-          ...giftMessage,
-          __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
-          __protocolEndIndex: block.__protocolEndIndex
-        });
+      if (!inPhoneCall) {
+        const giftMessage = createAiGiftMessageFromProtocol(block);
+        if (giftMessage) {
+          builtMessages.push({
+            ...giftMessage,
+            __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
+            __protocolEndIndex: block.__protocolEndIndex
+          });
+        }
       }
       return;
     }
 
     if (block.type === '红包') {
-      const redPacketPayload = parseAiRedPacketProtocolPayload(block.content);
-      if (redPacketPayload) {
-        builtMessages.push({
-          role: 'assistant',
-          type: 'red_packet',
-          redPacketStatus: 'pending',
-          ...redPacketPayload,
-          redPacketPayer: String(block.roleName || '').trim() || redPacketPayload.redPacketPayer || '对方',
-          __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
-          __protocolEndIndex: block.__protocolEndIndex
-        });
+      /* ========================================================================
+         [区域标注·本次修改·电话功能] 拦截红包
+         说明：通话中禁用红包。
+         ======================================================================== */
+      if (!inPhoneCall) {
+        const redPacketPayload = parseAiRedPacketProtocolPayload(block.content);
+        if (redPacketPayload) {
+          builtMessages.push({
+            role: 'assistant',
+            type: 'red_packet',
+            redPacketStatus: 'pending',
+            ...redPacketPayload,
+            redPacketPayer: String(block.roleName || '').trim() || redPacketPayload.redPacketPayer || '对方',
+            __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
+            __protocolEndIndex: block.__protocolEndIndex
+          });
+        }
       }
       return;
     }
 
     if (block.type === '外卖') {
-      const takeawayPayload = parseAiTakeawayProtocolPayload(block.content);
-      if (takeawayPayload) {
-        builtMessages.push({
-          role: 'assistant',
-          type: 'takeaway',
-          takeawayStatus: 'pending',
-          ...takeawayPayload,
-          __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
-          __protocolEndIndex: block.__protocolEndIndex
-        });
+      if (!inPhoneCall) {
+        const takeawayPayload = parseAiTakeawayProtocolPayload(block.content);
+        if (takeawayPayload) {
+          builtMessages.push({
+            role: 'assistant',
+            type: 'takeaway',
+            takeawayStatus: 'pending',
+            ...takeawayPayload,
+            __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
+            __protocolEndIndex: block.__protocolEndIndex
+          });
+        }
       }
       return;
     }
@@ -1563,7 +1605,7 @@ export function buildAiReplyMessages(rawText, state, options = {}) {
     });
   });
 
-  if (htmlCardBlocks.length) {
+  if (!inPhoneCall && htmlCardBlocks.length) {
     hasHtmlCardProtocol = true;
     htmlCardBlocks.forEach((block, index) => {
       const safeHtml = String(block?.html || '').trim();
