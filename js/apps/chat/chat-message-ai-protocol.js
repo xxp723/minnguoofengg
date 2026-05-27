@@ -184,7 +184,7 @@ export function repairAiMessageFormatIfPossible(message, state) {
 /* ======================================================================== */
 /* 协议清理与排序 */
 /* ======================================================================== */
-const AI_PROTOCOL_CLOSING_TAG_REGEX = /(?:\[\s*\/\s*(?:回复|表情|转账|礼物|红包|外卖|引用|撤回|拍一拍|语音|文字图|图片|卡片|旁白|心声)\s*\]|【\s*\/\s*(?:语音|文字图)\s*】)/gi;
+const AI_PROTOCOL_CLOSING_TAG_REGEX = /(?:\[\s*\/\s*(?:回复|表情包|表情|转账|礼物|红包|外卖|引用|撤回|拍一拍|语音|文字图|图片|卡片|旁白|心声)\s*\]|【\s*\/\s*(?:语音|文字图)\s*】)/gi;
 
 function stripAiProtocolClosingTags(value = '') {
   return String(value || '').replace(AI_PROTOCOL_CLOSING_TAG_REGEX, ' ');
@@ -245,7 +245,7 @@ export function cleanAiVisibleBubbleText(text) {
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
     .replace(/<\/?think>/gi, '')
     .replace(/^\s*(?:以下是)?(?:修正后内容|最终输出|回复格式|检查结果|修正结果|正确格式)\s*[：:]\s*/i, '')
-    .replace(/^\s*(?:\*\*)?\s*`?\s*\[\s*(?:回复|表情|引用|礼物|红包|外卖|转账|撤回|拍一拍|语音|文字图|图片)\s*\]\s*(?:[^：:\n`*]{1,40}\s*[：:]\s*)?/i, '')
+    .replace(/^\s*(?:\*\*)?\s*`?\s*\[\s*(?:回复|表情包|表情|引用|礼物|红包|外卖|转账|撤回|拍一拍|语音|文字图|图片)\s*\]\s*(?:[^：:\n`*]{1,40}\s*[：:]\s*)?/i, '')
     .replace(/^\s*\{(?:user|assistant|role|character|mask)_[^}\n]{3,120}\}\s*/i, '')
     .replace(/(?:`|\*\*)+/g, '')
     .replace(/\[\s*消息发送时间\s*[：:][\s\S]*?\]/gi, ' ')
@@ -1152,7 +1152,7 @@ export function extractAiProtocolBlocks(rawText) {
     .trim();
   if (!visibleText) return [];
 
-  const markerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情|转账|礼物|红包|外卖|引用|撤回|拍一拍|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
+  const markerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情包|表情|转账|礼物|红包|外卖|引用|撤回|拍一拍|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
   const matches = [...visibleText.matchAll(markerRegex)];
   if (!matches.length) return [];
 
@@ -1213,7 +1213,7 @@ export function bindAsideSegmentsToAiMessages(aiMessages = [], asideSegments = [
   }
 
   const source = String(rawTextWithAside || '');
-  const protocolMarkerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情|转账|礼物|红包|外卖|引用|撤回|拍一拍|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
+  const protocolMarkerRegex = /(?:\*\*)?\s*`?\s*(?:\[\s*(回复|表情包|表情|转账|礼物|红包|外卖|引用|撤回|拍一拍|语音|文字图|图片|卡片)\s*\]|【\s*(语音|文字图)\s*】)\s*/g;
   const protocolMarkers = [...source.matchAll(protocolMarkerRegex)]
     .map(match => Number(match.index || 0))
     .sort((a, b) => a - b);
@@ -1274,6 +1274,17 @@ export function buildAiReplyMessages(rawText, state, options = {}) {
         stickerId: repairedSticker.id,
         stickerName: repairedSticker.name,
         stickerUrl: repairedSticker.url
+      }], state.chatPromptSettings);
+    } else if (/(?:\[\s*(?:表情包|表情)\s*\]|【\s*(?:表情包|表情)\s*】)/i.test(String(rawText || ''))) {
+      /* [区域标注·本次修改] 单独一条未能命中正则匹配的情况下，如果明显是表情包意图也做兜底 */
+      const textContent = String(rawText || '').replace(/(?:\[\s*(?:表情包|表情)\s*\]|【\s*(?:表情包|表情)\s*】)/i, '').trim() || '未识别表情';
+      return enforceAiReplyMessageCount([{
+        role: 'assistant',
+        type: 'sticker',
+        content: `[表情包] ${textContent}`,
+        stickerId: '',
+        stickerName: textContent,
+        stickerUrl: ''
       }], state.chatPromptSettings);
     }
 
@@ -1342,7 +1353,8 @@ export function buildAiReplyMessages(rawText, state, options = {}) {
       return;
     }
 
-    if (block.type === '表情') {
+    /* [区域标注·本次修改] 增加表情包协议兜底处理与 `[表情包]` 标签支持 */
+    if (block.type === '表情' || block.type === '表情包') {
       const sticker = resolveStickerProtocolTarget(block.content, state) || findLooseStickerTargetFromText(block.content, state);
       if (sticker) {
         builtMessages.push({
@@ -1352,6 +1364,19 @@ export function buildAiReplyMessages(rawText, state, options = {}) {
           stickerId: sticker.id,
           stickerName: sticker.name,
           stickerUrl: sticker.url,
+          __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
+          __protocolEndIndex: block.__protocolEndIndex
+        });
+      } else {
+        // 当无法匹配本地表情包资源时，兜底生成不带 url 的占位表情包，防止格式退化
+        const fallbackName = cleanAiVisibleBubbleText(block.content).trim() || '未识别表情';
+        builtMessages.push({
+          role: 'assistant',
+          type: 'sticker',
+          content: `[表情包] ${fallbackName}`,
+          stickerId: '',
+          stickerName: fallbackName,
+          stickerUrl: '',
           __protocolOrder: getAiRuntimeProtocolOrder(block, builtMessages.length),
           __protocolEndIndex: block.__protocolEndIndex
         });
