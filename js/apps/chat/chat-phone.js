@@ -112,7 +112,7 @@ function bindPhoneEvents() {
      [区域标注·本次修改·电话消息发送优化] 
      说明：修复发送后电话页没马上显示消息的问题。
            无论是否 triggerAi，都先 skipAppendUser=false 把消息入列并立刻 updatePhoneUI()；
-           如果是点击纸飞机(triggerAi=true)，再另外用 skipAppendUser=true 去请求AI。
+           如果是点击纸飞机(triggerAi=true)，则在 sendMessage 中将 triggerAi 设置为 true。
      ======================================================================== */
   const sendPhoneMessage = async (triggerAi = false) => {
     const text = input.value.trim();
@@ -120,17 +120,16 @@ function bindPhoneEvents() {
 
     input.value = '';
     
-    // 1. 先只把用户消息写进 currentMessages 并立即刷新界面
-    await sendMessage(_container, state, _db, text, _settingsManager, { triggerAi: false });
+    // 如果 triggerAi 为 true，则直接发送内容并触发 AI
+    // 否则只发送内容入列，不触发 AI
+    if (triggerAi) {
+      await sendMessage(_container, state, _db, text, _settingsManager, { triggerAi: true });
+    } else {
+      await sendMessage(_container, state, _db, text, _settingsManager, { triggerAi: false });
+    }
+    
     updatePhoneUI();
     scrollToBottom();
-
-    // 2. 如果是点纸飞机，则请求 AI 回复
-    if (triggerAi) {
-      await sendMessage(_container, state, _db, '', _settingsManager, { skipAppendUser: true, triggerAi: true });
-      updatePhoneUI();
-      scrollToBottom();
-    }
   };
 
   btnSend.addEventListener('click', () => {

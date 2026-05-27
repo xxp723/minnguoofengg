@@ -673,10 +673,26 @@ function renderLoadMoreChatMessagesHtml(hiddenMessageCount = 0, nextLoadCount = 
 function renderChatMessageListHtml(session = {}, messages = [], options = {}) {
   const {
     allMessages,
-    visibleMessages: msgs,
+    visibleMessages: rawMsgs,
     hiddenMessageCount,
     nextLoadCount
   } = getVisibleChatMessagesForRender(messages, options);
+
+  const msgs = [];
+  let inPhoneCall = false;
+  for (const msg of rawMsgs) {
+    if (String(msg?.type || '') === 'phone_start_system') {
+      inPhoneCall = true;
+      continue;
+    }
+    if (String(msg?.type || '') === 'phone_end_system') {
+      inPhoneCall = false;
+      msgs.push(msg); // 让主聊天记录显示“通话结束及通话时长”气泡
+      continue;
+    }
+    if (inPhoneCall) continue; // 折叠/隐藏通话期间的聊天气泡
+    msgs.push(msg);
+  }
 
   if (allMessages.length === 0) {
     return `<div class="msg-empty">${MSG_ICONS.emptyChat}<p>还没有消息<br>发送一条消息开始聊天吧</p></div>`;
