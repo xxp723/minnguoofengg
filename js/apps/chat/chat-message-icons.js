@@ -42,9 +42,9 @@ export const MSG_ICONS = {
 
   /* ========================================================================
      [区域标注·本次修改·电话功能] IconPark — 电话按钮图标
-     说明：用于聊天消息页咖啡功能区第三行"电话"板块，图标来源保持 IconPark 风格。
+     说明：用于聊天消息页咖啡功能区第三行"电话"板块，图标改为座机电话筒样式。
      ======================================================================== */
-  phone: `<svg viewBox="0 0 48 48" fill="none"><path d="M8 30H4V14h4a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M40 30h4V14h-4a4 4 0 0 0-4 4v8a4 4 0 0 0 4 4Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M24 16v16" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="12" y="6" width="24" height="36" rx="4" stroke="currentColor" stroke-width="3"/><path d="M22 36h4" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+  phone: `<svg viewBox="0 0 48 48" fill="none"><path d="M9 16c-3 0-5 2.5-5 5.5v11C4 35.5 6 38 9 38h30c3 0 5-2.5 5-5.5v-11c0-3-2-5.5-5-5.5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 16v-6c0-3.3 2.7-6 6-6h12c3.3 0 6 2.7 6 6v6" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="27" r="2" fill="currentColor"/><circle cx="24" cy="27" r="2" fill="currentColor"/><circle cx="32" cy="27" r="2" fill="currentColor"/></svg>`,
 
   /* ==========================================================================
      [区域标注·本次修改3] 消息气泡功能栏 IconPark 图标

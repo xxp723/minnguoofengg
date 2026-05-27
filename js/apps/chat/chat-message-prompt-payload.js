@@ -94,6 +94,19 @@ export function buildPromptPayloadForLatestUserRound(messages = [], shortTermMem
 
   const getAiVisibleContentForMessage = (item = {}, options = {}) => {
     /* ========================================================================
+       [区域标注·本次修改·电话功能] 电话状态特殊处理
+       说明：
+       1. 对于 phone_start_system 消息，如果是历史摘要，只返回“[电话通话开始]”。
+       2. 对于 phone_end_system 消息，如果是历史摘要，只返回内容本身（时长）。
+       ======================================================================== */
+    if (String(item?.type || '') === 'phone_start_system') {
+      return '[电话通话开始]';
+    }
+    if (String(item?.type || '') === 'phone_end_system') {
+      return String(item?.content || '').trim() || '[电话通话结束]';
+    }
+
+    /* ========================================================================
        [区域标注·已完成·本次修改·拍一拍方向识别修复]
        说明：
        1. user_pat_system 显示层仍是系统提示小字，AI 请求层在这里补充解释。
@@ -182,10 +195,31 @@ export function buildPromptPayloadForLatestUserRound(messages = [], shortTermMem
     return baseContent;
   };
 
-  const userInput = currentRoundMessages.map((item, index) => {
+  let userInput = currentRoundMessages.map((item, index) => {
     const content = getAiVisibleContentForMessage(item, { historySummary: false });
     return currentRoundMessages.length > 1 ? `第${index + 1}条：${content}` : content;
   }).join('\n');
+
+  /* ========================================================================
+     [区域标注·本次修改·电话功能] 电话模式当轮提示注入
+     说明：
+     1. 如果最近的一条系统提示是 phone_start_system，说明当前正在通话中。
+     2. 此时在 userInput 前方注入系统提示，禁止动作描写并禁用特殊协议。
+     ======================================================================== */
+  let isPhoneMode = false;
+  for (let i = normalized.length - 1; i >= 0; i--) {
+    if (normalized[i].type === 'phone_start_system') {
+      isPhoneMode = true;
+      break;
+    }
+    if (normalized[i].type === 'phone_end_system') {
+      break;
+    }
+  }
+
+  if (isPhoneMode) {
+    userInput = `【系统提示：你们现在正在打电话，纯线上语音通话，看不到对方。请根据现有设定自然对话。你可以正常思考，但禁止任何动作描写，并且必须禁用所有的特殊消息交互协议（绝对禁止发图片、表情包、红包、转账、外卖等），只能发送纯文字语音回复。】\n\n${userInput}`;
+  }
 
   const roundLimit = Math.max(0, Math.floor(Number(shortTermMemoryRounds)) || 0);
   const currentRoundMessageIds = new Set(currentRoundMessages.map(item => String(item?.id || '')).filter(Boolean));

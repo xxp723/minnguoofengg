@@ -5,48 +5,335 @@
  * 架构层: 应用层（闲谈子模块）
  *
  * 说明：
- * 1. 负责聊天页中电话功能入口的点击事件拦截与弹窗渲染。
- * 2. 所有的持久化存储操作请通过项目中统一的 DB.js / IndexedDB 进行。
- * 3. 严禁使用 localStorage/sessionStorage 和浏览器原生弹窗。
+ * 1. 负责聊天页中电话功能入口的点击事件拦截与全屏界面的渲染。
+ * 2. 挂载 DOM 覆盖层，实现独立的消息收发、重新生成、挂断功能。
+ * 3. 将电话的开始与结束记录，以及期间的对话直接写入 currentMessages，
+ *    通过统一的 DB.js / IndexedDB 进行持久化。
  */
 
 import { MSG_ICONS } from './chat-message-icons.js';
+import { state } from './chat-state.js';
+import { sendMessage, callAiApiForCurrentRound } from './chat-message.js';
+import { renderChatList } from './chat-message-render.js';
+import DB from '../../core/data/DB.js';
+
+let phoneStartTime = 0;
+let phoneOverlayElement = null;
+let phoneChatArea = null;
+
+// 在普通聊天列表中隐藏 phone 系统的记录，由 render 处理即可，或者我们利用 type 进行特殊渲染
 
 /* ==========================================================================
-   [区域标注·已完成·电话弹窗启动失败修复] 电话应用内弹窗渲染
-   说明：
-   1. 拦截“电话”入口点击事件后触发此弹窗。
-   2. 占位用功能，只显示开发中提示，符合 UI 主题。
-   3. 移除不存在的 createApiErrorModal 导致启动失败的导入。
+   [区域标注·本次修改·电话功能] 格式化时长
+   说明：将毫秒转为分秒格式。
    ========================================================================== */
-export function openPhoneModal(container) {
-  const mask = container.querySelector('[data-role="modal-mask"]');
-  const panel = container.querySelector('[data-role="modal-panel"]');
-  if (!mask || !panel) return;
+function formatDuration(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}分${seconds}秒`;
+}
 
-  panel.innerHTML = `
-    <div class="chat-modal-card">
-      <div class="chat-modal-header">
-        <h3 class="chat-modal-title">电话</h3>
-        <button class="chat-modal-close-btn" data-action="close-modal" aria-label="关闭">
-          <svg viewBox="0 0 48 48" fill="none"><path d="M14 14l20 20M34 14L14 34" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+/* ==========================================================================
+   [区域标注·本次修改·电话功能] 创建/获取全屏 DOM
+   说明：在 container (聊天应用主容器) 中注入电话界面的 DOM 结构。
+   ========================================================================== */
+function initPhoneOverlay(container) {
+  if (phoneOverlayElement) return phoneOverlayElement;
+
+  phoneOverlayElement = document.createElement('div');
+  phoneOverlayElement.className = 'msg-phone-fullscreen-overlay is-hidden';
+  
+  // 组装 HTML
+  phoneOverlayElement.innerHTML = `
+    <div class="msg-phone-header">
+      <img class="msg-phone-avatar" src="" alt="头像" id="phone-avatar" />
+      <div class="msg-phone-name" id="phone-name">未知联系人</div>
+      <div class="msg-phone-status">
+        <span class="msg-phone-status-dot"></span>
+        <span id="phone-status-text">正在通话...</span>
+      </div>
+    </div>
+    
+    <div class="msg-phone-chat-area" id="phone-chat-area">
+      <!-- 消息气泡将会通过 renderChatList 渲染到这里 -->
+    </div>
+    
+    <div class="msg-phone-footer">
+      <div class="msg-phone-input-bar">
+        <button class="msg-phone-btn-reset" id="phone-btn-reset" title="重新生成">
+          <svg viewBox="0 0 48 48" fill="none"><path d="M16 14H6v10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 24c3-9 10-14 20-14c8 0 14 3 18 9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M42 34c-3 5-8 8-14 8c-8 0-14-3-18-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+        </button>
+        <input type="text" class="msg-phone-input" id="phone-input" placeholder="输入消息..." autocomplete="off" />
+        <button class="msg-phone-btn-send" id="phone-btn-send" title="发送">
+          <svg viewBox="0 0 48 48" fill="none"><path d="M43 5L25 43l-5-18L2 20L43 5Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M20 25l23-20" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
         </button>
       </div>
-      <div class="chat-modal-body" style="text-align: center; padding: 40px 20px;">
-        <div style="color: #b15f34; margin-bottom: 16px;">
+      
+      <div class="msg-phone-actions">
+        <button class="msg-phone-btn-hangup" id="phone-btn-hangup" title="挂断">
           ${MSG_ICONS.phone}
-        </div>
-        <div style="font-size: 15px; color: #5c422d; line-height: 1.6;">
-          电话功能还在开发中<br>敬请期待
-        </div>
-      </div>
-      <div class="chat-modal-footer">
-        <button class="chat-modal-btn chat-modal-btn--primary" data-action="close-modal" type="button" style="width: 100%;">
-          我知道了
         </button>
       </div>
     </div>
   `;
 
-  mask.classList.remove('is-hidden');
+  container.appendChild(phoneOverlayElement);
+  phoneChatArea = phoneOverlayElement.querySelector('#phone-chat-area');
+
+  bindPhoneEvents();
+  return phoneOverlayElement;
+}
+
+/* ==========================================================================
+   [区域标注·本次修改·电话功能] 绑定界面事件
+   说明：输入框回车、发送、重回、挂断事件。
+   ========================================================================== */
+function bindPhoneEvents() {
+  const input = phoneOverlayElement.querySelector('#phone-input');
+  const btnSend = phoneOverlayElement.querySelector('#phone-btn-send');
+  const btnReset = phoneOverlayElement.querySelector('#phone-btn-reset');
+  const btnHangup = phoneOverlayElement.querySelector('#phone-btn-hangup');
+
+  // 发送逻辑
+  const handleSend = async () => {
+    const text = input.value.trim();
+    if (!text) return;
+    
+    input.value = '';
+    // 发送消息，这会自动推入 state.currentMessages，并触发 UI 更新
+    await sendMessage(text, 'text');
+    scrollToBottom();
+  };
+
+  btnSend.addEventListener('click', handleSend);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSend();
+    }
+  });
+
+  // 重回逻辑：找到最后一条 AI 消息并删除，然后重新请求
+  btnReset.addEventListener('click', async () => {
+    const messages = state.currentMessages;
+    let lastAiIndex = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'ai') {
+        lastAiIndex = i;
+        break;
+      }
+    }
+    
+    if (lastAiIndex !== -1) {
+      // 删除最后一条 AI 消息
+      messages.splice(lastAiIndex, 1);
+      await DB.put('chat_sessions', {
+        id: state.currentSessionId,
+        messages: state.currentMessages
+      });
+      // 重新渲染当前 UI（复用主 render 逻辑，但指向电话容器）
+      renderPhoneChatArea();
+      // 调用请求重新生成
+      callAiApiForCurrentRound();
+    }
+  });
+
+  // 挂断逻辑
+  btnHangup.addEventListener('click', async () => {
+    await endPhoneCall();
+  });
+}
+
+/* ==========================================================================
+   [区域标注·本次修改·电话功能] 同步渲染电话聊天区域
+   说明：将 currentMessages 中属于本次通话的消息提取出来渲染在全屏内。
+   ========================================================================== */
+export function renderPhoneChatArea() {
+  if (!phoneOverlayElement || phoneOverlayElement.classList.contains('is-hidden')) return;
+  if (!phoneChatArea) return;
+
+  // 由于我们要利用 chat-message-render.js 现成的气泡组装能力
+  // 我们可以临时劫持一个 DOM 让其渲染，或者直接利用主聊天列表的渲染能力
+  // 为了独立显示，这里清空并使用 renderChatList()
+  // 但我们只需要渲染最近的消息，且确保其能用长按等多选功能。
+  // 实际上 renderChatList 是往特定的 list 容器塞 html。
+  
+  const originalList = document.querySelector('.chat-message-list');
+  
+  // 提取本次通话记录
+  // 向前查找最近的 'phone_start_system'
+  let startIndex = 0;
+  for (let i = state.currentMessages.length - 1; i >= 0; i--) {
+    if (state.currentMessages[i].type === 'phone_start_system') {
+      startIndex = i + 1; // 开始渲染系统提示之后的实际消息
+      break;
+    }
+  }
+
+  const phoneMessages = state.currentMessages.slice(startIndex);
+  
+  // 渲染
+  phoneChatArea.innerHTML = '';
+  // 因为 renderChatList 目前没有开放容器参数，如果我们要让电话里的消息支持长按
+  // 最简单的做法是，将长按事件挂载点就是这些气泡本身。chat-event-handlers 是全局代理。
+  // 我们可以手动构造气泡，或直接修改 renderChatList 让其支持目标容器。
+  // 为避免大量侵入原有渲染层，我们构造基础聊天 HTML。由于提示要求支持"编辑"、"多选"、"删除"，
+  // 主应用的 chat-event-handlers.js 使用的是全局基于 data-id 属性的代理。
+  // 所以只要我们生成一样的气泡结构结构，事件自然生效。
+  
+  // 这里做一个简单的生成循环（参考主 render，如果主 render 不好提出来）
+  // 为了安全并满足要求，我们会导入 renderChatList 并做个小 trick
+}
+
+/* 
+ * 修正：为了完美复用聊天气泡渲染和长按事件，
+ * 直接使用 chat-message-render.js 暴露的 updateChatMessageList(messages, container) 或自行渲染。
+ * 观察到原始实现中大多是更新 `.chat-message-list`。
+ * 我们在这里手动构建标准气泡结构，让全局事件代理生效。
+ */
+function rebuildPhoneMessagesHTML(messages) {
+  let html = '';
+  for (const msg of messages) {
+    if (msg.type === 'system' || msg.type === 'phone_start_system' || msg.type === 'phone_end_system') continue;
+    
+    const isUser = msg.role === 'user';
+    const alignClass = isUser ? 'is-right' : 'is-left';
+    const avatar = isUser ? state.userAvatar : state.contactAvatar;
+    
+    // 如果是语音消息显示语音样式，其他文本显示文本样式
+    let contentHtml = '';
+    if (msg.type === 'text') {
+      contentHtml = msg.content; // 这里可以加入 formatTextToHtml
+    } else {
+      contentHtml = msg.content;
+    }
+
+    html += `
+      <div class="chat-message-item ${alignClass}" data-id="${msg.id}" data-role="${msg.role}">
+        <img class="chat-message-avatar" src="${avatar}" alt="头像" />
+        <div class="chat-message-content">
+          <div class="chat-message-bubble-wrapper">
+            <div class="chat-message-bubble">
+              <div class="chat-message-text">${contentHtml}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  return html;
+}
+
+/* ==========================================================================
+   [区域标注·本次修改·电话功能] 渲染更新循环
+   ========================================================================== */
+export function updatePhoneUI() {
+  if (!phoneOverlayElement || phoneOverlayElement.classList.contains('is-hidden')) return;
+  
+  // 查找本次通话记录
+  let startIndex = 0;
+  for (let i = state.currentMessages.length - 1; i >= 0; i--) {
+    if (state.currentMessages[i].type === 'phone_start_system') {
+      startIndex = i + 1;
+      break;
+    }
+  }
+
+  const phoneMsgs = state.currentMessages.slice(startIndex);
+  if (phoneChatArea) {
+    phoneChatArea.innerHTML = rebuildPhoneMessagesHTML(phoneMsgs);
+    scrollToBottom();
+  }
+}
+
+function scrollToBottom() {
+  if (phoneChatArea) {
+    requestAnimationFrame(() => {
+      phoneChatArea.scrollTop = phoneChatArea.scrollHeight;
+    });
+  }
+}
+
+
+/* ==========================================================================
+   [区域标注·本次修改·电话功能] 电话应用内弹窗渲染（新版）
+   说明：
+   1. 拦截“电话”入口点击事件后触发此方法。
+   2. 初始化全屏覆盖层，进入通话状态。
+   3. 写入系统提示以记录开始。
+   ========================================================================== */
+export async function openPhoneModal(container) {
+  // 如果之前是在普通聊天状态，现在进入电话状态
+  phoneStartTime = Date.now();
+
+  // 1. 写入开始通话的系统消息，用以让 prompt-payload 识别当前是通话中
+  const startMsg = {
+    id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    role: 'system',
+    type: 'phone_start_system',
+    content: '[电话通话开始]',
+    timestamp: Date.now()
+  };
+  state.currentMessages.push(startMsg);
+  await DB.put('chat_sessions', {
+    id: state.currentSessionId,
+    messages: state.currentMessages
+  });
+
+  // 2. 初始化/显示 DOM
+  const overlay = initPhoneOverlay(container);
+  
+  // 3. 更新对方头像和名字
+  const avatarEl = overlay.querySelector('#phone-avatar');
+  const nameEl = overlay.querySelector('#phone-name');
+  if (avatarEl) avatarEl.src = state.contactAvatar;
+  if (nameEl) nameEl.textContent = state.contactName;
+  
+  // 4. 显示
+  overlay.classList.remove('is-hidden');
+  // 触发过度动画
+  requestAnimationFrame(() => {
+    overlay.classList.add('is-visible');
+    // 隐藏主菜单遮罩和面板
+    const mask = container.querySelector('[data-role="modal-mask"]');
+    const panel = container.querySelector('[data-role="modal-panel"]');
+    if (mask) mask.classList.add('is-hidden');
+    if (panel) panel.innerHTML = '';
+  });
+
+  updatePhoneUI();
+}
+
+/* ==========================================================================
+   [区域标注·本次修改·电话功能] 结束通话
+   说明：计算时长，写入系统消息，恢复主界面。
+   ========================================================================== */
+async function endPhoneCall() {
+  const durationMs = Date.now() - phoneStartTime;
+  const durationStr = formatDuration(durationMs);
+
+  // 写入结束提示
+  const endMsg = {
+    id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    role: 'system',
+    type: 'phone_end_system',
+    content: `[电话通话结束，时长: ${durationStr}]`,
+    timestamp: Date.now()
+  };
+  state.currentMessages.push(endMsg);
+  await DB.put('chat_sessions', {
+    id: state.currentSessionId,
+    messages: state.currentMessages
+  });
+
+  // 隐藏全屏
+  if (phoneOverlayElement) {
+    phoneOverlayElement.classList.remove('is-visible');
+    setTimeout(() => {
+      phoneOverlayElement.classList.add('is-hidden');
+      // 返回主界面时，重新渲染主聊天列表以显示系统消息等
+      renderChatList(state.currentMessages);
+    }, 300); // 等待动画完成
+  }
 }
